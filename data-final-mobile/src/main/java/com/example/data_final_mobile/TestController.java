@@ -8,6 +8,6 @@ public class TestController {
 
     @GetMapping("/api/test")
     public String getTestData() {
-        return "Backend Spring Boot đã hoạt động thành công!";
+        return "Back-end Spring Boot đã hoạt động thành công!";
     }
 }
