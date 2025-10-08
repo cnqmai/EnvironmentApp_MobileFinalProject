@@ -1,4 +1,3 @@
-// Đặt tại: backend-springboot/environment-backend/src/main/java/com/enviro/app/environment_backend/security/JwtService.java
 package com.enviro.app.environment_backend.security;
 
 import java.security.Key;
@@ -6,10 +5,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
@@ -18,22 +20,17 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JwtService {
 
-    // Lấy secret key và thời gian hết hạn từ application.properties (Sẽ cấu hình ở bước sau)
     @Value("${jwt.secret.key}")
     private String secretKey;
 
     @Value("${jwt.expiration.ms}")
     private long expirationMs; 
 
-    /**
-     * Tạo token JWT cho người dùng.
-     */
+    // --- PHẦN TẠO TOKEN --- 
     public String generateToken(UUID userId, String email) {
         Map<String, Object> claims = new HashMap<>();
-        // Lưu trữ ID và Email vào claims
         claims.put("userId", userId.toString());
         claims.put("email", email); 
-        
         return buildToken(claims, email, expirationMs);
     }
 
@@ -47,13 +44,37 @@ public class JwtService {
                 .setSubject(subject) 
                 .setIssuedAt(issuedAt)
                 .setExpiration(expiration)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256) // Ký token bằng secret key
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // Giải mã Secret Key từ Base64 để tạo Key bảo mật
     private Key getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+    
+    // --- PHẦN ĐỌC/TRÍCH XUẤT TOKEN ---
+    
+    public Claims extractAllClaims(String token) {
+        return Jwts
+                .parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+    
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+    
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername())) && !extractClaim(token, Claims::getExpiration).before(new Date());
     }
 }
