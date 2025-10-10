@@ -23,3 +23,13 @@ jwt:
     key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
   expiration:
     ms: 86400000
+
+# --- CẤU HÌNH API AQI (Dùng OpenWeatherMap làm ví dụ) ---
+aqi:
+  api:
+    # URL API lấy chất lượng không khí của OpenWeatherMap (tham số: lat, lon, appid)
+    base-url: http://api.openweathermap.org/data/2.5/air_pollution
+    # KHÓA API MÀ BẠN ĐÃ LẤY TỪ OPENWEATHERMAP/IQAir/etc.
+    key: "5ad9ae819b67abf939f3e0d4604bd362"
+    # BỔ SUNG URL CHO GEOCoding API
+    geocoding-url: http://api.openweathermap.org/geo/1.0/reverse 

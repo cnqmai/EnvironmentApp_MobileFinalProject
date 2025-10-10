@@ -3,6 +3,7 @@ package com.enviro.app.environment_backend.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,11 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.enviro.app.environment_backend.dto.AuthResponse;
+import com.enviro.app.environment_backend.dto.EmailRequest;
 import com.enviro.app.environment_backend.dto.LoginRequest;
 import com.enviro.app.environment_backend.dto.RegisterRequest;
-import com.enviro.app.environment_backend.model.User;
-import com.enviro.app.environment_backend.security.JwtService;
-import com.enviro.app.environment_backend.service.UserService;
+import com.enviro.app.environment_backend.dto.ResetPasswordRequest;
+import com.enviro.app.environment_backend.model.PasswordResetToken;
+import com.enviro.app.environment_backend.model.User; // Thêm import
+import com.enviro.app.environment_backend.security.JwtService; // Cần tạo DTO này
+import com.enviro.app.environment_backend.service.PasswordResetService; // Cần tạo DTO này
+import com.enviro.app.environment_backend.service.UserService; // Thêm import
 
 import jakarta.validation.Valid;
 
@@ -25,11 +30,13 @@ public class AuthController {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
-    public AuthController(UserService userService, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    private final PasswordResetService passwordResetService;
+    
+     public AuthController(UserService userService, PasswordEncoder passwordEncoder, JwtService jwtService, PasswordResetService passwordResetService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.passwordResetService = passwordResetService; // Inject service
     }
 
     /**
@@ -109,5 +116,51 @@ public class AuthController {
             .expires(System.currentTimeMillis() + 86400000)
             .build()
         );
+    }
+
+    /**
+     * API 1: Yêu cầu Reset Mật khẩu (POST /api/auth/forgot-password)
+     * Gửi email reset link.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody EmailRequest request) {
+        User user = userService.findByEmail(request.getEmail())
+            .orElse(null); // Trả về null nếu không tìm thấy (để tránh tiết lộ user tồn tại)
+
+        if (user != null) {
+            passwordResetService.createAndSendResetToken(user);
+        }
+
+        // Luôn trả về 200 OK để không tiết lộ liệu email có tồn tại hay không
+        return ResponseEntity.ok("Nếu email tồn tại, link reset mật khẩu đã được gửi đi.");
+    }
+    
+    /**
+     * API 2: Xác nhận và Đặt lại Mật khẩu (POST /api/auth/reset-password)
+     * Body: { "token": "uuid-token", "newPassword": "...", "confirmPassword": "..." }
+     */
+    @PostMapping("/reset-password")
+    @Transactional
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mật khẩu mới và xác nhận mật khẩu không khớp.");
+        }
+        
+        // 1. Tìm Token
+        PasswordResetToken resetToken = passwordResetService.getToken(request.getToken());
+        
+        if (resetToken == null || resetToken.isExpired()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token không hợp lệ hoặc đã hết hạn.");
+        }
+
+        // 2. Cập nhật mật khẩu User
+        User user = resetToken.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userService.save(user); // Giả định userService.save(user) sẽ cập nhật
+        
+        // 3. Vô hiệu hóa/Xóa Token (quan trọng)
+        passwordResetService.deleteToken(resetToken); // Cần thêm phương thức này vào service
+
+        return ResponseEntity.ok("Mật khẩu đã được đặt lại thành công.");
     }
 }
