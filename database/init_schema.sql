@@ -1,3 +1,19 @@
+-- --- THÊM MỚI: Xóa các bảng cũ nếu chúng tồn tại để tạo lại ---
+DROP TABLE IF EXISTS user_badges CASCADE;
+DROP TABLE IF EXISTS badges CASCADE;
+DROP TABLE IF EXISTS chatbot_history CASCADE;
+DROP TABLE IF EXISTS likes CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS posts CASCADE;
+DROP TABLE IF EXISTS report_media CASCADE;
+DROP TABLE IF EXISTS reports CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS saved_locations CASCADE;
+DROP TABLE IF EXISTS password_reset_tokens CASCADE;
+DROP TYPE IF EXISTS report_status;
+DROP TYPE IF EXISTS media_type;
+-- ---------------------------------------------------------
+
 -- Kích hoạt extension để sử dụng UUID làm khóa chính
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -8,8 +24,11 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100),
     avatar_url TEXT,
-    default_location VARCHAR(255), -- FR-1.2.1
-    points INT DEFAULT 0, -- FR-9.1.1
+    default_location VARCHAR(255),
+    points INT DEFAULT 0,
+    gender VARCHAR(10),
+    date_of_birth DATE,
+    phone_number VARCHAR(20),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -21,10 +40,10 @@ CREATE TYPE report_status AS ENUM ('received', 'processing', 'completed');
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    description TEXT NOT NULL, -- FR-4.1.1
-    latitude DECIMAL(9, 6) NOT NULL, -- FR-4.1.2
-    longitude DECIMAL(9, 6) NOT NULL, -- FR-4.1.2
-    status report_status NOT NULL DEFAULT 'received', -- FR-4.2.2
+    description TEXT NOT NULL,
+    latitude DECIMAL(9, 6) NOT NULL,
+    longitude DECIMAL(9, 6) NOT NULL,
+    status report_status NOT NULL DEFAULT 'received',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -46,7 +65,7 @@ COMMENT ON TABLE report_media IS 'Lưu trữ ảnh/video cho các báo cáo vi p
 CREATE TABLE posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT NOT NULL, -- FR-8.1.1
+    content TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

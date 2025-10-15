@@ -7,25 +7,23 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import java.time.LocalDate; // SỬA: Import LocalDate
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-// --- Lombok Annotations ---
-@Data // Tự động tạo getters, setters, toString, equals, hashCode
-@Builder // Hỗ trợ tạo đối tượng theo Builder pattern
-@NoArgsConstructor // Tự động tạo constructor không tham số
-@AllArgsConstructor // Tự động tạo constructor có tất cả tham số
-
-// --- JPA Annotations ---
-@Entity // Đánh dấu đây là một Entity, sẽ được map với một bảng trong DB
-@Table(name = "users") // Chỉ định tên của bảng trong DB là "users"
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "users")
 public class User {
 
-    @Id // Đánh dấu đây là khóa chính
-    @GeneratedValue(strategy = GenerationType.UUID) // Tự động sinh giá trị UUID cho khóa chính
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(unique = true, nullable = false) // Cột này là duy nhất và không được null
+    @Column(unique = true, nullable = false)
     private String email;
 
     @Column(nullable = false)
@@ -37,14 +35,21 @@ public class User {
 
     private String defaultLocation;
 
-    @Column(columnDefinition = "integer default 0") // Đặt giá trị mặc định cho cột
+    @Column(columnDefinition = "integer default 0")
     private int points;
+    
+    // --- THÊM MỚI ---
+    private String gender;
 
-    @CreationTimestamp // Tự động gán giá trị thời gian khi một đối tượng được tạo
+    @Column(name = "date_of_birth") // Ánh xạ với cột trong DB
+    private LocalDate dateOfBirth;
+
+    private String phoneNumber;
+    // ----------------
+
+    @CreationTimestamp
     private OffsetDateTime createdAt;
 
-    @UpdateTimestamp // Tự động gán giá trị thời gian khi một đối tượng được cập nhật
+    @UpdateTimestamp
     private OffsetDateTime updatedAt;
-
-    // Bạn sẽ thêm các mối quan hệ với các bảng khác (như Report, Post) ở đây sau
 }

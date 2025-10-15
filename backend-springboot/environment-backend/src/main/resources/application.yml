@@ -5,31 +5,34 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/environment_db
     username: env_app_user
-    password: "2112" # Đảm bảo không có khoảng trắng thừa
+    password: "2112"
 
   jpa:
     show-sql: true
     hibernate:
-      # SỬA: Đặt lại là 'none' để server khởi động và API hoạt động
       ddl-auto: none
     properties:
       hibernate:
-        # PostgreSQLDialect có thể không cần thiết, nhưng an toàn hơn khi giữ lại
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+          
+          # --- THÊM MỚI: Cấu hình cho Facebook ---
+          facebook:
+            client-id: "YOUR_FACEBOOK_APP_ID"
+            client-secret: "YOUR_FACEBOOK_APP_SECRET"
+
+# --- THÊM MỚI: Cấu hình API của Facebook ---
+facebook:
+  api:
+    user-info-uri: "https://graph.facebook.com/me?fields=id,name,email,picture.type(large)"
 
 # --- JWT Configuration ---
 jwt:
   secret:
-    key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
-  expiration:
-    ms: 86400000
-
-# --- CẤU HÌNH API AQI (Dùng OpenWeatherMap làm ví dụ) ---
-aqi:
-  api:
-    # URL API lấy chất lượng không khí của OpenWeatherMap (tham số: lat, lon, appid)
-    base-url: http://api.openweathermap.org/data/2.5/air_pollution
-    # KHÓA API MÀ BẠN ĐÃ LẤY TỪ OPENWEATHERMAP/IQAir/etc.
-    key: "5ad9ae819b67abf939f3e0d4604bd362"
-    # BỔ SUNG URL CHO GEOCoding API
-    geocoding-url: http://api.openweathermap.org/geo/1.0/reverse 
+    key: MjAxNS0x

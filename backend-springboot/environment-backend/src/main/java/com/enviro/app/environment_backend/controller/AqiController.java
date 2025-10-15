@@ -1,13 +1,12 @@
 package com.enviro.app.environment_backend.controller;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.enviro.app.environment_backend.dto.AqiAlertRequest;
+import com.enviro.app.environment_backend.dto.AqiAlertResponse;
 import com.enviro.app.environment_backend.dto.AqiResponse;
 import com.enviro.app.environment_backend.service.AqiService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/aqi")
@@ -28,17 +27,47 @@ public class AqiController {
         @RequestParam double lat,
         @RequestParam double lon) {
 
-        // 1. Gọi Service để lấy dữ liệu AQI từ nguồn bên ngoài
         AqiResponse aqiData = aqiService.getCurrentAqiByGps(lat, lon);
-
-        // 2. Xử lý và trả về dữ liệu
-        // Nếu không tìm thấy dữ liệu (ví dụ: aqiData == null), bạn có thể trả về 404
         if (aqiData == null) {
             return ResponseEntity.notFound().build();
         }
-
         return ResponseEntity.ok(aqiData);
     }
-    
-    // Bạn có thể thêm API lấy AQI theo khu vực đã lưu trữ ở đây sau (nếu có DB cho khu vực)
+
+    /**
+     * THÊM MỚI: API Kiểm tra cảnh báo AQI
+     * POST /api/aqi/check-alert
+     */
+    @PostMapping("/check-alert")
+    public ResponseEntity<AqiAlertResponse> checkAqiAlert(@Valid @RequestBody AqiAlertRequest request) {
+        // 1. Lấy dữ liệu AQI hiện tại
+        AqiResponse currentAqi = aqiService.getCurrentAqiByGps(request.getLatitude(), request.getLongitude());
+
+        if (currentAqi == null || currentAqi.getAqiValue() < 0) {
+            // Xử lý trường hợp không lấy được dữ liệu AQI
+            AqiAlertResponse response = AqiAlertResponse.builder()
+                    .alert(false)
+                    .currentAqi(-1)
+                    .userThreshold(request.getThreshold())
+                    .message("Không thể lấy dữ liệu AQI tại vị trí này.")
+                    .build();
+            return ResponseEntity.ok(response);
+        }
+
+        // 2. So sánh với ngưỡng của người dùng
+        boolean shouldAlert = currentAqi.getAqiValue() > request.getThreshold();
+        String message = shouldAlert
+                ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getAqiValue() + ") đã vượt ngưỡng an toàn (" + request.getThreshold() + ") của bạn."
+                : "Chất lượng không khí trong ngưỡng an toàn của bạn.";
+
+        // 3. Xây dựng và trả về phản hồi
+        AqiAlertResponse response = AqiAlertResponse.builder()
+                .alert(shouldAlert)
+                .currentAqi(currentAqi.getAqiValue())
+                .userThreshold(request.getThreshold())
+                .message(message)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
 }
