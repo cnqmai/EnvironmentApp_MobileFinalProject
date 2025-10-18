@@ -1,8 +1,9 @@
 import React, { useCallback } from "react";
-import { StyleSheet, FlatList, SafeAreaView } from "react-native";
-import { Appbar, Headline } from "react-native-paper";
+import { StyleSheet, FlatList, View, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AQICard from "../components/AQICard";
+import typography, { FONT_FAMILY } from "../styles/typography";
 
 const aqiData = [
   {
@@ -41,25 +42,42 @@ const DashboardScreen = () => {
         aqi={item.aqi}
         description={item.description}
         isSensitiveGroup={item.isSensitiveGroup}
-        onPress={() => router.push({ pathname: "/details", params: item })}
+        onPress={() =>
+          router.push({
+            pathname: "/detail",
+            params: {
+              locationName: item.location.name,
+              locationCity: item.location.city,
+              aqi: item.aqi,
+              isSensitiveGroup: item.isSensitiveGroup,
+            },
+          })
+        }
       />
     ),
     [router]
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Appbar.Header style={styles.appbar}>
-        <Appbar.Content title="Dashboard AQI" titleStyle={styles.appbarTitle} />
-      </Appbar.Header>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Dashboard</Text>
+      </View>
 
-      <Headline style={styles.dashboardTitle}>AQI khu vực của tôi</Headline>
+      <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
 
       <FlatList
         data={aqiData}
         renderItem={renderAQICard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        style={styles.flatListStyle}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={30}
+        initialNumToRender={3}
+        keyboardShouldPersistTaps="handled"
       />
     </SafeAreaView>
   );
@@ -68,27 +86,46 @@ const DashboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
+    backgroundColor: "#F0EFED",
+    position: "relative",
   },
-  appbar: {
-    backgroundColor: "#fff",
-    elevation: 0,
+  header: {
+    backgroundColor: "#F0EFED",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderBottomWidth: 0,
+    zIndex: 2,
   },
-  appbarTitle: {
+  headerTitle: {
+    ...typography.h2,
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "700",
+    color: "#0A0A0A",
+    letterSpacing: -0.3,
   },
   dashboardTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginHorizontal: 16,
-    marginTop: 15,
-    marginBottom: 5,
-    color: "#333",
+    ...typography.h1,
+    fontSize: 36,
+    fontWeight: "900",
+    marginHorizontal: 24,
+    marginTop: 8,
+    marginBottom: 32,
+    color: "#0A0A0A",
+    letterSpacing: -0.8,
+    lineHeight: 42,
+    zIndex: 1,
+  },
+  flatListStyle: {
+    flex: 1,
+    zIndex: 0,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 50,
+    paddingTop: 16,
+    paddingHorizontal: 4,
+    flexGrow: 1,
+    minHeight: 200,
   },
 });
 

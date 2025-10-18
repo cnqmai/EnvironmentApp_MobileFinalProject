@@ -5,6 +5,7 @@ import { Button } from "react-native-paper";
 import Slider from "@react-native-community/slider";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const AQIThresholdSettingsScreen = () => {
   const router = useRouter();
@@ -23,8 +24,8 @@ const AQIThresholdSettingsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={{ padding: 16, flex: 1 }}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
         {/*Nút quay lại*/}
         <TouchableOpacity
           style={styles.backButton}
@@ -91,23 +92,31 @@ const AQIThresholdSettingsScreen = () => {
           Lưu cài đặt
         </Button>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0EFED",
+    backgroundColor: "#F5F5F5",
     fontFamily: "System",
+  },
+  content: {
+    padding: 20,
+    flex: 1,
   },
   backButton: {
     padding: 8,
-    borderRadius: 45,
+    borderRadius: 20,
     alignSelf: "flex-start",
     backgroundColor: "#fff",
     zIndex: 10,
     elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   screenTitle: {
     marginTop: 20,
@@ -120,11 +129,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 20,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
   label: {
@@ -148,7 +158,7 @@ const styles = StyleSheet.create({
   saveButton: {
     width: "100%",
     marginTop: 8,
-    borderRadius: 25,
+    borderRadius: 20,
     paddingVertical: 4,
     backgroundColor: "#2196F3",
   },
