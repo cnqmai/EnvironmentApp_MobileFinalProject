@@ -23,13 +23,11 @@ const AQIDetailScreen = () => {
   const { locationName, locationCity, aqi, isSensitiveGroup } = routeParams;
   const [menuVisible, setMenuVisible] = useState(false);
 
-  // Construct location object from individual parameters
   const location = {
     name: locationName || "Unknown",
     city: locationCity || "Unknown",
   };
 
-  // Parse boolean values
   const isSensitive = isSensitiveGroup === "true" || isSensitiveGroup === true;
 
   // Dữ liệu biểu đồ AQI theo giờ với màu sắc động
@@ -212,7 +210,7 @@ const AQIDetailScreen = () => {
             text="Đeo khẩu trang chống bụi mịn khi ra ngoài"
           />
         </View>
-      </ScrollView>{" "}
+      </ScrollView>
       <Modal
         animation="slide"
         transparent={true}

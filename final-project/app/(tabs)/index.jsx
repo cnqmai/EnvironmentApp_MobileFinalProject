@@ -2,8 +2,8 @@ import React, { useCallback } from "react";
 import { StyleSheet, FlatList, View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import AQICard from "../components/AQICard";
-import typography, { FONT_FAMILY } from "../styles/typography";
+import AQICard from "../../components/AQICard";
+import typography from "../../styles/typography";
 
 const aqiData = [
   {
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   listContent: {
-    paddingBottom: 50,
+    paddingBottom: 120,
     paddingTop: 16,
     paddingHorizontal: 4,
     flexGrow: 1,

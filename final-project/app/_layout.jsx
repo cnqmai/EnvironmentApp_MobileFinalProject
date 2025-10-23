@@ -18,13 +18,18 @@ export default function RootLayout() {
       <PaperProvider theme={theme}>
         <StatusBar style="dark" />
         <Stack>
-          <Stack.Screen
-            name="index"
-            options={{ headerShown: false, title: "Dashboard AQI" }}
-          />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="detail"
             options={{ headerShown: false, title: "AQI chi tiết" }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{ headerShown: false, title: "Cài đặt" }}
+          />
+          <Stack.Screen
+            name="edit-profile"
+            options={{ headerShown: false, title: "Chỉnh sửa hồ sơ" }}
           />
           <Stack.Screen
             name="settings/aqi-threshold"
