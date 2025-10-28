@@ -32,6 +32,18 @@ export default function RootLayout() {
             options={{ headerShown: false, title: "Chỉnh sửa hồ sơ" }}
           />
           <Stack.Screen
+            name="recycle-guide"
+            options={{ headerShown: false, title: "Hướng dẫn tái chế" }}
+          />
+          <Stack.Screen
+            name="recycle-search"
+            options={{ headerShown: false, title: "Tìm kiếm rác" }}
+          />
+          <Stack.Screen
+            name="recycle-camera"
+            options={{ headerShown: false, title: "Chụp ảnh nhận diện" }}
+          />
+          <Stack.Screen
             name="settings/aqi-threshold"
             options={{ headerShown: false, title: "Cài đặt ngưỡng cảnh báo" }}
           />

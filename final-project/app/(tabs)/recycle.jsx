@@ -3,9 +3,12 @@ import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import typography from "../../styles/typography";
 
 const RecycleScreen = () => {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
@@ -24,37 +27,115 @@ const RecycleScreen = () => {
         </View>
 
         <View style={styles.gridContainer}>
-          <TouchableOpacity style={[styles.wasteCard, styles.organicWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.organicWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "organic",
+                  title: "Rác hữu cơ",
+                  icon: "leaf",
+                  iconColor: "#2E7D32",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="leaf" size={40} color="#2E7D32" />
             <Text style={styles.wasteTitle}>Rác hữu cơ</Text>
             <Text style={styles.wasteSubtitle}>Thực phẩm, lá cây</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.wasteCard, styles.recycleWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.recycleWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "recyclable",
+                  title: "Rác tái chế",
+                  icon: "recycle",
+                  iconColor: "#1976D2",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="recycle" size={40} color="#1976D2" />
             <Text style={styles.wasteTitle}>Rác tái chế</Text>
             <Text style={styles.wasteSubtitle}>Giấy, nhựa, kim loại</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.wasteCard, styles.hazardousWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.hazardousWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "hazardous",
+                  title: "Rác nguy hại",
+                  icon: "alert",
+                  iconColor: "#F57C00",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="alert" size={40} color="#F57C00" />
             <Text style={styles.wasteTitle}>Rác nguy hại</Text>
             <Text style={styles.wasteSubtitle}>Pin, hóa chất</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.wasteCard, styles.electronicWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.electronicWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "electronic",
+                  title: "Rác điện tử",
+                  icon: "laptop",
+                  iconColor: "#512DA8",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="laptop" size={40} color="#512DA8" />
             <Text style={styles.wasteTitle}>Rác điện tử</Text>
             <Text style={styles.wasteSubtitle}>Máy tính, điện thoại</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.wasteCard, styles.glassWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.glassWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "glass",
+                  title: "Rác thủy tinh",
+                  icon: "cup",
+                  iconColor: "#0097A7",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="cup" size={40} color="#0097A7" />
             <Text style={styles.wasteTitle}>Rác thủy tinh</Text>
             <Text style={styles.wasteSubtitle}>Chai lọ, kính vỡ</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.wasteCard, styles.fabricWaste]}>
+          <TouchableOpacity
+            style={[styles.wasteCard, styles.fabricWaste]}
+            onPress={() =>
+              router.push({
+                pathname: "/recycle-guide",
+                params: {
+                  type: "textile",
+                  title: "Rác vải",
+                  icon: "hanger",
+                  iconColor: "#C2185B",
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="hanger" size={40} color="#C2185B" />
             <Text style={styles.wasteTitle}>Rác vải</Text>
             <Text style={styles.wasteSubtitle}>Quần áo, vải vụn</Text>
@@ -62,12 +143,18 @@ const RecycleScreen = () => {
         </View>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push("/recycle-search")}
+          >
             <MaterialCommunityIcons name="magnify" size={20} color="#0A0A0A" />
             <Text style={styles.actionButtonText}>Tìm kiếm</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push("/recycle-camera")}
+          >
             <MaterialCommunityIcons name="camera" size={20} color="#0A0A0A" />
             <Text style={styles.actionButtonText}>Chụp ảnh</Text>
           </TouchableOpacity>
