@@ -16,7 +16,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.Arrays;
 
 @Service
 public class AqiService {

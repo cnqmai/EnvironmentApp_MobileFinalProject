@@ -7,6 +7,7 @@ DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS posts CASCADE;
 DROP TABLE IF EXISTS report_media CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
+DROP TABLE IF EXISTS waste_categories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS saved_locations CASCADE;
 DROP TABLE IF EXISTS password_reset_tokens CASCADE;
@@ -34,12 +35,24 @@ CREATE TABLE users (
 );
 COMMENT ON TABLE users IS 'Lưu trữ thông tin người dùng (FR-1.x)';
 
+-- --- Bảng Danh mục Rác (Waste Categories) ---
+CREATE TABLE waste_categories (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    icon_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE waste_categories IS 'Lưu trữ các danh mục rác thải (ví dụ: Rác thải nhựa, Rác thải điện tử, ...)';
+
 -- --- Bảng Báo cáo vi phạm (FR-4.x) ---
 CREATE TYPE report_status AS ENUM ('received', 'processing', 'completed');
 
 CREATE TABLE reports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category_id BIGINT REFERENCES waste_categories(id) ON DELETE SET NULL,
     description TEXT NOT NULL,
     latitude DECIMAL(9, 6) NOT NULL,
     longitude DECIMAL(9, 6) NOT NULL,
@@ -53,8 +66,8 @@ COMMENT ON TABLE reports IS 'Lưu trữ các báo cáo vi phạm môi trường 
 CREATE TYPE media_type AS ENUM ('image', 'video');
 
 CREATE TABLE report_media (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    report_id BIGINT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
     media_url TEXT NOT NULL,
     type media_type NOT NULL,
     uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -120,11 +133,50 @@ CREATE TABLE user_badges (
 );
 COMMENT ON TABLE user_badges IS 'Ghi nhận các huy hiệu mà người dùng đã đạt được';
 
+-- --- Bảng Vị trí đã Lưu (Saved Locations) ---
+CREATE TABLE saved_locations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    latitude DECIMAL(9, 6) NOT NULL,
+    longitude DECIMAL(9, 6) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE saved_locations IS 'Lưu trữ các vị trí đã lưu của người dùng (ví dụ: "Nhà", "Công ty")';
+
+-- --- Bảng Token Reset Mật khẩu ---
+CREATE TABLE password_reset_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expiry_date TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE password_reset_tokens IS 'Lưu trữ token reset mật khẩu';
+
 -- --- Tạo chỉ mục (Indexes) để tăng tốc độ truy vấn ---
 CREATE INDEX ON reports (user_id);
+CREATE INDEX ON reports (category_id);
 CREATE INDEX ON report_media (report_id);
 CREATE INDEX ON posts (user_id);
 CREATE INDEX ON comments (post_id);
 CREATE INDEX ON comments (user_id);
 CREATE INDEX ON likes (post_id);
 CREATE INDEX ON chatbot_history (user_id);
+CREATE INDEX ON saved_locations (user_id);
+CREATE INDEX ON password_reset_tokens (user_id);
+CREATE INDEX ON password_reset_tokens (token);
+
+-- --- Dữ liệu mẫu cho Danh mục Rác ---
+INSERT INTO waste_categories (name, description, icon_url) VALUES
+('Rác thải nhựa', 'Các loại rác thải làm từ nhựa như chai, túi, bao bì nhựa', NULL),
+('Rác thải điện tử', 'Các thiết bị điện tử hư hỏng như điện thoại, laptop, pin', NULL),
+('Rác thải hữu cơ', 'Rác thải có thể phân hủy như thức ăn thừa, lá cây', NULL),
+('Rác thải kim loại', 'Các vật dụng kim loại như lon, sắt, nhôm', NULL),
+('Rác thải thủy tinh', 'Chai lọ, bình làm từ thủy tinh', NULL),
+('Rác thải giấy', 'Giấy, bìa carton, sách báo cũ', NULL),
+('Rác thải nguy hại', 'Rác thải độc hại như hóa chất, pin, dầu nhớt', NULL),
+('Rác thải xây dựng', 'Vật liệu xây dựng thải bỏ như gạch, xi măng', NULL),
+('Rác thải y tế', 'Rác thải từ bệnh viện, phòng khám', NULL),
+('Rác thải khác', 'Các loại rác thải không thuộc các danh mục trên', NULL);

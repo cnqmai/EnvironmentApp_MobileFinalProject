@@ -18,13 +18,18 @@ public class ReportRequest {
     Double longitude;
 
     // Danh sách URL media đã upload trước (client upload trước khi gọi API này)
+    // Có thể null hoặc empty nếu không có ảnh/video
     List<MediaItem> media; 
+
+    // ID danh mục rác (optional - có thể null nếu chưa chọn danh mục)
+    Long categoryId;
 
     @Value // DTO nội bộ cho từng item media
     public static class MediaItem {
-        @NotBlank
+        @NotBlank(message = "URL media không được để trống")
         String url;
-        @NotBlank
-        String type; // Ví dụ: "IMAGE" hoặc "VIDEO"
+        
+        @NotBlank(message = "Loại media không được để trống")
+        String type; // "image" hoặc "video" (lowercase để match với database enum)
     }
 }
