@@ -8,7 +8,9 @@ import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.model.WasteCategory;
 import com.enviro.app.environment_backend.repository.ReportMediaRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
+import com.enviro.app.environment_backend.repository.UserRepository;
 import com.enviro.app.environment_backend.repository.WasteCategoryRepository;
+import com.enviro.app.environment_backend.service.BadgeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +26,19 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final ReportMediaRepository reportMediaRepository;
     private final WasteCategoryRepository wasteCategoryRepository;
+    private final UserRepository userRepository;
+    private final BadgeService badgeService;
 
     public ReportService(ReportRepository reportRepository, 
                         ReportMediaRepository reportMediaRepository,
-                        WasteCategoryRepository wasteCategoryRepository) {
+                        WasteCategoryRepository wasteCategoryRepository,
+                        UserRepository userRepository,
+                        BadgeService badgeService) {
         this.reportRepository = reportRepository;
         this.reportMediaRepository = reportMediaRepository;
         this.wasteCategoryRepository = wasteCategoryRepository;
+        this.userRepository = userRepository;
+        this.badgeService = badgeService;
     }
 
     /**
@@ -90,7 +98,30 @@ public class ReportService {
         // Cập nhật Report entity với mediaList đã được lưu
         savedReport.setReportMedia(mediaList);
         
+        // 5. TỰ ĐỘNG CỘNG ĐIỂM CHO USER KHI TẠO BÁO CÁO (FR-9.1.1)
+        // Mỗi báo cáo được tạo = 10 điểm
+        int pointsToAdd = 10;
+        user.setPoints(user.getPoints() + pointsToAdd);
+        User updatedUser = userRepository.save(user);
+        
+        // 6. TỰ ĐỘNG TRAO BADGES NẾU ĐẠT ĐỦ ĐIỂM (FR-9.1.2)
+        badgeService.checkAndAwardBadges(updatedUser);
+        
         return savedReport;
+    }
+    
+    /**
+     * Lấy tất cả báo cáo của một user (FR-4.2.1)
+     */
+    public List<Report> getUserReports(User user) {
+        return reportRepository.findByUserOrderByCreatedAtDesc(user);
+    }
+    
+    /**
+     * Đếm số lượng báo cáo của một user
+     */
+    public long countUserReports(User user) {
+        return reportRepository.countByUser(user);
     }
 
     /**

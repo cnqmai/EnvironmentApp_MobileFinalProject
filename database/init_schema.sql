@@ -1,4 +1,6 @@
 -- --- THÊM MỚI: Xóa các bảng cũ nếu chúng tồn tại để tạo lại ---
+DROP TABLE IF EXISTS notification_settings CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS user_badges CASCADE;
 DROP TABLE IF EXISTS badges CASCADE;
 DROP TABLE IF EXISTS chatbot_history CASCADE;
@@ -11,6 +13,19 @@ DROP TABLE IF EXISTS waste_categories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS saved_locations CASCADE;
 DROP TABLE IF EXISTS password_reset_tokens CASCADE;
+DROP TABLE IF EXISTS user_quiz_scores CASCADE;
+DROP TABLE IF EXISTS quiz_questions CASCADE;
+DROP TABLE IF EXISTS quizzes CASCADE;
+DROP TABLE IF EXISTS knowledge_articles CASCADE;
+DROP TABLE IF EXISTS daily_tips CASCADE;
+DROP TABLE IF EXISTS user_rewards CASCADE;
+DROP TABLE IF EXISTS rewards CASCADE;
+DROP TABLE IF EXISTS community_groups CASCADE;
+DROP TABLE IF EXISTS group_members CASCADE;
+DROP TABLE IF EXISTS waste_collection_points CASCADE;
+DROP TYPE IF EXISTS collection_point_type;
+DROP TYPE IF EXISTS notification_type;
+DROP TYPE IF EXISTS notification_status;
 DROP TYPE IF EXISTS report_status;
 DROP TYPE IF EXISTS media_type;
 -- ---------------------------------------------------------
@@ -155,6 +170,37 @@ CREATE TABLE password_reset_tokens (
 );
 COMMENT ON TABLE password_reset_tokens IS 'Lưu trữ token reset mật khẩu';
 
+-- --- Bảng Thông báo (FR-6.x) ---
+CREATE TYPE notification_type AS ENUM ('campaign', 'collection_reminder', 'weather_alert', 'aqi_alert', 'badge_earned', 'report_status', 'general');
+CREATE TYPE notification_status AS ENUM ('unread', 'read');
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type notification_type NOT NULL,
+    status notification_status NOT NULL DEFAULT 'unread',
+    related_id VARCHAR(255), -- ID liên quan (badge_id, report_id, campaign_id, etc.)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE notifications IS 'Lưu trữ thông báo cho người dùng (FR-6.x)';
+
+-- --- Bảng Cấu hình Thông báo của User (FR-2.2.2, FR-6.x) ---
+CREATE TABLE notification_settings (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    aqi_alert_enabled BOOLEAN DEFAULT true,
+    aqi_threshold INT DEFAULT 100, -- Ngưỡng AQI để gửi cảnh báo
+    collection_reminder_enabled BOOLEAN DEFAULT true,
+    campaign_notifications_enabled BOOLEAN DEFAULT true,
+    weather_alert_enabled BOOLEAN DEFAULT true,
+    badge_notifications_enabled BOOLEAN DEFAULT true,
+    report_status_notifications_enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE notification_settings IS 'Cấu hình thông báo của từng user (FR-2.2.2, FR-6.x)';
+
 -- --- Tạo chỉ mục (Indexes) để tăng tốc độ truy vấn ---
 CREATE INDEX ON reports (user_id);
 CREATE INDEX ON reports (category_id);
@@ -167,6 +213,179 @@ CREATE INDEX ON chatbot_history (user_id);
 CREATE INDEX ON saved_locations (user_id);
 CREATE INDEX ON password_reset_tokens (user_id);
 CREATE INDEX ON password_reset_tokens (token);
+CREATE INDEX ON notifications (user_id);
+CREATE INDEX ON notifications (status);
+CREATE INDEX ON notifications (created_at);
+CREATE INDEX ON waste_collection_points (type);
+CREATE INDEX ON waste_collection_points (latitude, longitude);
+CREATE INDEX ON knowledge_articles (category);
+CREATE INDEX ON knowledge_articles (is_published);
+CREATE INDEX ON quiz_questions (quiz_id);
+CREATE INDEX ON user_quiz_scores (user_id);
+CREATE INDEX ON user_quiz_scores (quiz_id);
+CREATE INDEX ON community_groups (area_type, area_name);
+CREATE INDEX ON group_members (group_id);
+CREATE INDEX ON rewards (type);
+CREATE INDEX ON rewards (is_active);
+CREATE INDEX ON user_rewards (user_id);
+CREATE INDEX ON user_rewards (status);
+CREATE INDEX ON daily_tips (display_date);
+CREATE INDEX ON daily_tips (is_active);
+
+-- --- Bảng Bài viết Kiến thức (FR-11.1.1) ---
+CREATE TYPE article_type AS ENUM ('article', 'video', 'infographic');
+
+CREATE TABLE knowledge_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    type article_type NOT NULL DEFAULT 'article',
+    thumbnail_url TEXT,
+    video_url TEXT,
+    author_name VARCHAR(100),
+    category VARCHAR(100),
+    view_count INT DEFAULT 0,
+    is_published BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE knowledge_articles IS 'Thư viện kiến thức về môi trường (FR-11.1.1)';
+
+-- --- Bảng Quiz (FR-11.1.2) ---
+CREATE TABLE quizzes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    difficulty VARCHAR(20) DEFAULT 'medium',
+    time_limit_minutes INT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE quizzes IS 'Các bài quiz/trắc nghiệm về môi trường (FR-11.1.2)';
+
+-- --- Bảng Câu hỏi Quiz ---
+CREATE TABLE quiz_questions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    option_a VARCHAR(255) NOT NULL,
+    option_b VARCHAR(255) NOT NULL,
+    option_c VARCHAR(255),
+    option_d VARCHAR(255),
+    correct_answer VARCHAR(1) NOT NULL, -- 'A', 'B', 'C', 'D'
+    explanation TEXT,
+    order_number INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE quiz_questions IS 'Câu hỏi trong các quiz (FR-11.1.2)';
+
+-- --- Bảng Kết quả Quiz của User ---
+CREATE TABLE user_quiz_scores (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    score INT NOT NULL, -- Số câu đúng
+    total_questions INT NOT NULL,
+    percentage DECIMAL(5, 2) NOT NULL,
+    time_taken_seconds INT,
+    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, quiz_id) -- Mỗi user chỉ làm quiz một lần (hoặc có thể bỏ UNIQUE để cho phép làm lại)
+);
+COMMENT ON TABLE user_quiz_scores IS 'Kết quả quiz của người dùng (FR-11.1.2)';
+
+-- --- Bảng Nhóm Cộng đồng (FR-8.1.3) ---
+CREATE TABLE community_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    area_type VARCHAR(50), -- 'ward' (phường/xã), 'district' (quận/huyện), 'city' (thành phố)
+    area_name VARCHAR(255),
+    creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_public BOOLEAN DEFAULT true,
+    member_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE community_groups IS 'Nhóm cộng đồng theo khu vực (FR-8.1.3)';
+
+-- --- Bảng Thành viên Nhóm ---
+CREATE TABLE group_members (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_id UUID NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+    role VARCHAR(20) DEFAULT 'member', -- 'admin', 'moderator', 'member'
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, group_id)
+);
+COMMENT ON TABLE group_members IS 'Thành viên của các nhóm cộng đồng';
+
+-- --- Bảng Phần thưởng/Voucher (FR-9.1.3) ---
+CREATE TYPE reward_type AS ENUM ('voucher', 'tree', 'merchandise', 'points_bonus');
+
+CREATE TABLE rewards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type reward_type NOT NULL,
+    points_cost INT NOT NULL,
+    image_url TEXT,
+    voucher_code VARCHAR(100), -- Nếu là voucher
+    discount_percent INT, -- Nếu là voucher có % giảm giá
+    quantity_available INT DEFAULT -1, -- -1 = không giới hạn
+    is_active BOOLEAN DEFAULT true,
+    expiry_date DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE rewards IS 'Danh mục phần thưởng/voucher có thể đổi bằng điểm (FR-9.1.3)';
+
+-- --- Bảng Phần thưởng của User ---
+CREATE TABLE user_rewards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reward_id UUID NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
+    voucher_code VARCHAR(100), -- Code để user sử dụng
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'claimed', 'used', 'expired'
+    redeemed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    used_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ
+);
+COMMENT ON TABLE user_rewards IS 'Phần thưởng mà user đã đổi (FR-9.1.3)';
+
+-- --- Bảng Gợi ý Hành động Mỗi ngày (FR-11.1.3) ---
+CREATE TABLE daily_tips (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(50), -- 'energy', 'waste', 'water', 'transport', 'general'
+    icon_url TEXT,
+    action_text VARCHAR(255), -- Ví dụ: "Tắt điện khi ra ngoài"
+    points_reward INT DEFAULT 5, -- Điểm thưởng khi hoàn thành
+    is_active BOOLEAN DEFAULT true,
+    display_date DATE, -- Ngày hiển thị tip này
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE daily_tips IS 'Gợi ý hành động nhỏ mỗi ngày (FR-11.1.3)';
+
+-- --- Bảng Điểm Thu Gom Rác (FR-10.1.1, FR-10.1.2) ---
+CREATE TYPE collection_point_type AS ENUM ('plastic', 'electronic', 'organic', 'metal', 'glass', 'paper', 'hazardous', 'medical', 'other');
+
+CREATE TABLE waste_collection_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    type collection_point_type NOT NULL,
+    latitude DECIMAL(9, 6) NOT NULL,
+    longitude DECIMAL(9, 6) NOT NULL,
+    address TEXT,
+    description TEXT,
+    phone_number VARCHAR(20),
+    opening_hours VARCHAR(255),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE waste_collection_points IS 'Lưu trữ các điểm thu gom rác tái chế (FR-10.1.1)';
 
 -- --- Dữ liệu mẫu cho Danh mục Rác ---
 INSERT INTO waste_categories (name, description, icon_url) VALUES

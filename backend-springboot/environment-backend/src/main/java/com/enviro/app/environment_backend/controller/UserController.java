@@ -1,6 +1,7 @@
 package com.enviro.app.environment_backend.controller;
 
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
+import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.UserService;
 import org.springframework.http.HttpStatus;
@@ -32,5 +33,27 @@ public class UserController {
         User currentUser = getCurrentUser();
         User updatedUser = userService.updateUserProfile(currentUser.getId(), request);
         return ResponseEntity.ok(updatedUser);
+    }
+    
+    /**
+     * API XÓA TÀI KHOẢN (FR-7.2)
+     * DELETE /api/users/me
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<String> deleteMyAccount() {
+        User currentUser = getCurrentUser();
+        userService.deleteUser(currentUser.getId());
+        return ResponseEntity.ok("Tài khoản đã được xóa thành công.");
+    }
+    
+    /**
+     * API LẤY THỐNG KÊ CÁ NHÂN (FR-13.1.1)
+     * GET /api/users/me/statistics
+     */
+    @GetMapping("/me/statistics")
+    public ResponseEntity<UserStatisticsResponse> getMyStatistics() {
+        User currentUser = getCurrentUser();
+        UserStatisticsResponse statistics = userService.getUserStatistics(currentUser.getId());
+        return ResponseEntity.ok(statistics);
     }
 }
