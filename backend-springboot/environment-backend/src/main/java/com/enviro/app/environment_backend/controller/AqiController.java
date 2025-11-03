@@ -45,29 +45,40 @@ public class AqiController {
 
         if (currentAqi == null || currentAqi.getAqiValue() < 0) {
             // Xử lý trường hợp không lấy được dữ liệu AQI
-            AqiAlertResponse response = AqiAlertResponse.builder()
-                    .alert(false)
-                    .currentAqi(-1)
-                    .userThreshold(request.getThreshold())
-                    .message("Không thể lấy dữ liệu AQI tại vị trí này.")
-                    .build();
+            AqiAlertResponse response = new AqiAlertResponse(
+                    false,
+                    -1,
+                    request.getThreshold(),
+                    "Không thể lấy dữ liệu AQI tại vị trí này.");
             return ResponseEntity.ok(response);
         }
 
         // 2. So sánh với ngưỡng của người dùng
-        boolean shouldAlert = currentAqi.getAqiValue() > request.getThreshold();
+        int mappedAqiThreshold = mapThresholdLevelToAqi(request.getThreshold());
+        boolean shouldAlert = currentAqi.getAqiValue() > mappedAqiThreshold;
         String message = shouldAlert
-                ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getAqiValue() + ") đã vượt ngưỡng an toàn (" + request.getThreshold() + ") của bạn."
-                : "Chất lượng không khí trong ngưỡng an toàn của bạn.";
+                ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getAqiValue() + ") đã vượt ngưỡng an toàn (AQI " + mappedAqiThreshold + ") của bạn."
+                : "Chất lượng không khí đang trong ngưỡng an toàn của bạn (AQI ≤ " + mappedAqiThreshold + ").";
 
         // 3. Xây dựng và trả về phản hồi
-        AqiAlertResponse response = AqiAlertResponse.builder()
-                .alert(shouldAlert)
-                .currentAqi(currentAqi.getAqiValue())
-                .userThreshold(request.getThreshold())
-                .message(message)
-                .build();
+        AqiAlertResponse response = new AqiAlertResponse(
+                shouldAlert,
+                currentAqi.getAqiValue(),
+                request.getThreshold(),
+                message);
 
         return ResponseEntity.ok(response);
+    }
+
+    private int mapThresholdLevelToAqi(int level) {
+        // 1: Good (≤50), 2: Moderate (≤100), 3: Unhealthy for Sensitive (≤150)
+        // 4: Unhealthy (≤200), 5: Very Unhealthy (≤300)
+        return switch (Math.max(1, Math.min(level, 5))) {
+            case 1 -> 50;
+            case 2 -> 100;
+            case 3 -> 150;
+            case 4 -> 200;
+            default -> 300;
+        };
     }
 }

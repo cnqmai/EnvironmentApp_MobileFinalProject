@@ -11,5 +11,10 @@ public class ChatbotRequest {
     
     @NotBlank(message = "Câu hỏi không được để trống")
     String message; // Câu hỏi của user
+
+    // Explicit getter to avoid reliance on Lombok in IDE
+    public String getMessage() {
+        return message;
+    }
 }
 

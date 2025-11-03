@@ -1,15 +1,16 @@
 package com.enviro.app.environment_backend.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
 import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service xử lý logic Chatbot AI (FR-5.x)
@@ -39,20 +40,16 @@ public class ChatbotService {
         String botResponse = generateBotResponse(userQuery);
 
         // Lưu vào lịch sử
-        ChatbotHistory history = ChatbotHistory.builder()
-                .user(user)
-                .userQuery(userQuery)
-                .botResponse(botResponse)
-                .build();
+        ChatbotHistory history = new ChatbotHistory(user, userQuery, botResponse);
 
         ChatbotHistory savedHistory = chatbotHistoryRepository.save(history);
 
-        return ChatbotResponse.builder()
-                .historyId(savedHistory.getId())
-                .userQuery(savedHistory.getUserQuery())
-                .botResponse(savedHistory.getBotResponse())
-                .createdAt(savedHistory.getCreatedAt())
-                .build();
+        return new ChatbotResponse(
+                savedHistory.getId(),
+                savedHistory.getUserQuery(),
+                savedHistory.getBotResponse(),
+                savedHistory.getCreatedAt()
+        );
     }
 
     /**
@@ -115,12 +112,11 @@ public class ChatbotService {
         List<ChatbotHistory> historyList = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
         
         return historyList.stream()
-                .map(h -> ChatbotResponse.builder()
-                        .historyId(h.getId())
-                        .userQuery(h.getUserQuery())
-                        .botResponse(h.getBotResponse())
-                        .createdAt(h.getCreatedAt())
-                        .build())
+                .map(h -> new ChatbotResponse(
+                        h.getId(),
+                        h.getUserQuery(),
+                        h.getBotResponse(),
+                        h.getCreatedAt()))
                 .collect(Collectors.toList());
     }
 }

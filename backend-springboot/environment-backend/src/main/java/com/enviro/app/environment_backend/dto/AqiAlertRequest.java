@@ -20,4 +20,17 @@ public class AqiAlertRequest {
     @NotNull(message = "Ngưỡng AQI không được để trống")
     @Min(1) @Max(5)
     Integer threshold;
+
+    // Explicit getters to avoid reliance on Lombok in IDE
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public Integer getThreshold() {
+        return threshold;
+    }
 }

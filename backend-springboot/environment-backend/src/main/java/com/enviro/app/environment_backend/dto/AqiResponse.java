@@ -27,4 +27,9 @@ public class AqiResponse {
     // --- Dữ liệu chi tiết về các chất ô nhiễm (tùy chọn) ---
     // double pm25;
     // double o3;
+
+    // Explicit getter to avoid reliance on Lombok in IDE
+    public int getAqiValue() {
+        return aqiValue;
+    }
 }

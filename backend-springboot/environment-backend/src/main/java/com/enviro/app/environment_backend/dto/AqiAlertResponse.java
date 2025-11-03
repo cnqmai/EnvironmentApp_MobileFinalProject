@@ -17,4 +17,12 @@ public class AqiAlertResponse {
     
     // Thông điệp cảnh báo
     String message;
+
+    // Explicit public constructor to avoid reliance on Lombok builder in IDE
+    public AqiAlertResponse(boolean alert, int currentAqi, int userThreshold, String message) {
+        this.alert = alert;
+        this.currentAqi = currentAqi;
+        this.userThreshold = userThreshold;
+        this.message = message;
+    }
 }
