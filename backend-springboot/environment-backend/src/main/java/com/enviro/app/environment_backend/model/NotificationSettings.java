@@ -1,14 +1,23 @@
 package com.enviro.app.environment_backend.model;
 
-import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn; // Import UUID
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.OffsetDateTime;
 
 @Data
 @Builder
@@ -18,10 +27,16 @@ import java.time.OffsetDateTime;
 @Table(name = "notification_settings")
 public class NotificationSettings {
 
+    // FIX 1: The actual primary key field, matching the ID type of the User entity.
     @Id
+    private UUID userId;
+
+    // FIX 2: @MapsId signals that the primary key of this entity (userId) is
+    // derived from the primary key of the associated entity (User).
     @OneToOne(fetch = FetchType.LAZY)
+    @MapsId // Maps the PK of this entity (userId) to the foreign key column (user_id)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private User user; // Removed @Id from here
 
     @Column(name = "aqi_alert_enabled", nullable = false)
     @Builder.Default
@@ -59,4 +74,3 @@ public class NotificationSettings {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 }
-
