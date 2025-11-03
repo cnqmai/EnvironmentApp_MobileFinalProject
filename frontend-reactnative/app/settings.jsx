@@ -5,11 +5,15 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import typography from "../styles/typography";
+import { removeToken } from "../src/utils/apiHelper";
 
 const SettingsScreen = () => {
   const router = useRouter();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await removeToken();
+    } catch (_) {}
     router.push("/(tabs)/profile?logout=true");
   };
 

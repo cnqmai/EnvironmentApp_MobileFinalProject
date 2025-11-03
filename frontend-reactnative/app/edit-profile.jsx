@@ -11,6 +11,7 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import typography from "../styles/typography";
+import { updateProfile } from "../src/services/userService";
 
 const EditProfileScreen = () => {
   const router = useRouter();
@@ -21,9 +22,27 @@ const EditProfileScreen = () => {
   const [email, setEmail] = useState("anh123@gmail.com");
   const [phone, setPhone] = useState("0123456789");
 
-  const handleSave = () => {
-    console.log("Lưu thông tin...");
-    router.back();
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    if (saving) return;
+    try {
+      setSaving(true);
+      const payload = {
+        fullName,
+        gender,
+        birthDate,
+        location,
+        email,
+        phone,
+      };
+      await updateProfile(payload);
+      router.back();
+    } catch (e) {
+      console.error(e);
+      // Có thể thay bằng Toast/Alert nếu có sẵn
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -147,7 +166,7 @@ const EditProfileScreen = () => {
           onPress={handleSave}
           activeOpacity={0.8}
         >
-          <Text style={styles.saveButtonText}>Lưu thông tin</Text>
+          <Text style={styles.saveButtonText}>{saving ? "Đang lưu..." : "Lưu thông tin"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

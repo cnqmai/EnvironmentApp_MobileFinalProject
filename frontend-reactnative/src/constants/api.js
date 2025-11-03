@@ -19,7 +19,7 @@ import { Platform } from 'react-native';
 // ============================================
 // CẤU HÌNH NÀY - Đổi IP theo máy của bạn
 // ============================================
-const YOUR_COMPUTER_IP = '192.168.100.190'; // IP máy tính của bạn
+const YOUR_COMPUTER_IP = '10.7.157.24'; // IP máy tính của bạn
 // Hoặc nếu dùng ngrok, thay bằng: 'https://xxxx.ngrok.io/api'
 
 let API_BASE_URL;
