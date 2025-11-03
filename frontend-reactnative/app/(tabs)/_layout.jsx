@@ -65,11 +65,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="recycle"
         options={{
-          title: "Tìm kiếm",
+          title: "Tái chế",
           tabBarIcon: ({ color, size, focused }) => (
-            <MaterialCommunityIcons name="magnify" size={28} color={color} />
+            <MaterialCommunityIcons name="recycle" size={28} color={color} />
           ),
         }}
       />
