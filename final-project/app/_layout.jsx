@@ -47,6 +47,18 @@ export default function RootLayout() {
             name="settings/aqi-threshold"
             options={{ headerShown: false, title: "Cài đặt ngưỡng cảnh báo" }}
           />
+          <Stack.Screen
+            name="chat/chat-history"
+            options={{ headerShown: false, title: "Đoạn hội thoại" }}
+          />
+          <Stack.Screen
+            name="chat/chatbot"
+            options={{ headerShown: false, title: "Chatbot" }}
+          />
+          <Stack.Screen
+            name="chat/chatbot-voice"
+            options={{ headerShown: false, title: "Chatbot giọng nói" }}
+          />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>
