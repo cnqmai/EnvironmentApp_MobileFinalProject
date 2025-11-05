@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { StyleSheet, FlatList, View, Text } from "react-native";
+import { StyleSheet, FlatList, View, Text, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AQICard from "../../components/AQICard";
@@ -8,21 +8,14 @@ import { getAqiForSavedLocations } from "../../src/services/locationService";
 import * as ExpoLocation from "expo-location";
 import { getAqiByGps } from "../../src/services/aqiService";
 
-const fallbackAqi = [
-  {
-    id: "fallback-1",
-    location: { name: "Quận 7", city: "TP. Hồ Chí Minh" },
-    aqi: 152,
-    description: "Không tốt cho nhóm nhạy cảm",
-    isSensitiveGroup: true,
-  },
-];
+const fallbackAqi = [];
 
 const DashboardScreen = () => {
   const router = useRouter();
   const [aqiData, setAqiData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [myLocationAqi, setMyLocationAqi] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -40,10 +33,10 @@ const DashboardScreen = () => {
               isSensitiveGroup: Boolean(it.isSensitiveGroup),
             }))
           : [];
-        if (mounted) setAqiData(mapped.length ? mapped : fallbackAqi);
+        if (mounted) setAqiData(mapped);
       } catch (e) {
-        console.error(e);
-        if (mounted) setAqiData(fallbackAqi);
+        console.error('[Dashboard] getAqiForSavedLocations error:', e);
+        if (mounted) setAqiData([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -53,27 +46,88 @@ const DashboardScreen = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+const loadDeviceLocationAqi = useCallback(async () => {
+  let cancelled = false;
+  try {
+    const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+    console.log('[Dashboard] location permission:', status);
+    if (status !== 'granted') return;
+
+    // Nhanh: dùng vị trí gần nhất nếu có
+    const last = await ExpoLocation.getLastKnownPositionAsync();
+    if (last && !cancelled) {
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-        const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-        const resp = await getAqiByGps(pos.coords.latitude, pos.coords.longitude);
-        if (!mounted) return;
-        setMyLocationAqi({
-          location: { name: resp?.locationName || "Vị trí của tôi", city: resp?.city || "" },
-          aqi: resp?.aqi ?? 0,
-          description: resp?.description || "",
-          isSensitiveGroup: Boolean(resp?.isSensitiveGroup),
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+        console.log('[Dashboard] lastKnownPosition:', last?.coords);
+        const resp = await getAqiByGps(last.coords.latitude, last.coords.longitude);
+        console.log('[Dashboard] AQI from lastKnownPosition:', resp);
+        if (!cancelled) {
+          setMyLocationAqi({
+            location: { name: resp?.locationName || "Vị trí của tôi", city: resp?.city || "" },
+            aqi: resp?.aqi ?? 0,
+            description: resp?.description || "",
+            isSensitiveGroup: Boolean(resp?.isSensitiveGroup),
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Chính xác hơn: lấy vị trí hiện tại
+    const pos = await ExpoLocation.getCurrentPositionAsync({
+      accuracy: Platform.OS === 'android' ? ExpoLocation.Accuracy.Balanced : ExpoLocation.Accuracy.High,
+      maximumAge: 10000,
+      mayShowUserSettingsDialog: true,
+    });
+    console.log('[Dashboard] currentPosition:', pos?.coords);
+    const resp = await getAqiByGps(pos.coords.latitude, pos.coords.longitude);
+    console.log('[Dashboard] AQI from currentPosition:', resp);
+    if (!cancelled) {
+      setMyLocationAqi({
+        location: { name: resp?.locationName || "Vị trí của tôi", city: resp?.city || "" },
+        aqi: resp?.aqi ?? 0,
+        description: resp?.description || "",
+        isSensitiveGroup: Boolean(resp?.isSensitiveGroup),
+      });
+    }
+  } catch (e) {
+    console.error('[Dashboard] load device AQI error:', e);
+  }
+  return () => { cancelled = true; };
+}, []);
+
+useEffect(() => {
+  let mounted = true;
+  loadDeviceLocationAqi();
+  return () => { mounted = false; };
+}, [loadDeviceLocationAqi]);
+
+const onRefresh = useCallback(async () => {
+  setRefreshing(true);
+  try {
+    await Promise.all([
+      loadDeviceLocationAqi(),
+      (async () => {
+        try {
+          const items = await getAqiForSavedLocations();
+          const mapped = Array.isArray(items)
+            ? items.map((it, idx) => ({
+                id: String(it.id ?? idx),
+                location: { name: it.locationName || it.name || "Unknown", city: it.locationCity || it.city || "Unknown" },
+                aqi: it.aqi ?? 0,
+                description: it.description || "",
+                isSensitiveGroup: Boolean(it.isSensitiveGroup),
+              }))
+            : [];
+          setAqiData(mapped.length ? mapped : fallbackAqi);
+        } catch (e) {
+          console.error(e);
+          setAqiData(fallbackAqi);
+        }
+      })(),
+    ]);
+  } finally {
+    setRefreshing(false);
+  }
+}, [loadDeviceLocationAqi]);
 
   const renderAQICard = useCallback(
     ({ item }) => (
@@ -134,6 +188,7 @@ const DashboardScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         style={styles.flatListStyle}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={true}
         maxToRenderPerBatch={5}

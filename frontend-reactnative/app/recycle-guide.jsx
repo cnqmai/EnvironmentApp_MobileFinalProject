@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import typography from "../styles/typography";
+import { getSavedLocations } from "../src/services/locationService";
 
 const RecycleGuideScreen = () => {
   const router = useRouter();
@@ -116,6 +117,24 @@ const RecycleGuideScreen = () => {
   };
 
   const content = getGuideContent();
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await getSavedLocations();
+        if (mounted) setLocations(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -173,33 +192,29 @@ const RecycleGuideScreen = () => {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Điểm thu gom gần bạn</Text>
-        <View style={styles.locationCard}>
-          <TouchableOpacity
-            style={styles.locationTouchable}
-            activeOpacity={0.8}
-          >
-            <View style={styles.locationInfo}>
-              <MaterialCommunityIcons
-                name="map-marker"
-                size={24}
-                color="#0A0A0A"
-              />
-              <View style={styles.locationDetails}>
-                <Text style={styles.locationName}>Trung tâm tái chế xanh</Text>
-                <Text style={styles.locationAddress}>
-                  123 Nguyễn Văn Linh, Q.7
-                </Text>
+        <Text style={styles.sectionTitle}>Điểm thu gom đã lưu</Text>
+        {(loading ? [] : locations).slice(0, 3).map((loc, idx) => (
+          <View key={idx} style={styles.locationCard}>
+            <TouchableOpacity
+              style={styles.locationTouchable}
+              activeOpacity={0.8}
+            >
+              <View style={styles.locationInfo}>
+                <MaterialCommunityIcons
+                  name="map-marker"
+                  size={24}
+                  color="#0A0A0A"
+                />
+                <View style={styles.locationDetails}>
+                  <Text style={styles.locationName}>{loc?.name || loc?.title || "Điểm thu gom"}</Text>
+                  <Text style={styles.locationAddress}>
+                    {loc?.address || loc?.city || ""}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>1.2 km</Text>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.hoursContainer}>
-            <Text style={styles.hoursText}>Mở cửa: 7:00 - 18:00</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        ))}
 
         <TouchableOpacity style={styles.mapButton} activeOpacity={0.9}>
           <Text style={styles.mapButtonText}>Xem bản đồ</Text>

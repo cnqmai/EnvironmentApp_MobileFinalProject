@@ -56,3 +56,42 @@ export const getMyStatistics = async () => {
     return response.json();
 };
 
+/**
+ * Lấy thông tin hồ sơ user hiện tại
+ * GET /api/users/me
+ */
+export const getMyProfile = async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/me`, {
+        method: 'GET',
+    });
+
+    if (!response.ok) {
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy thông tin người dùng' }));
+        throw new Error(errorDetail.message || 'Không thể lấy thông tin người dùng.');
+    }
+
+    return response.json();
+};
+
+/**
+ * Cố gắng lấy user hiện tại qua nhiều endpoint thường gặp
+ */
+export const getCurrentUserFlexible = async () => {
+    const tryEndpoints = [
+        `${API_BASE_URL}/users/me`,
+        `${API_BASE_URL}/auth/me`,
+        `${API_BASE_URL}/users/profile`,
+    ];
+
+    for (const url of tryEndpoints) {
+        try {
+            const res = await fetchWithAuth(url, { method: 'GET' });
+            if (res.ok) {
+                return await res.json();
+            }
+        } catch (_) {}
+    }
+
+    throw new Error('Không thể lấy thông tin người dùng từ các endpoint chuẩn.');
+};
+

@@ -5,10 +5,17 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import typography from "../../styles/typography";
+import { getMyProfile, getMyStatistics, getCurrentUserFlexible } from "../../src/services/userService";
+import { getToken } from "../../src/utils/apiHelper";
+import { getMyBadges } from "../../src/services/badgeService";
 
 const ProfileScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [user, setUser] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [badges, setBadges] = useState([]);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -17,6 +24,61 @@ const ProfileScreen = () => {
       setIsLoggedIn(false);
     }
   }, [params.logout]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingProfile(true);
+        const token = await getToken();
+        if (!token) {
+          if (mounted) setIsLoggedIn(false);
+          return;
+        }
+        let profile = null;
+        try {
+          profile = await getMyProfile();
+        } catch (e) {
+          try {
+            profile = await getCurrentUserFlexible();
+          } catch (_) {}
+        }
+        console.log("[Profile] resolved user:", profile);
+        if (mounted && profile) setUser(profile);
+        // Lấy thống kê cá nhân nếu cần hiển thị
+        getMyStatistics()
+          .then((s) => { if (mounted) setStats(s); })
+          .catch(() => {});
+        // Lấy badges
+        getMyBadges()
+          .then((b) => { if (mounted) setBadges(Array.isArray(b) ? b : []); })
+          .catch(() => {});
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (mounted) setLoadingProfile(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const decodeJwt = (jwt) => {
+    try {
+      const parts = jwt.split(".");
+      if (parts.length < 2) return null;
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(atob(base64).split("").map(c => '%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+      return JSON.parse(json);
+    } catch (_) { return null; }
+  };
+
+  const [jwtClaims, setJwtClaims] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const token = await getToken();
+      if (token) setJwtClaims(decodeJwt(token));
+    })();
+  }, []);
 
   const MenuItem = ({ icon, title, onPress }) => (
     <TouchableOpacity
@@ -140,7 +202,15 @@ const ProfileScreen = () => {
                 color="#0a0a0aff"
               />
             </View>
-            <Text style={styles.userName}>Lưu Thuý Anh</Text>
+            <Text style={styles.userName}>
+              {loadingProfile
+                ? "Đang tải..."
+                : (
+                    user?.fullName ||
+                    (user?.firstName || user?.lastName ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim() : null) ||
+                    "Người dùng"
+                  )}
+            </Text>
 
             <View style={styles.infoRow}>
               <MaterialCommunityIcons
@@ -148,7 +218,7 @@ const ProfileScreen = () => {
                 size={16}
                 color="#666"
               />
-              <Text style={styles.infoText}>anh123@gmail.com</Text>
+              <Text style={styles.infoText}>{user?.email || user?.mail || jwtClaims?.email || ""}</Text>
             </View>
 
             <View style={styles.infoRow}>
@@ -157,7 +227,7 @@ const ProfileScreen = () => {
                 size={16}
                 color="#666"
               />
-              <Text style={styles.infoText}>0123456789</Text>
+              <Text style={styles.infoText}>{user?.phone || user?.phoneNumber || user?.mobile || ""}</Text>
             </View>
 
             <View style={styles.infoRow}>
@@ -166,7 +236,7 @@ const ProfileScreen = () => {
                 size={16}
                 color="#666"
               />
-              <Text style={styles.infoText}>Thành phố Hồ Chí Minh</Text>
+              <Text style={styles.infoText}>{user?.location || user?.city || user?.address?.city || ""}</Text>
             </View>
           </View>
 
@@ -178,14 +248,44 @@ const ProfileScreen = () => {
 
             <View style={styles.pointsRow}>
               <Text style={styles.pointsLabel}>Điểm xanh</Text>
-              <Text style={styles.pointsValue}>200/300xp</Text>
+              <Text style={styles.pointsValue}>
+                {stats ? `${stats.points || stats.totalPoints || 0}/${stats.nextBadgePoints || 300}xp` : ""}
+              </Text>
             </View>
 
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: "66.67%" }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: stats?.nextBadgePoints
+                        ? `${Math.min(((stats.points || stats.totalPoints || 0) / stats.nextBadgePoints) * 100, 100)}%`
+                        : "0%",
+                    },
+                  ]}
+                />
               </View>
             </View>
+            {badges.length > 0 && (
+              <View style={styles.badgesContainer}>
+                <Text style={styles.badgesLabel}>Huy hiệu đạt được:</Text>
+                <View style={styles.badgesRow}>
+                  {badges.slice(0, 3).map((badge) => (
+                    <View key={badge.id || badge.badgeId} style={styles.badgeItem}>
+                      <MaterialCommunityIcons
+                        name={badge.icon || "medal"}
+                        size={24}
+                        color={badge.color || "#4CAF50"}
+                      />
+                      <Text style={styles.badgeName} numberOfLines={1}>
+                        {badge.name || badge.title || "Badge"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.learnMoreButton}
@@ -593,6 +693,40 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: -0.2,
+  },
+  badgesContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  badgesLabel: {
+    ...typography.small,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 8,
+  },
+  badgesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  badgeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  badgeName: {
+    ...typography.small,
+    fontSize: 11,
+    color: "#0A0A0A",
+    fontWeight: "500",
+    maxWidth: 80,
   },
 });
 

@@ -12,12 +12,14 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import typography from "../styles/typography";
 import { getAllCategories } from "../src/services/categoryService";
+import { searchWasteGuide } from "../src/services/recycleService";
 
 const RecycleSearchScreen = () => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -71,6 +73,39 @@ const RecycleSearchScreen = () => {
                   name="close-circle"
                   size={20}
                   color="#8E8E93"
+                />
+              </TouchableOpacity>
+            )}
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={async () => {
+                  if (searching) return;
+                  try {
+                    setSearching(true);
+                    const result = await searchWasteGuide(searchQuery);
+                    if (result?.categoryType || result?.type || result?.category) {
+                      const type = (result.categoryType || result.type || result.category).toLowerCase();
+                      router.push({
+                        pathname: "/recycle-guide",
+                        params: {
+                          type: type,
+                          title: result.categoryName || result.name || searchQuery,
+                          subtitle: result.description || result.guide || "",
+                        },
+                      });
+                    }
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setSearching(false);
+                  }
+                }}
+                disabled={searching}
+              >
+                <MaterialCommunityIcons
+                  name="magnify"
+                  size={20}
+                  color={searching ? "#8E8E93" : "#007AFF"}
                 />
               </TouchableOpacity>
             )}
