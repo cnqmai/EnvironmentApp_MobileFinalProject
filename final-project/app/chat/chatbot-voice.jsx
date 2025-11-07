@@ -41,13 +41,6 @@ const VoiceChat = () => {
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Chatbot môi trường</Text>
-        <IconButton
-          icon="microphone"
-          size={22}
-          color="#fff"
-          onPress={() => {}}
-          style={styles.iconWrap}
-        />
       </View>
 
       <View style={styles.centerArea}>
@@ -61,7 +54,7 @@ const VoiceChat = () => {
             onPress={() => setListening((s) => !s)}
             style={styles.micInner}
           >
-            <Text style={styles.micIcon}>{listening ? "●" : "♪"}</Text>
+            <IconButton icon="microphone" size={40} iconColor="#000" />
           </TouchableOpacity>
         </Animated.View>
 
@@ -90,13 +83,18 @@ const styles = StyleSheet.create({
     height: 72,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     backgroundColor: "#0EA5F5",
   },
   backWrap: { padding: 8 },
   backText: { ...typography.h3, color: "#fff", fontWeight: "700" },
-  title: { ...typography.h2, color: "#fff", fontWeight: "700" },
+  title: {
+    ...typography.h2,
+    color: "#fff",
+    fontWeight: "700",
+    alignSelf: "center",
+    marginLeft: 8,
+  },
   centerArea: { flex: 1, justifyContent: "center", alignItems: "center" },
   micOuter: {
     width: 210,
