@@ -2,13 +2,18 @@ import { API_BASE_URL } from '../constants/api';
 import { saveToken } from '../utils/apiHelper';
 
 export const loginUser = async (email, password) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-    });
+    let response;
+    try {
+        response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
+    } catch (e) {
+        throw new Error('Không thể kết nối tới máy chủ xác thực. Kiểm tra mạng/Wi‑Fi và API_BASE_URL.');
+    }
 
     if (!response.ok) {
         // Lấy thông báo lỗi từ Spring Boot (nếu có ResponseStatusException)
@@ -28,14 +33,21 @@ export const loginUser = async (email, password) => {
 };
 
 export const registerUser = async (email, password, fullName) => {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const url = `${API_BASE_URL}/auth/register`;
+    console.log("🔗 Gửi request đến:", url);
+    
+    let response;
+    try {
+      response = await fetch(url, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, fullName }),
-    });
-
+      });
+    } catch (e) {
+      console.error("❌ Không thể kết nối tới:", url, e);
+      throw new Error('Không thể kết nối tới máy chủ đăng ký. Kiểm tra mạng/Wi-Fi và API_BASE_URL.');
+    }
+  
     if (!response.ok) {
         const errorDetail = await response.json().catch(() => ({ message: 'Lỗi đăng ký không xác định' }));
         throw new Error(errorDetail.message || 'Email đã tồn tại hoặc dữ liệu không hợp lệ.');

@@ -17,7 +17,15 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
         <StatusBar style="dark" />
-        <Stack>
+        <Stack initialRouteName="login">
+          <Stack.Screen
+            name="login"
+            options={{ headerShown: false, title: "Đăng nhập" }}
+          />
+          <Stack.Screen
+            name="register"
+            options={{ headerShown: false, title: "Đăng ký" }}
+          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="detail"
