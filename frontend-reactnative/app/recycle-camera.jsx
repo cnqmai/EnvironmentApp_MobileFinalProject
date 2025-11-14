@@ -1,16 +1,13 @@
-import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import React from "react";
+import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import typography from "../styles/typography";
-import { recognizeWasteImage } from "../src/services/recycleService";
 
 const RecycleCameraScreen = () => {
   const router = useRouter();
-  const [processing, setProcessing] = useState(false);
 
   const stats = [
     { label: "Đã phân loại", value: "1,234", color: "#4CAF50" },
@@ -23,78 +20,6 @@ const RecycleCameraScreen = () => {
     "Đặt vật phẩm trên nền đơn giản",
     "Chụp từ nhiều góc độ",
   ];
-
-  const handlePickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Cần quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh.");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await processImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Lỗi", "Không thể chọn ảnh.");
-    }
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Cần quyền camera", "Vui lòng cấp quyền sử dụng camera.");
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await processImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Lỗi", "Không thể chụp ảnh.");
-    }
-  };
-
-  const processImage = async (imageUri) => {
-    try {
-      setProcessing(true);
-      const result = await recognizeWasteImage(imageUri);
-      
-      // Navigate to recycle guide với kết quả nhận diện
-      if (result?.categoryType || result?.type || result?.category) {
-        const type = (result.categoryType || result.type || result.category).toLowerCase();
-        router.push({
-          pathname: "/recycle-guide",
-          params: {
-            type: type,
-            title: result.categoryName || result.name || "Kết quả phân loại",
-            subtitle: result.description || result.guide || "",
-          },
-        });
-      } else {
-        Alert.alert("Không nhận diện được", "Vui lòng thử lại với ảnh khác.");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Lỗi", error.message || "Không thể nhận diện loại rác từ ảnh.");
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -125,39 +50,17 @@ const RecycleCameraScreen = () => {
           <Text style={styles.uploadSubtitle}>PNG, JPG (tối đa 10MB)</Text>
 
           <View style={styles.uploadButtons}>
-            <TouchableOpacity
-              style={[styles.uploadButton, processing && styles.disabledButton]}
-              onPress={handlePickImage}
-              activeOpacity={0.9}
-              disabled={processing}
-            >
-              {processing ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons
-                    name="tray-arrow-up"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.uploadButtonText}>Chọn ảnh</Text>
-                </>
-              )}
+            <TouchableOpacity style={styles.uploadButton} activeOpacity={0.9}>
+              <MaterialCommunityIcons
+                name="tray-arrow-up"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.uploadButtonText}>Chọn ảnh</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.cameraButton, processing && styles.disabledButton]}
-              onPress={handleTakePhoto}
-              activeOpacity={0.9}
-              disabled={processing}
-            >
-              {processing ? (
-                <ActivityIndicator color="#0A0A0A" size="small" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="camera" size={20} color="#0A0A0A" />
-                  <Text style={styles.cameraButtonText}>Chụp</Text>
-                </>
-              )}
+            <TouchableOpacity style={styles.cameraButton} activeOpacity={0.9}>
+              <MaterialCommunityIcons name="camera" size={20} color="#0A0A0A" />
+              <Text style={styles.cameraButtonText}>Chụp</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -352,9 +255,6 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
-  },
-  disabledButton: {
-    opacity: 0.6,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   StyleSheet,
@@ -11,33 +11,17 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import typography from "../styles/typography";
-import { getAllCategories } from "../src/services/categoryService";
-import { searchWasteGuide } from "../src/services/recycleService";
 
 const RecycleSearchScreen = () => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const data = await getAllCategories();
-        if (mounted) setCategories(Array.isArray(data) ? data : []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const quickFilters = [
+    { id: 1, label: "Chai nhựa", selected: true },
+    { id: 2, label: "Hộp giấy", selected: false },
+    { id: 3, label: "Pin cũ", selected: false },
+    { id: 4, label: "Túi ni lông", selected: false },
+  ];
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -76,66 +60,27 @@ const RecycleSearchScreen = () => {
                 />
               </TouchableOpacity>
             )}
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={async () => {
-                  if (searching) return;
-                  try {
-                    setSearching(true);
-                    const result = await searchWasteGuide(searchQuery);
-                    if (result?.categoryType || result?.type || result?.category) {
-                      const type = (result.categoryType || result.type || result.category).toLowerCase();
-                      router.push({
-                        pathname: "/recycle-guide",
-                        params: {
-                          type: type,
-                          title: result.categoryName || result.name || searchQuery,
-                          subtitle: result.description || result.guide || "",
-                        },
-                      });
-                    }
-                  } catch (e) {
-                    console.error(e);
-                  } finally {
-                    setSearching(false);
-                  }
-                }}
-                disabled={searching}
-              >
-                <MaterialCommunityIcons
-                  name="magnify"
-                  size={20}
-                  color={searching ? "#8E8E93" : "#007AFF"}
-                />
-              </TouchableOpacity>
-            )}
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Tìm kiếm phổ biến</Text>
         <View style={styles.filtersContainer}>
-          {(loading ? [] : categories).map((cat) => (
+          {quickFilters.map((filter) => (
             <TouchableOpacity
-              key={cat.id || cat.code || cat.name}
-              style={styles.filterChip}
+              key={filter.id}
+              style={[
+                styles.filterChip,
+                filter.selected && styles.filterChipSelected,
+              ]}
               activeOpacity={0.7}
-              onPress={() => {
-                const raw = (cat.code || cat.name || "recyclable").toString().toLowerCase();
-                const allowed = ["organic", "recyclable", "hazardous", "electronic", "glass", "textile"];
-                const inferred = allowed.includes(raw)
-                  ? raw
-                  : raw.includes("hữu") ? "organic" : "recyclable";
-                router.push({
-                  pathname: "/recycle-guide",
-                  params: {
-                    type: inferred,
-                    title: cat.name || cat.title || "Danh mục",
-                  },
-                });
-              }}
             >
-              <Text style={styles.filterText}>
-                {cat.name || cat.title || "Danh mục"}
+              <Text
+                style={[
+                  styles.filterText,
+                  filter.selected && styles.filterTextSelected,
+                ]}
+              >
+                {filter.label}
               </Text>
             </TouchableOpacity>
           ))}

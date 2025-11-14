@@ -2,9 +2,6 @@ import { Stack } from "expo-router";
 import { Provider as PaperProvider, DefaultTheme } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
-import { getToken, saveToken } from "../src/utils/apiHelper";
-import { FIXED_DEV_JWT } from "../src/constants/auth";
 
 const theme = {
   ...DefaultTheme,
@@ -16,19 +13,6 @@ const theme = {
 };
 
 export default function RootLayout() {
-  useEffect(() => {
-    (async () => {
-      try {
-        const existing = await getToken();
-        if (!existing && FIXED_DEV_JWT) {
-          await saveToken(FIXED_DEV_JWT);
-          console.log("Dev JWT seeded from constants.");
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, []);
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
