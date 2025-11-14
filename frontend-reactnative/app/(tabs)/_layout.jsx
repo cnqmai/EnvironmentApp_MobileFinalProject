@@ -1,137 +1,143 @@
-import React, { useState } from "react";
+import React from "react";
 import { Tabs } from "expo-router";
-import { Platform, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { StyleSheet, Platform, View } from "react-native";
+import {
+  MaterialIcons,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+
 import TabOverflowMenu from "../../components/TabOverflowMenu";
 
-export default function TabsLayout() {
-  const [showOverflow, setShowOverflow] = useState(false);
-
+const TabsLayout = () => {
   return (
-    <>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: "#007AFF",
-          tabBarInactiveTintColor: "#8E8E93",
-          tabBarStyle: {
-            position: "absolute",
-            alignItems: "center",
-            bottom: 25,
-            left: 16,
-            right: 16,
-            marginHorizontal: 16,
-            elevation: 8,
-            backgroundColor: "#FFFFFF",
-            borderRadius: 36,
-            height: 60,
-            paddingBottom: 10,
-            paddingTop: 10,
-            borderTopWidth: 0,
-            shadowColor: "#000",
-            shadowOffset: {
-              width: 0,
-              height: 10,
-            },
-            shadowOpacity: 0.15,
-            shadowRadius: 20,
-            ...Platform.select({
-              ios: {
-                shadowOpacity: 0.15,
-              },
-              android: {
-                elevation: 8,
-              },
-            }),
-          },
-          tabBarLabelStyle: {
-            display: "none",
-          },
-          tabBarIconStyle: {
-            marginTop: 0,
-          },
-          tabBarItemStyle: {
-            justifyContent: "center",
-            alignItems: "center",
-          },
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: "#00796B",
+        tabBarInactiveTintColor: "#555",
+        tabBarShowLabel: false,
+        headerShown: false,
+        tabBarStyle: {
+          ...styles.tabBar,
+          height: Platform.OS === "android" ? 70 : 90,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="dashboard" size={28} color={color} />
+          ),
         }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Trang chủ",
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons
-                name={focused ? "home" : "home-outline"}
-                size={28}
-                color={color}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="recycle"
-          options={{
-            title: "Tái chế",
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons name="recycle" size={28} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="notifications"
-          options={{
-            title: "Thông báo",
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons
-                name={focused ? "bell" : "bell-outline"}
-                size={28}
-                color={color}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Hồ sơ",
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons
-                name={focused ? "account" : "account-outline"}
-                size={28}
-                color={color}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: "Thêm",
-            tabBarButton: (props) => (
-              <TouchableOpacity
-                onPress={() => setShowOverflow(true)}
-                style={{ justifyContent: "center", alignItems: "center" }}
-              >
-                <MaterialCommunityIcons
-                  name="dots-horizontal"
-                  size={28}
-                  color={
-                    props.accessibilityState &&
-                    props.accessibilityState.selected
-                      ? "#007AFF"
-                      : "#8E8E93"
-                  }
-                />
-              </TouchableOpacity>
-            ),
-          }}
-        />
-      </Tabs>
-      <TabOverflowMenu
-        visible={showOverflow}
-        onClose={() => setShowOverflow(false)}
       />
-    </>
+      <Tabs.Screen
+        name="recycle"
+        options={{
+          title: "Tái chế",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="recycling" size={32} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="notifications" size={28} color={color} />
+          ),
+          tabBarBadge: 3,
+          tabBarBadgeStyle: styles.badge,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Hồ sơ",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-circle" size={30} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "Thêm",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="dots-horizontal-circle"
+              size={28}
+              color={color}
+            />
+          ),
+          tabBarButton: (props) => (
+            <TabOverflowMenu {...props} /> // Component tùy chỉnh của bạn
+          ),
+        }}
+      />
+      
+      {/* ===== ẨN TAB TẠM THỜI ===== */}
+      <Tabs.Screen
+        name="login" // Tên tệp: login.jsx
+        options={{
+          title: "Đăng nhập",
+          href: null, // <-- ẨN TAB NÀY KHỎI GIAO DIỆN
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="login" size={28} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="register" // Tên tệp: register.jsx
+        options={{
+          title: "Đăng ký",
+          href: null, // <-- ẨN TAB NÀY KHỎI GIAO DIỆN
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="account-plus" size={28} color={color} />
+          ),
+        }}
+      />
+      {/* ============================== */}
+      
+    </Tabs>
   );
-}
+};
+
+// Styles gốc từ tệp của bạn
+const styles = StyleSheet.create({
+  tabBar: {
+    position: "absolute",
+    bottom: 25,
+    left: 20,
+    right: 20,
+    borderRadius: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderTopWidth: 0,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 5.46,
+  },
+  badge: {
+    backgroundColor: "#FF6347", // Màu đỏ
+    color: "#fff",
+    fontSize: 11,
+    lineHeight: 14,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    textAlign: "center",
+    overflow: "hidden",
+    position: "absolute",
+    top: 10,
+    right: 18,
+  },
+});
+
+export default TabsLayout;

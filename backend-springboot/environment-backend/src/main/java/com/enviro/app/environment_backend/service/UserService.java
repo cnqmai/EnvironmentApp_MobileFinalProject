@@ -4,18 +4,24 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.UUID; // Sử dụng UUID
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Thêm các DTO và Model cần thiết
+import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
+import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
 import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
+import com.enviro.app.environment_backend.model.NotificationSettings;
 import com.enviro.app.environment_backend.model.Report;
 import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
+// Thêm các Repository cần thiết
+import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
 import com.enviro.app.environment_backend.repository.UserRepository;
@@ -26,16 +32,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
     private final SavedLocationRepository savedLocationRepository;
+    // THÊM: Repository còn thiếu
+    private final NotificationSettingsRepository notificationSettingsRepository;
 
+    // CẬP NHẬT: Hàm khởi tạo (Constructor)
     public UserService(UserRepository userRepository, 
                       ReportRepository reportRepository,
-                      SavedLocationRepository savedLocationRepository) {
+                      SavedLocationRepository savedLocationRepository,
+                      NotificationSettingsRepository notificationSettingsRepository) { // THÊM
         this.userRepository = userRepository;
         this.reportRepository = reportRepository;
         this.savedLocationRepository = savedLocationRepository;
+        this.notificationSettingsRepository = notificationSettingsRepository; // THÊM
     }
 
-    public Optional<User> findById(UUID id) {
+    public Optional<User> findById(UUID id) { // SỬA: Dùng UUID
         return userRepository.findById(id);
     }
 
@@ -43,16 +54,16 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    // Cần phương thức này cho AuthController
     public User save(User user) {
         return userRepository.save(user);
     }
 
     @Transactional
-    public User updateUserProfile(UUID userId, UpdateProfileRequest request) {
+    public User updateUserProfile(UUID userId, UpdateProfileRequest request) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        // Cập nhật các trường hiện có
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName());
         }
@@ -62,8 +73,6 @@ public class UserService {
         if (request.getDefaultLocation() != null) {
             user.setDefaultLocation(request.getDefaultLocation());
         }
-
-        // --- THÊM MỚI: Cập nhật các trường mới ---
         if (request.getGender() != null) {
             user.setGender(request.getGender());
         }
@@ -72,60 +81,43 @@ public class UserService {
         }
         if (request.getDateOfBirth() != null) {
             try {
-                // Chuyển đổi String "yyyy-MM-dd" thành đối tượng LocalDate
                 user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
             } catch (DateTimeParseException e) {
-                // Có thể bỏ qua hoặc log lỗi nếu định dạng ngày tháng không đúng
                 System.err.println("Invalid date format for dateOfBirth: " + request.getDateOfBirth());
             }
         }
-        // ------------------------------------
 
         return userRepository.save(user);
     }
     
-    /**
-     * Xóa tài khoản và toàn bộ dữ liệu liên quan (FR-7.2)
-     * Cascade delete sẽ tự động xóa các bảng liên quan (reports, saved_locations, etc.)
-     */
     @Transactional
-    public void deleteUser(UUID userId) {
+    public void deleteUser(UUID userId) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
-        // Xóa user (cascade delete sẽ tự động xóa các bảng liên quan do ON DELETE CASCADE)
         userRepository.delete(user);
     }
     
-    /**
-     * Lấy thống kê cá nhân của user (FR-13.1.1)
-     */
-    public UserStatisticsResponse getUserStatistics(UUID userId) {
+    public UserStatisticsResponse getUserStatistics(UUID userId) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
-        // Đếm tổng số báo cáo
         long totalReports = reportRepository.countByUser(user);
-        
-        // Đếm số báo cáo theo trạng thái (tối ưu hơn - query trực tiếp)
         long reportsReceived = reportRepository.countByUserAndStatus(user, ReportStatus.RECEIVED);
         long reportsProcessing = reportRepository.countByUserAndStatus(user, ReportStatus.IN_PROGRESS);
         long reportsCompleted = reportRepository.countByUserAndStatus(user, ReportStatus.RESOLVED);
-        
-        // Đếm số vị trí đã lưu
         long savedLocationsCount = savedLocationRepository.countByUserId(userId);
         
-        // Đếm số lần phân loại rác và tổng số media (lấy danh sách reports một lần)
         List<Report> userReports = reportRepository.findByUserOrderByCreatedAtDesc(user);
         long wasteClassificationsCount = userReports.stream()
                 .filter(r -> r.getWasteCategory() != null)
                 .count();
         
-        // Đếm tổng số media đã upload
         long totalMediaUploaded = userReports.stream()
                 .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
                 .sum();
         
+        // SỬA: Dùng @Builder (vì DTO UserStatisticsResponse không có setters)
         return UserStatisticsResponse.builder()
                 .totalReports(totalReports)
                 .reportsReceived(reportsReceived)
@@ -136,5 +128,64 @@ public class UserService {
                 .wasteClassificationsCount(wasteClassificationsCount)
                 .totalMediaUploaded(totalMediaUploaded)
                 .build();
+    }
+
+    // --- THÊM: Các phương thức bị thiếu (đã cập nhật) ---
+
+    public NotificationSettingsResponse getNotificationSettings(UUID userId) { // SỬA: Dùng UUID
+        NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
+        
+        // SỬA: Dùng tên trường mới (ví dụ: getAqiAlertEnabled)
+        return NotificationSettingsResponse.builder()
+            .aqiAlertEnabled(settings.getAqiAlertEnabled())
+            .aqiThreshold(settings.getAqiThreshold())
+            .collectionReminderEnabled(settings.getCollectionReminderEnabled())
+            .campaignNotificationsEnabled(settings.getCampaignNotificationsEnabled())
+            .weatherAlertEnabled(settings.getWeatherAlertEnabled())
+            .badgeNotificationsEnabled(settings.getBadgeNotificationsEnabled())
+            .reportStatusNotificationsEnabled(settings.getReportStatusNotificationsEnabled())
+            .build();
+    }
+
+    @Transactional
+    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { // SỬA: Dùng UUID
+        NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
+        
+        // SỬA: Dùng tên trường mới (ví dụ: setAqiAlertEnabled)
+        if (request.getAqiAlertEnabled() != null) {
+            settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
+        }
+        if (request.getAqiThreshold() != null) {
+            settings.setAqiThreshold(request.getAqiThreshold());
+        }
+        if (request.getCollectionReminderEnabled() != null) {
+            settings.setCollectionReminderEnabled(request.getCollectionReminderEnabled());
+        }
+        if (request.getCampaignNotificationsEnabled() != null) {
+            settings.setCampaignNotificationsEnabled(request.getCampaignNotificationsEnabled());
+        }
+        if (request.getWeatherAlertEnabled() != null) {
+            settings.setWeatherAlertEnabled(request.getWeatherAlertEnabled());
+        }
+        if (request.getBadgeNotificationsEnabled() != null) {
+            settings.setBadgeNotificationsEnabled(request.getBadgeNotificationsEnabled());
+        }
+        if (request.getReportStatusNotificationsEnabled() != null) {
+            settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
+        }
+        
+        NotificationSettings updatedSettings = notificationSettingsRepository.save(settings);
+        
+        return NotificationSettingsResponse.builder()
+            .aqiAlertEnabled(updatedSettings.getAqiAlertEnabled())
+            .aqiThreshold(updatedSettings.getAqiThreshold())
+            .collectionReminderEnabled(updatedSettings.getCollectionReminderEnabled())
+            .campaignNotificationsEnabled(updatedSettings.getCampaignNotificationsEnabled())
+            .weatherAlertEnabled(updatedSettings.getWeatherAlertEnabled())
+            .badgeNotificationsEnabled(updatedSettings.getBadgeNotificationsEnabled())
+            .reportStatusNotificationsEnabled(updatedSettings.getReportStatusNotificationsEnabled())
+            .build();
     }
 }
