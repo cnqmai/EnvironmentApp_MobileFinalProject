@@ -5,6 +5,7 @@ import java.util.Arrays;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod; // <-- THÊM IMPORT NÀY
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -75,13 +76,20 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             
-            // MỞ KHOÁ TẤT CẢ CÁC ENDPOINT
+            // === SỬA LỖI BẮT ĐẦU TỪ ĐÂY ===
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/**").permitAll() 
-                .anyRequest().permitAll()             
+                // 1. Cho phép tất cả các endpoint /api/auth/** (Đăng nhập, Đăng ký, v.v.)
+                .requestMatchers("/api/auth/**").permitAll()
+                
+                // 2. Cho phép API AQI công khai (lấy theo GPS)
+                .requestMatchers(HttpMethod.GET, "/api/aqi").permitAll() 
+                
+                // 3. Yêu cầu xác thực (phải đăng nhập) cho TẤT CẢ các yêu cầu khác
+                .anyRequest().authenticated()             
             )
+            // ================================
             
-            // Giữ lại Filter để không gây lỗi Bean Injection
+            // Đảm bảo Filter chạy TRƯỚC khi kiểm tra bảo mật
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         http.formLogin(form -> form.disable());

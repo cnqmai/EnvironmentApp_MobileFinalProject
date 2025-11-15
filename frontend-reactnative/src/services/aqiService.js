@@ -43,3 +43,24 @@ export const checkAqiAlert = async (latitude, longitude, threshold) => {
 
     return response.json(); // Trả về AqiAlertResponse DTO
 };
+
+/**
+ * Lấy dữ liệu AQI cho tất cả các địa điểm đã lưu của người dùng. (FR-2.1.2)
+ * Protected API - cần authentication
+ * @returns {Promise<SavedLocationAqiResponse[]>}
+ */
+export const getAqiForSavedLocations = async () => {
+  // Endpoint này tương ứng với getAqiForSavedLocations trong AqiController.java
+  const url = `${API_BASE_URL}/aqi/saved-locations`;
+  
+  // Sử dụng fetchWithAuth vì đây là API cần đăng nhập
+  const response = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error('Không thể lấy dữ liệu AQI cho các địa điểm đã lưu.');
+  }
+
+  return response.json(); // Trả về một mảng SavedLocationAqiResponse
+};

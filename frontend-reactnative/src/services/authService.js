@@ -1,157 +1,161 @@
 import { API_BASE_URL } from '../constants/api';
-import { saveToken } from '../utils/apiHelper';
+import { fetchWithAuth } from '../utils/apiHelper';
 
-export const loginUser = async (email, password) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-        // Lấy thông báo lỗi từ Spring Boot (nếu có ResponseStatusException)
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi đăng nhập không xác định' }));
-        throw new Error(errorDetail.message || 'Sai Email hoặc Mật khẩu.');
-    }
-
-    const data = await response.json();
+/**
+ * Xử lý lỗi API chung, cố gắng đọc JSON từ backend
+ */
+const handleApiError = async (response) => {
+  try {
+    const errorData = await response.json();
     
-    // Lưu JWT Token vào AsyncStorage
-    if (data.token) {
-        await saveToken(data.token);
-        console.log("Login Successful, token saved:", data.token);
+    // Lỗi validation từ @Valid
+    if (errorData.errors) {
+      const firstError = Object.values(errorData.errors)[0];
+      return firstError || errorData.error || 'Yêu cầu không hợp lệ';
     }
     
-    return data; // Trả về AuthResponse: { userId, email, fullName, token, expires, ... }
+    // Lỗi chung (ví dụ: 401 Unauthorized từ AuthController)
+    if (errorData.message) {
+      return errorData.message;
+    }
+
+    if (errorData.error) {
+      return errorData.error;
+    }
+
+    return 'Đã xảy ra lỗi không xác định';
+  } catch (e) {
+    return await response.text() || 'Lỗi máy chủ';
+  }
 };
 
-export const registerUser = async (email, password, fullName) => {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, fullName }),
-    });
 
-    if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi đăng ký không xác định' }));
-        throw new Error(errorDetail.message || 'Email đã tồn tại hoặc dữ liệu không hợp lệ.');
-    }
+/**
+ * Đăng nhập người dùng (FR-1.1.1)
+ * Public API
+ * @returns {Promise<AuthResponse>}
+ */
+export const login = async (email, password) => { // SỬA: 'username' -> 'email'
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    // SỬA: Gửi 'email'
+    body: JSON.stringify({ email, password }),
+  });
 
-    const data = await response.json();
-    
-    // Lưu JWT Token vào AsyncStorage
-    if (data.token) {
-        await saveToken(data.token);
-        console.log("Registration Successful, token saved:", data.token);
-    }
-    
-    return data; // Trả về AuthResponse
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
+
+  return response.json(); // Trả về { token, user }
 };
 
 /**
- * Đăng nhập bằng Google OAuth2
- * POST /api/auth/google
+ * Đăng ký người dùng mới (FR-1.1.2)
+ * Public API
+ * @returns {Promise<User>}
+ */
+export const register = async (fullName, email, password) => { // SỬA: 'username' -> 'fullName'
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    // SỬA: Gửi 'fullName'
+    body: JSON.stringify({ fullName, email, password }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
+
+  return response.json(); // Trả về thông tin user đã tạo
+};
+
+/**
+ * Yêu cầu reset mật khẩu (FR-1.1.3)
+ * Public API
+ * @returns {Promise<void>}
+ */
+export const requestPasswordReset = async (email) => {
+  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Reset mật khẩu bằng token (FR-1.1.3)
+ * Public API
+ * @returns {Promise<void>}
+ */
+export const resetPassword = async (token, newPassword) => {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token, newPassword }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Đăng nhập bằng Google (FR-1.2.1)
+ * Public API
+ * @returns {Promise<AuthResponse>}
  */
 export const loginWithGoogle = async (googleToken) => {
-    const response = await fetch(`${API_BASE_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: googleToken }),
-    });
+  const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token: googleToken }),
+  });
 
-    if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi đăng nhập Google' }));
-        throw new Error(errorDetail.message || 'Không thể đăng nhập bằng Google.');
-    }
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
 
-    const data = await response.json();
-    
-    // Lưu JWT Token vào AsyncStorage
-    if (data.token) {
-        await saveToken(data.token);
-        console.log("Google Login Successful, token saved:", data.token);
-    }
-    
-    return data;
+  return response.json();
 };
 
 /**
- * Đăng nhập bằng Facebook OAuth2
- * POST /api/auth/facebook
+ * Đăng nhập bằng Facebook (FR-1.2.2)
+ * Public API
+ * @returns {Promise<AuthResponse>}
  */
 export const loginWithFacebook = async (facebookToken) => {
-    const response = await fetch(`${API_BASE_URL}/auth/facebook`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: facebookToken }),
-    });
+  const response = await fetch(`${API_BASE_URL}/auth/facebook`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token: facebookToken }),
+  });
 
-    if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi đăng nhập Facebook' }));
-        throw new Error(errorDetail.message || 'Không thể đăng nhập bằng Facebook.');
-    }
+  if (!response.ok) {
+    const errorMessage = await handleApiError(response);
+    throw new Error(errorMessage);
+  }
 
-    const data = await response.json();
-    
-    // Lưu JWT Token vào AsyncStorage
-    if (data.token) {
-        await saveToken(data.token);
-        console.log("Facebook Login Successful, token saved:", data.token);
-    }
-    
-    return data;
-};
-
-/**
- * Yêu cầu reset mật khẩu
- * POST /api/auth/forgot-password
- */
-export const forgotPassword = async (email) => {
-    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-    });
-
-    if (!response.ok) {
-        const errorDetail = await response.text().catch(() => 'Lỗi yêu cầu reset mật khẩu');
-        throw new Error(errorDetail || 'Không thể gửi yêu cầu reset mật khẩu.');
-    }
-
-    return response.text(); // Trả về message
-};
-
-/**
- * Reset mật khẩu với token
- * POST /api/auth/reset-password
- */
-export const resetPassword = async (token, newPassword, confirmPassword) => {
-    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-            token, 
-            newPassword, 
-            confirmPassword 
-        }),
-    });
-
-    if (!response.ok) {
-        const errorDetail = await response.text().catch(() => 'Lỗi reset mật khẩu');
-        throw new Error(errorDetail || 'Không thể reset mật khẩu.');
-    }
-
-    return response.text(); // Trả về message
+  return response.json();
 };

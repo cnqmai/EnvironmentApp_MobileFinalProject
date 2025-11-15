@@ -1,66 +1,68 @@
-import { Stack } from "expo-router";
-import { Provider as PaperProvider, DefaultTheme } from "react-native-paper";
+import React, { useState, useEffect } from "react";
+import { Slot, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
+// Đường dẫn import đúng từ app/_layout.jsx là '../src/...'
+import { getToken } from "../src/utils/apiHelper";
 
-const theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: "#2196F3",
-    accent: "#f1c40f",
-  },
+/**
+ * Component này sẽ kiểm tra xác thực và điều hướng người dùng
+ */
+const AuthProvider = ({ children }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const segments = useSegments(); // Lấy đường dẫn hiện tại
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await getToken();
+        
+        // Kiểm tra xem người dùng có đang ở màn hình login/register không
+        // (tabs) -> login hoặc (tabs) -> register
+        const inAuthGroup = segments[0] === '(tabs)' && (segments[1] === 'login' || segments[1] === 'register');
+
+        if (!token && !inAuthGroup) {
+          // 1. Không có token VÀ không ở trang auth -> Chuyển đến login
+          router.replace("/(tabs)/login");
+        } else if (token && inAuthGroup) {
+          // 2. Có token VÀ đang ở trang auth (ví dụ: vừa login) -> Chuyển đến dashboard
+          router.replace("/(tabs)");
+        }
+        
+      } catch (e) {
+        console.error("Lỗi khi kiểm tra auth:", e);
+        // Nếu có lỗi, vẫn đưa về login
+        router.replace("/(tabs)/login");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Kiểm tra auth khi component mount hoặc đường dẫn thay đổi
+    checkAuth();
+  }, [segments, router]); // Chạy lại khi đường dẫn thay đổi
+
+  // Hiển thị màn hình loading trong khi kiểm tra token
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#00796B" />
+      </View>
+    );
+  }
+
+  // Nếu không loading, hiển thị nội dung (các trang)
+  return children;
 };
 
 export default function RootLayout() {
+  // Bọc toàn bộ ứng dụng trong AuthProvider
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={theme}>
-        <StatusBar style="dark" />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="detail"
-            options={{ headerShown: false, title: "AQI chi tiết" }}
-          />
-          <Stack.Screen
-            name="settings"
-            options={{ headerShown: false, title: "Cài đặt" }}
-          />
-          <Stack.Screen
-            name="edit-profile"
-            options={{ headerShown: false, title: "Chỉnh sửa hồ sơ" }}
-          />
-          <Stack.Screen
-            name="recycle-guide"
-            options={{ headerShown: false, title: "Hướng dẫn tái chế" }}
-          />
-          <Stack.Screen
-            name="recycle-search"
-            options={{ headerShown: false, title: "Tìm kiếm rác" }}
-          />
-          <Stack.Screen
-            name="recycle-camera"
-            options={{ headerShown: false, title: "Chụp ảnh nhận diện" }}
-          />
-          <Stack.Screen
-            name="settings/aqi-threshold"
-            options={{ headerShown: false, title: "Cài đặt ngưỡng cảnh báo" }}
-          />
-          <Stack.Screen
-            name="chat/chat-history"
-            options={{ headerShown: false, title: "Đoạn hội thoại" }}
-          />
-          <Stack.Screen
-            name="chat/chatbot"
-            options={{ headerShown: false, title: "Chatbot" }}
-          />
-          <Stack.Screen
-            name="chat/chatbot-voice"
-            options={{ headerShown: false, title: "Chatbot giọng nói" }}
-          />
-        </Stack>
-      </PaperProvider>
+      <AuthProvider>
+        <Slot />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
