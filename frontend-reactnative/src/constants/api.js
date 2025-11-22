@@ -3,25 +3,25 @@ import { Platform } from 'react-native';
 // ============================================
 // CẤU HÌNH NÀY - Đổi IP theo máy của bạn
 // ============================================
-const YOUR_COMPUTER_IP = '192.168.1.30'; // IP máy tính của bạn
+// Dựa trên ipconfig bạn cung cấp: Wireless LAN adapter Wi-Fi
+const YOUR_COMPUTER_IP = '172.20.10.9'; 
 
 let API_BASE_URL;
 
 // Logic chọn API Base URL:
-// - Android Emulator: dùng 10.0.2.2
-// - Mọi trường hợp khác (iOS, thiết bị thật): dùng IP máy tính
+// - Android Emulator: dùng 10.0.2.2 (Loopback của máy ảo Android)
+// - Mọi trường hợp khác (iOS, thiết bị thật Android, Simulator iOS): dùng IP máy tính
 
 if (Platform.OS === 'android') {
-  // Android - Mặc định dùng 10.0.2.2 cho máy ảo
-  API_BASE_URL = 'http://10.0.2.2:8080/api'; // Android Emulator
+  // Nếu đang chạy trên máy ảo Android (Android Studio Emulator)
+  // API_BASE_URL = 'http://10.0.2.2:8080/api'; 
   
-  // NẾU BẠN DÙNG THIẾT BỊ ANDROID THẬT (KHÔNG PHẢI MÁY ẢO):
-  // Hãy comment dòng trên và uncomment dòng dưới:
-  // API_BASE_URL = `http://${YOUR_COMPUTER_IP}:8080/api`;
+  // Nếu bạn đang chạy trên ĐIỆN THOẠI ANDROID THẬT:
+  // (Vì dải IP 172.20.10.x thường là Hotspot, nên thiết bị thật sẽ dùng IP này)
+  API_BASE_URL = `http://${YOUR_COMPUTER_IP}:8080/api`;
 
 } else {
   // Thiết bị thật (iOS với Expo Go), Máy ảo iOS, hoặc Production
-  // Tất cả đều có thể dùng IP máy tính
   API_BASE_URL = `http://${YOUR_COMPUTER_IP}:8080/api`;
 }
 

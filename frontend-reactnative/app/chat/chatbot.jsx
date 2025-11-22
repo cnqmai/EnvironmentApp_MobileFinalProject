@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -7,124 +7,99 @@ import {
   Animated,
   RefreshControl,
   Modal,
+  ActivityIndicator
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, Avatar, IconButton, Searchbar } from "react-native-paper";
 import { useRouter } from "expo-router";
 import typography from "../../styles/typography";
 
-const initialThreads = [
-  {
-    id: "1",
-    title: "Hướng dẫn vứt pin",
-    snippet:
-      "Pin đã dùng xử lý như thế nào? Mang đến điểm thu gom rác điện tử.",
-    time: "Hôm nay",
-    unread: true,
-  },
-  {
-    id: "2",
-    title: "AQI Quận 7",
-    snippet: "AQI hôm nay là 132, hạn chế ra ngoài nếu nhạy cảm.",
-    time: "Hôm nay",
-    unread: false,
-  },
-  {
-    id: "3",
-    title: "Phân loại nhựa",
-    snippet: "Nên rửa và bóc nhãn trước khi bỏ vào điểm tái chế.",
-    time: "Hôm qua",
-    unread: false,
-  },
-];
+// Services
+import { getChatHistory } from "../../src/services/chatbotService";
+import { getToken } from "../../src/utils/apiHelper";
 
 const ChatBot = () => {
   const router = useRouter();
-  const [threads, setThreads] = useState(initialThreads);
+  const [threads, setThreads] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = await getToken();
+      if (!token) {
+        // Xử lý chưa đăng nhập nếu cần
+        setLoading(false);
+        return;
+      }
+
+      const historyData = await getChatHistory();
+      
+      // Chuyển đổi dữ liệu từ API sang format của UI
+      // Giả sử API trả về mảng các session
+      const formattedThreads = historyData.map(item => ({
+        id: item.id.toString(),
+        title: item.title || "Cuộc trò chuyện mới",
+        snippet: item.lastMessage || "...",
+        time: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('vi-VN') : "",
+        unread: false // Cần logic check unread từ API nếu có
+      }));
+
+      setThreads(formattedThreads);
+    } catch (error) {
+      console.error("Lỗi lấy lịch sử chat:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    fetchHistory();
   };
 
   const deleteThread = (id) => {
+    // Cần thêm API delete nếu backend hỗ trợ
     setThreads(threads.filter((t) => t.id !== id));
   };
 
   const filteredThreads = threads.filter(
     (t) =>
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.snippet.toLowerCase().includes(searchQuery.toLowerCase())
+      t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.snippet?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const newChatTopics = [
-    {
-      id: 1,
-      title: "Phân loại rác",
-      icon: "♻️",
-      description: "Hướng dẫn phân loại rác tái chế",
-    },
-    {
-      id: 2,
-      title: "Chất lượng không khí",
-      icon: "🌫️",
-      description: "Kiểm tra AQI và khuyến cáo",
-    },
-    {
-      id: 3,
-      title: "Thu gom rác thải",
-      icon: "📍",
-      description: "Tìm điểm thu gom gần bạn",
-    },
-    {
-      id: 4,
-      title: "Luật môi trường",
-      icon: "📋",
-      description: "Quy định và chính sách",
-    },
-    {
-      id: 5,
-      title: "Tiết kiệm năng lượng",
-      icon: "💡",
-      description: "Mẹo giảm tiêu thụ điện",
-    },
-    {
-      id: 6,
-      title: "Trò chuyện tự do",
-      icon: "💬",
-      description: "Hỏi bất kỳ điều gì về môi trường",
-    },
+    { id: 1, title: "Phân loại rác", icon: "♻️", description: "Hướng dẫn phân loại rác tái chế" },
+    { id: 2, title: "Chất lượng không khí", icon: "🌫️", description: "Kiểm tra AQI và khuyến cáo" },
+    { id: 3, title: "Thu gom rác thải", icon: "📍", description: "Tìm điểm thu gom gần bạn" },
+    { id: 4, title: "Luật môi trường", icon: "📋", description: "Quy định và chính sách" },
+    { id: 5, title: "Tiết kiệm năng lượng", icon: "💡", description: "Mẹo giảm tiêu thụ điện" },
+    { id: 6, title: "Trò chuyện tự do", icon: "💬", description: "Hỏi bất kỳ điều gì về môi trường" },
   ];
 
   const createNewChat = (topic) => {
-    const newId = (threads.length + 1).toString();
-    const newThread = {
-      id: newId,
-      title: topic.title,
-      snippet: "Bắt đầu cuộc trò chuyện mới...",
-      time: "Vừa xong",
-      unread: true,
-    };
-
-    setThreads([newThread, ...threads]);
     setShowNewChatModal(false);
-
-    setTimeout(() => {
-      router.push(
-        `/chat/chat-history?threadId=${newId}&title=${encodeURIComponent(
-          topic.title
-        )}`
-      );
-    }, 300);
+    // Điều hướng sang màn hình chat chi tiết với ID mới hoặc topic
+    router.push(
+        `/chat/chat-history?title=${encodeURIComponent(topic.title)}&isNew=true`
+    );
   };
 
+  // ... Giữ nguyên hàm renderItem và EmptyState ...
+  // (Chỉ thay đổi phần gọi API trong renderItem nếu cần thiết)
+  
   const renderItem = ({ item }) => {
-    const scaleAnim = new Animated.Value(1);
+    // ... (Giữ nguyên logic animation)
+     const scaleAnim = new Animated.Value(1);
 
     const handlePressIn = () => {
       Animated.spring(scaleAnim, {
@@ -150,16 +125,14 @@ const ChatBot = () => {
           onPressOut={handlePressOut}
           onPress={() =>
             router.push(
-              `/chat/chat-history?threadId=${
-                item.id
-              }&title=${encodeURIComponent(item.title)}`
+              `/chat/chat-history?threadId=${item.id}&title=${encodeURIComponent(item.title)}`
             )
           }
         >
           <View style={styles.avatarContainer}>
             <Avatar.Text
               size={48}
-              label={item.title
+              label={(item.title || "C")
                 .split(" ")
                 .map((w) => w[0])
                 .slice(0, 2)
@@ -205,7 +178,7 @@ const ChatBot = () => {
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
-      <View style={styles.emptyIcon}>
+        <View style={styles.emptyIcon}>
         <Text style={styles.emptyIconText}>💬</Text>
       </View>
       <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện</Text>
@@ -223,26 +196,21 @@ const ChatBot = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.headerLeft}
-        >
-          <IconButton icon="arrow-left" size={24} iconColor="#0A0A0A" />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Chatbot môi trường</Text>
-          <Text style={styles.subtitle}>{threads.length} cuộc trò chuyện</Text>
+        {/* ... Header code như cũ ... */}
+        <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+            <IconButton icon="arrow-left" size={24} iconColor="#0A0A0A" />
+            </TouchableOpacity>
+            <View style={styles.headerCenter}>
+            <Text style={styles.title}>Chatbot môi trường</Text>
+            <Text style={styles.subtitle}>{threads.length} cuộc trò chuyện</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowNewChatModal(true)} style={styles.headerRight}>
+            <View style={styles.newChatButton}>
+                <IconButton icon="plus" size={24} iconColor="#fff" />
+            </View>
+            </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => setShowNewChatModal(true)}
-          style={styles.headerRight}
-        >
-          <View style={styles.newChatButton}>
-            <IconButton icon="plus" size={24} iconColor="#fff" />
-          </View>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.searchContainer}>
         <Searchbar
@@ -255,22 +223,29 @@ const ChatBot = () => {
         />
       </View>
 
-      <FlatList
-        data={filteredThreads}
-        keyExtractor={(i) => i.id}
-        renderItem={renderItem}
-        contentContainerStyle={[
-          styles.list,
-          filteredThreads.length === 0 && styles.emptyList,
-        ]}
-        ListEmptyComponent={EmptyState}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredThreads}
+          keyExtractor={(i) => i.id}
+          renderItem={renderItem}
+          contentContainerStyle={[
+            styles.list,
+            filteredThreads.length === 0 && styles.emptyList,
+          ]}
+          ListEmptyComponent={EmptyState}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
+      {/* Modal logic giữ nguyên */}
       <Modal
         visible={showNewChatModal}
         transparent
@@ -330,6 +305,7 @@ const ChatBot = () => {
   );
 };
 
+// Styles giữ nguyên
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F7F8" },
   header: {

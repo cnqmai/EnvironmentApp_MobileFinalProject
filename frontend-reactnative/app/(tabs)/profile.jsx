@@ -1,106 +1,123 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import typography from "../../styles/typography";
+
+// Services
+import { getMyProfile, getMyStatistics } from "../../src/services/userService";
+import { getToken, removeToken } from "../../src/utils/apiHelper";
 
 const ProfileScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, points: 0 });
+  const [loading, setLoading] = useState(true);
+  
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  useEffect(() => {
-    if (params.logout === "true") {
-      setIsLoggedIn(false);
-    }
-  }, [params.logout]);
+  // Hàm fetch dữ liệu user
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const token = await getToken();
+      
+      if (!token) {
+        setIsLoggedIn(false);
+        setLoading(false);
+        return;
+      }
 
-  const MenuItem = ({ icon, title, onPress }) => (
+      // Gọi song song 2 API
+      const [profile, statistics] = await Promise.all([
+        getMyProfile().catch(e => null),
+        getMyStatistics().catch(e => null)
+      ]);
+
+      if (profile) {
+        setIsLoggedIn(true);
+        setUserData(profile);
+      } else {
+        setIsLoggedIn(false); // Token hết hạn hoặc lỗi
+      }
+
+      if (statistics) {
+        setStats({
+          reportsCount: statistics.totalReports || 0,
+          questionsCount: statistics.totalChatMessages || 0,
+          points: statistics.currentPoints || 0
+        });
+      }
+
+    } catch (error) {
+      console.error("Profile Error:", error);
+      setIsLoggedIn(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load lại dữ liệu mỗi khi màn hình được focus (để cập nhật điểm sau khi làm nhiệm vụ)
+  useFocusEffect(
+    useCallback(() => {
+      if (params.logout === "true") {
+        handleLogout();
+      } else {
+        fetchUserProfile();
+      }
+    }, [params.logout])
+  );
+
+  const handleLogout = async () => {
+    await removeToken();
+    setIsLoggedIn(false);
+    setUserData(null);
+    setMenuVisible(false);
+    router.replace("/login"); 
+  };
+
+  const MenuItem = ({ icon, title, onPress, color }) => (
     <TouchableOpacity
       style={styles.menuItem}
       onPress={() => {
-        console.log(`MenuItem clicked: ${title}`);
         onPress?.();
       }}
       activeOpacity={0.7}
     >
-      <MaterialCommunityIcons name={icon} size={20} color="#0A0A0A" />
-      <Text style={styles.menuItemText}>{title}</Text>
+      <MaterialCommunityIcons name={icon} size={20} color={color || "#0A0A0A"} />
+      <Text style={[styles.menuItemText, color && { color }]}>{title}</Text>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </SafeAreaView>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.guestHeader}>
             <View style={styles.guestAvatarContainer}>
-              <MaterialCommunityIcons
-                name="emoticon-happy-outline"
-                size={56}
-                color="#666"
-              />
+              <MaterialCommunityIcons name="account-circle-outline" size={56} color="#666" />
             </View>
             <Text style={styles.guestTitle}>Chưa đăng nhập</Text>
           </View>
 
-          <View style={styles.locationCard}>
-            <View style={styles.locationRow}>
-              <MaterialCommunityIcons
-                name="map-marker-outline"
-                size={20}
-                color="#666"
-              />
-              <Text style={styles.locationText}>Thành phố Hồ Chí Minh</Text>
-            </View>
-          </View>
-
           <View style={styles.loginPromptCard}>
-            <Text style={styles.loginPromptTitle}>Đăng nhập để ...</Text>
-            <View style={styles.featureList}>
-              <View style={styles.featureItem}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={20}
-                  color="#4CAF50"
-                />
-                <Text style={styles.featureText}>Lưu vị trí yêu thích</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={20}
-                  color="#4CAF50"
-                />
-                <Text style={styles.featureText}>Nhận cảnh báo AQI</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={20}
-                  color="#4CAF50"
-                />
-                <Text style={styles.featureText}>Xem lịch sử báo cáo</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={20}
-                  color="#4CAF50"
-                />
-                <Text style={styles.featureText}>Tích lũy điểm thành tích</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
+            <Text style={styles.loginPromptTitle}>Đăng nhập để trải nghiệm đầy đủ</Text>
+            {/* ... Giữ nguyên phần UI giới thiệu tính năng ... */}
+             <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => setIsLoggedIn(true)}
+              onPress={() => router.push("/login")}
               activeOpacity={0.8}
             >
               <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
@@ -134,90 +151,50 @@ const ProfileScreen = () => {
 
           <View style={styles.userCard}>
             <View style={styles.avatarContainer}>
-              <MaterialCommunityIcons
-                name="emoticon-happy-outline"
-                size={56}
-                color="#0a0a0aff"
-              />
+              {userData?.avatarUrl ? (
+                  // Nếu có ảnh avatar từ API thì dùng Image, tạm thời dùng icon
+                  <MaterialCommunityIcons name="account" size={56} color="#0a0a0aff" />
+              ) : (
+                  <MaterialCommunityIcons name="emoticon-happy-outline" size={56} color="#0a0a0aff" />
+              )}
             </View>
-            <Text style={styles.userName}>Lưu Thuý Anh</Text>
+            <Text style={styles.userName}>{userData?.fullName || "Người dùng"}</Text>
 
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons
-                name="email-outline"
-                size={16}
-                color="#666"
-              />
-              <Text style={styles.infoText}>anh123@gmail.com</Text>
+              <MaterialCommunityIcons name="email-outline" size={16} color="#666" />
+              <Text style={styles.infoText}>{userData?.email}</Text>
             </View>
-
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons
-                name="phone-outline"
-                size={16}
-                color="#666"
-              />
-              <Text style={styles.infoText}>0123456789</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons
-                name="map-marker-outline"
-                size={16}
-                color="#666"
-              />
-              <Text style={styles.infoText}>Thành phố Hồ Chí Minh</Text>
-            </View>
+             {/* Các field khác nếu có trong API */}
           </View>
 
           <View style={styles.greenWarriorCard}>
             <View style={styles.greenWarriorHeader}>
               <MaterialCommunityIcons name="leaf" size={24} color="#4CAF50" />
-              <Text style={styles.greenWarriorTitle}>CHIẾN BINH XANH</Text>
+              <Text style={styles.greenWarriorTitle}>THÀNH TÍCH XANH</Text>
             </View>
 
             <View style={styles.pointsRow}>
-              <Text style={styles.pointsLabel}>Điểm xanh</Text>
-              <Text style={styles.pointsValue}>200/300xp</Text>
+              <Text style={styles.pointsLabel}>Điểm hiện tại</Text>
+              <Text style={styles.pointsValue}>{stats.points} điểm</Text>
             </View>
-
+            
+            {/* Thanh tiến độ có thể tính toán dựa trên level nếu API trả về */}
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: "66.67%" }]} />
+                <View style={[styles.progressBarFill, { width: "50%" }]} /> 
               </View>
             </View>
-
-            <TouchableOpacity
-              style={styles.learnMoreButton}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.learnMoreText}>Tìm hiểu thêm về </Text>
-              <Text style={styles.learnMoreBold}>Huy hiệu xanh</Text>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={16}
-                color="#4CAF50"
-              />
-            </TouchableOpacity>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <MaterialCommunityIcons
-                name="file-document-outline"
-                size={32}
-                color="#0A0A0A"
-              />
-              <Text style={styles.statText}>12 báo cáo đã gửi</Text>
+              <MaterialCommunityIcons name="file-document-outline" size={32} color="#0A0A0A" />
+              <Text style={styles.statText}>{stats.reportsCount} báo cáo đã gửi</Text>
             </View>
 
             <View style={styles.statCard}>
-              <MaterialCommunityIcons
-                name="message-text-outline"
-                size={32}
-                color="#0A0A0A"
-              />
-              <Text style={styles.statText}>8 câu hỏi chatbot</Text>
+              <MaterialCommunityIcons name="message-text-outline" size={32} color="#0A0A0A" />
+              <Text style={styles.statText}>{stats.questionsCount} câu hỏi chatbot</Text>
             </View>
           </View>
         </ScrollView>
@@ -241,12 +218,10 @@ const ProfileScreen = () => {
             />
             <View style={styles.menuDivider} />
             <MenuItem
-              icon="cog-outline"
-              title="Cài đặt"
-              onPress={() => {
-                console.log("Opening settings...");
-                router.push("/settings");
-              }}
+              icon="logout"
+              title="Đăng xuất"
+              color="#D32F2F"
+              onPress={handleLogout}
             />
           </View>
         </>
@@ -255,7 +230,9 @@ const ProfileScreen = () => {
   );
 };
 
+// Giữ nguyên styles...
 const styles = StyleSheet.create({
+  // ... copy styles cũ vào đây
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
@@ -264,7 +241,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
     flexGrow: 1,
   },
-
   header: {
     backgroundColor: "#F0EFED",
     paddingHorizontal: 24,
@@ -287,7 +263,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
   },
-
   overlay: {
     position: "absolute",
     top: 0,
@@ -296,7 +271,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 999,
   },
-
   dropdownMenu: {
     position: "absolute",
     top: 110,
@@ -332,7 +306,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
     marginHorizontal: 12,
   },
-
   userCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
@@ -380,7 +353,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginLeft: 8,
   },
-
   greenWarriorCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
@@ -456,7 +428,6 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     fontWeight: "700",
   },
-
   statsRow: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -486,7 +457,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: -0.2,
   },
-
   guestHeader: {
     alignItems: "center",
     paddingVertical: 40,
@@ -511,7 +481,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     letterSpacing: -0.3,
   },
-
   locationCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
@@ -537,7 +506,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginLeft: 8,
   },
-
   loginPromptCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,

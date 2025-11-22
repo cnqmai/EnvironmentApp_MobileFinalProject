@@ -1,40 +1,88 @@
-// Mai
-import React, { useCallback } from "react";
-import { StyleSheet, FlatList, View, Text } from "react-native";
+import React, { useState, useCallback, useEffect } from "react";
+import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import * as Location from 'expo-location';
+
+// Components
 import AQICard from "../../components/AQICard";
 import typography from "../../styles/typography";
 
-const aqiData = [
-  {
-    id: "1",
-    location: { name: "Quận 7", city: "TP. Hồ Chí Minh" },
-    aqi: 152,
-    status: "Kém",
-    description: "Không tốt cho nhóm nhạy cảm",
-    isSensitiveGroup: true,
-  },
-  {
-    id: "2",
-    location: { name: "Bình Thạnh", city: "TP. Hồ Chí Minh" },
-    aqi: 190,
-    status: "Xấu",
-    description: "Ảnh hưởng đến sức khỏe",
-    isSensitiveGroup: false,
-  },
-  {
-    id: "3",
-    location: { name: "Gò Vấp", city: "TP. Hồ Chí Minh" },
-    aqi: 50,
-    status: "Tốt",
-    description: "Bụi mịn thấp",
-    isSensitiveGroup: false,
-  },
-];
+// Services
+import { getAqiByGps, getAqiForSavedLocations } from "../../src/services/aqiService";
+import { getToken } from "../../src/utils/apiHelper";
 
 const DashboardScreen = () => {
   const router = useRouter();
+  const [aqiList, setAqiList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Hàm lấy dữ liệu
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      let data = [];
+
+      // 1. Lấy vị trí hiện tại và AQI tại đó
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({});
+        try {
+          const currentAqi = await getAqiByGps(location.coords.latitude, location.coords.longitude);
+          // Format dữ liệu cho khớp với AQICard
+          if (currentAqi) {
+             data.push({
+              id: 'current',
+              location: { name: "Vị trí hiện tại", city: "" },
+              aqi: currentAqi.aqi,
+              status: currentAqi.level, // Ví dụ: "Tốt", "Kém"
+              description: currentAqi.recommendation,
+              isSensitiveGroup: currentAqi.aqi > 100,
+            });
+          }
+        } catch (e) {
+          console.log("Lỗi lấy AQI GPS:", e);
+        }
+      }
+
+      // 2. Lấy AQI từ các địa điểm đã lưu (nếu đã đăng nhập)
+      const token = await getToken();
+      if (token) {
+        try {
+          const savedLocations = await getAqiForSavedLocations();
+          const formattedSaved = savedLocations.map((item, index) => ({
+            id: `saved-${index}`,
+            location: { name: item.name, city: "" }, // Backend trả về tên địa điểm
+            aqi: item.aqi,
+            status: item.level,
+            description: item.recommendation,
+            isSensitiveGroup: item.aqi > 100,
+          }));
+          data = [...data, ...formattedSaved];
+        } catch (e) {
+          console.log("Chưa đăng nhập hoặc lỗi lấy địa điểm đã lưu");
+        }
+      }
+
+      setAqiList(data);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Lỗi", "Không thể tải dữ liệu chất lượng không khí.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
   const renderAQICard = useCallback(
     ({ item }) => (
@@ -67,19 +115,28 @@ const DashboardScreen = () => {
 
       <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
 
-      <FlatList
-        data={aqiData}
-        renderItem={renderAQICard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        style={styles.flatListStyle}
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={30}
-        initialNumToRender={3}
-        keyboardShouldPersistTaps="handled"
-      />
+      {loading && !refreshing ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={aqiList}
+          renderItem={renderAQICard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          style={styles.flatListStyle}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', color: '#666', marginTop: 20 }}>
+              Chưa có dữ liệu. Hãy bật GPS hoặc thêm địa điểm.
+            </Text>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -89,6 +146,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F0EFED",
     position: "relative",
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   header: {
     backgroundColor: "#F0EFED",
