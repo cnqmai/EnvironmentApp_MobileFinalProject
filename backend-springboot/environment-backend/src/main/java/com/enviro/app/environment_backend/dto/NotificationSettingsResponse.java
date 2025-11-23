@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
  * DTO trả về notification settings (FR-2.2.2)
  */
 @Value
-public @Builder
+@Builder 
 public class NotificationSettingsResponse {
     
     Boolean aqiAlertEnabled;
@@ -22,4 +22,3 @@ public class NotificationSettingsResponse {
     OffsetDateTime createdAt;
     OffsetDateTime updatedAt;
 }
-

@@ -4,7 +4,8 @@ import { Platform } from 'react-native';
 // CẤU HÌNH NÀY - Đổi IP theo máy của bạn
 // ============================================
 // Dựa trên ipconfig bạn cung cấp: Wireless LAN adapter Wi-Fi
-const YOUR_COMPUTER_IP = '172.20.10.9'; 
+// Sửa .30 thành .3
+const YOUR_COMPUTER_IP = '192.168.1.3';
 
 let API_BASE_URL;
 
