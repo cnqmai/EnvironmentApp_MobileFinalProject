@@ -1,87 +1,86 @@
 package com.enviro.app.environment_backend.security;
 
+import java.io.IOException;
+
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.enviro.app.environment_backend.service.CustomUserDetailsService;
+
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.lang.NonNull;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-
-@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final CustomUserDetailsService userDetailsService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, CustomUserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
 
     @Override
     protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+        
+        final String requestPath = request.getRequestURI();
+        final String method = request.getMethod();
+
+        // [DEBUG LOG 1] Kiểm tra request đến
+        System.out.println("------------------------------------------------");
+        System.out.println(">>> 1. Incoming Request: " + method + " " + requestPath);
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
-
-        // ==================================================================
-        // BƯỚC QUAN TRỌNG NHẤT ĐỂ SỬA LỖI 403
-        // ==================================================================
-        // Nếu request không có Token (ví dụ: Đăng nhập, Đăng ký), 
-        // ta KHÔNG ĐƯỢC chặn lại ở đây. Hãy cho nó đi tiếp (filterChain.doFilter)
-        // để SecurityConfig quyết định (nếu là public endpoint thì sẽ cho qua).
+        
+        // [DEBUG LOG 2] Kiểm tra Header
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println(">>> 2. No Valid Authorization Header found. Passing to next filter.");
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Nếu có Token, tiến hành giải mã và xác thực
+        System.out.println(">>> 2. Authorization Header found.");
+        final String jwt = authHeader.substring(7);
+        String userEmail = null; 
+
         try {
-            jwt = authHeader.substring(7); // Bỏ chữ "Bearer "
-            userEmail = jwtService.extractUsername(jwt); // Lấy email từ token
-
-            // Nếu lấy được email và chưa xác thực trong context hiện tại
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // Lấy thông tin user từ DB
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-
-                // Kiểm tra token có hợp lệ không
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-                    
-                    // Lưu thông tin xác thực vào SecurityContext
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
-            }
+            userEmail = jwtService.extractUsername(jwt);
+            System.out.println(">>> 3. Extracted Email from Token: " + userEmail);
         } catch (Exception e) {
-            // Nếu Token bị lỗi (hết hạn, sai chữ ký...), ta chỉ log lỗi
-            // và VẪN CHO request đi tiếp.
-            // Lý do: Nếu endpoint cần bảo mật, SecurityConfig sẽ chặn sau (lỗi 403 chuẩn).
-            // Nếu endpoint public, request vẫn được thực hiện.
-            System.out.println("⚠️ JWT Filter Error: " + e.getMessage());
+             System.out.println(">>> [ERROR] Token Extraction Failed: " + e.getMessage());
+             // Đừng return ở đây vội, cứ để filter chain chạy tiếp để Security xử lý lỗi 403 chuẩn
         }
 
-        // Cho phép request đi tiếp đến bộ lọc tiếp theo
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            System.out.println(">>> 4. Loading UserDetails for: " + userEmail);
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail); 
+            
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                System.out.println(">>> 5. Authentication SUCCESS! User set in SecurityContext.");
+            } else {
+                System.out.println(">>> 5. [ERROR] Token is INVALID or Expired.");
+            }
+        } else {
+            System.out.println(">>> 4. Skipped loading user (Email null or already authenticated).");
+        }
+
+        System.out.println(">>> 6. Continuing Filter Chain...");
         filterChain.doFilter(request, response);
     }
 }

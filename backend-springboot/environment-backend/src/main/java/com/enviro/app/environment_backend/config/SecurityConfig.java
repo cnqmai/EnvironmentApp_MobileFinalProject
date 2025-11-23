@@ -1,11 +1,10 @@
 package com.enviro.app.environment_backend.config;
 
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; 
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -19,22 +18,29 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher; // IMPORT QUAN TRỌNG
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector; // IMPORT QUAN TRỌNG
 
 import com.enviro.app.environment_backend.security.JwtAuthenticationFilter;
+import com.enviro.app.environment_backend.security.JwtService;
+import com.enviro.app.environment_backend.service.CustomUserDetailsService;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthFilter;
+    
+    private final JwtService jwtService;
+    private final CustomUserDetailsService customUserDetailsService;
     private final UserDetailsService userDetailsService;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
-        this.jwtAuthFilter = jwtAuthFilter;
+    public SecurityConfig(JwtService jwtService, CustomUserDetailsService customUserDetailsService, UserDetailsService userDetailsService) {
+        this.jwtService = jwtService;
+        this.customUserDetailsService = customUserDetailsService;
         this.userDetailsService = userDetailsService;
     }
 
@@ -55,49 +61,61 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-
+    
+    // --- 1. CORS FILTER ---
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        return (HttpServletRequest request) -> {
-            CorsConfiguration config = new CorsConfiguration();
-            // Cho phép mọi nguồn (quan trọng khi gọi từ Mobile/Expo)
-            config.setAllowedOrigins(Collections.singletonList("*"));
-            // Cho phép mọi phương thức
-            config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-            // Cho phép mọi header
-            config.setAllowedHeaders(Collections.singletonList("*"));
-            // Không dùng credentials khi allow origin *
-            config.setAllowCredentials(false);
-            config.setMaxAge(3600L);
-            return config;
-        };
+    public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(false);
+        config.setAllowedOrigins(List.of("*"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedMethods(List.of("*"));
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, HandlerMappingIntrospector introspector) throws Exception {
+        // --- GIẢI PHÁP MVC MATCHER ---
+        // Sử dụng MvcRequestMatcher để đồng bộ hóa cách hiểu đường dẫn giữa Security và Controller
+        MvcRequestMatcher.Builder mvc = new MvcRequestMatcher.Builder(introspector);
+
+        // Khởi tạo Filter thủ công (không dùng @Bean để tránh đăng ký 2 lần)
+        JwtAuthenticationFilter jwtAuthFilter = new JwtAuthenticationFilter(jwtService, customUserDetailsService);
+
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             
+            // Xử lý lỗi trả về 401 rõ ràng
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint((request, response, authException) -> {
+                    System.out.println(">>> [SECURITY BLOCK] Access Denied: " + authException.getMessage());
+                    System.out.println(">>> Blocked URI: " + request.getRequestURI());
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: " + authException.getMessage());
+                })
+            )
+
             .authorizeHttpRequests(auth -> auth
-                // 1. QUAN TRỌNG: Cho phép phương thức OPTIONS (Preflight request) đi qua
-                // Nếu không có dòng này, điện thoại sẽ bị lỗi 403 khi kiểm tra kết nối
+                // 1. Cho phép API AUTH (Thử cả 2 trường hợp có và không có /api để chắc chắn)
+                .requestMatchers(mvc.pattern("/api/auth/**")).permitAll()
+                .requestMatchers(mvc.pattern("/auth/**")).permitAll() // <--- THÊM DÒNG NÀY ĐỂ FIX LỖI PATH
+                
+                // 2. Cho phép API AQI
+                .requestMatchers(mvc.pattern("/api/aqi/**")).permitAll()
+                .requestMatchers(mvc.pattern("/aqi/**")).permitAll()
+                
+                // 3. Cho phép trang lỗi và Swagger (nếu có)
+                .requestMatchers(mvc.pattern("/error")).permitAll()
+                
+                // 4. Cho phép OPTIONS (CORS)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
-                // 2. Các API xác thực (Đăng nhập, Đăng ký, Quên mật khẩu)
-                .requestMatchers("/api/auth/**").permitAll()
-                
-                // 3. Các API công khai khác (nếu có)
-                .requestMatchers(HttpMethod.GET, "/api/aqi").permitAll() // Xem AQI không cần login
-                .requestMatchers(HttpMethod.GET, "/api/categories").permitAll() // Danh mục rác
-                .requestMatchers(HttpMethod.GET, "/api/collection-points").permitAll() // Điểm thu gom
-                
-                // 4. Tất cả các yêu cầu còn lại BẮT BUỘC phải có Token
+                // 5. Các request còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
             
-            // Đảm bảo Filter JWT chạy TRƯỚC khi kiểm tra bảo mật
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
