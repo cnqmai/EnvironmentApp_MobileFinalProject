@@ -18,9 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Controller xử lý các API liên quan đến Community Posts (FR-8.x)
- */
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
@@ -33,9 +30,6 @@ public class PostController {
         this.userService = userService;
     }
 
-    /**
-     * Phương thức tiện ích để lấy User đang đăng nhập từ JWT Token
-     */
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
@@ -43,10 +37,6 @@ public class PostController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
     }
 
-    /**
-     * API TẠO BÀI VIẾT (FR-8.1.1)
-     * POST /api/posts
-     */
     @PostMapping
     public ResponseEntity<PostResponse> createPost(@Valid @RequestBody PostRequest request) {
         User user = getCurrentUser();
@@ -54,10 +44,6 @@ public class PostController {
         return new ResponseEntity<>(post, HttpStatus.CREATED);
     }
 
-    /**
-     * API LẤY TẤT CẢ BÀI VIẾT (FR-8.1.1)
-     * GET /api/posts
-     */
     @GetMapping
     public ResponseEntity<List<PostResponse>> getAllPosts() {
         User currentUser = getCurrentUser();
@@ -65,10 +51,6 @@ public class PostController {
         return ResponseEntity.ok(posts);
     }
 
-    /**
-     * API LẤY BÀI VIẾT THEO ID (FR-8.1.1)
-     * GET /api/posts/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<PostResponse> getPostById(@PathVariable UUID id) {
         User currentUser = getCurrentUser();
@@ -76,10 +58,6 @@ public class PostController {
         return ResponseEntity.ok(post);
     }
 
-    /**
-     * API LIKE/UNLIKE BÀI VIẾT (FR-8.1.2)
-     * POST /api/posts/{id}/like
-     */
     @PostMapping("/{id}/like")
     public ResponseEntity<PostResponse> toggleLike(@PathVariable UUID id) {
         User user = getCurrentUser();
@@ -87,10 +65,6 @@ public class PostController {
         return ResponseEntity.ok(post);
     }
 
-    /**
-     * API THÊM BÌNH LUẬN (FR-8.1.2)
-     * POST /api/posts/{id}/comments
-     */
     @PostMapping("/{id}/comments")
     public ResponseEntity<CommentResponse> addComment(
             @PathVariable UUID id,
@@ -100,14 +74,9 @@ public class PostController {
         return new ResponseEntity<>(comment, HttpStatus.CREATED);
     }
 
-    /**
-     * API LẤY BÌNH LUẬN CỦA BÀI VIẾT (FR-8.1.2)
-     * GET /api/posts/{id}/comments
-     */
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<CommentResponse>> getPostComments(@PathVariable UUID id) {
         List<CommentResponse> comments = postService.getPostComments(id);
         return ResponseEntity.ok(comments);
     }
 }
-

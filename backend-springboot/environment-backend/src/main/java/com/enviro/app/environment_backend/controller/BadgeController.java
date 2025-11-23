@@ -13,9 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-/**
- * Controller xử lý các API liên quan đến Badges System (FR-9.1.2)
- */
 @RestController
 @RequestMapping("/api/badges")
 public class BadgeController {
@@ -28,9 +25,6 @@ public class BadgeController {
         this.userService = userService;
     }
 
-    /**
-     * Phương thức tiện ích để lấy User đang đăng nhập từ JWT Token
-     */
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
@@ -38,11 +32,6 @@ public class BadgeController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
     }
 
-    /**
-     * API LẤY TẤT CẢ BADGES (FR-9.1.2)
-     * GET /api/badges
-     * Trả về tất cả badges, đánh dấu badges nào user đã đạt được
-     */
     @GetMapping
     public ResponseEntity<List<BadgeResponse>> getAllBadges() {
         User user = getCurrentUser();
@@ -50,10 +39,6 @@ public class BadgeController {
         return ResponseEntity.ok(badges);
     }
 
-    /**
-     * API LẤY BADGES CỦA USER HIỆN TẠI (FR-9.1.2)
-     * GET /api/badges/me
-     */
     @GetMapping("/me")
     public ResponseEntity<List<BadgeResponse>> getMyBadges() {
         User user = getCurrentUser();
@@ -61,4 +46,3 @@ public class BadgeController {
         return ResponseEntity.ok(badges);
     }
 }
-

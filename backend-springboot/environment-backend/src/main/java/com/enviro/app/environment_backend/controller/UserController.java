@@ -35,10 +35,6 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
     
-    /**
-     * API XÓA TÀI KHOẢN (FR-7.2)
-     * DELETE /api/users/me
-     */
     @DeleteMapping("/me")
     public ResponseEntity<String> deleteMyAccount() {
         User currentUser = getCurrentUser();
@@ -46,10 +42,6 @@ public class UserController {
         return ResponseEntity.ok("Tài khoản đã được xóa thành công.");
     }
     
-    /**
-     * API LẤY THỐNG KÊ CÁ NHÂN (FR-13.1.1)
-     * GET /api/users/me/statistics
-     */
     @GetMapping("/me/statistics")
     public ResponseEntity<UserStatisticsResponse> getMyStatistics() {
         User currentUser = getCurrentUser();

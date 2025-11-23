@@ -15,9 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-/**
- * Controller xử lý các API liên quan đến Chatbot AI (FR-5.x)
- */
 @RestController
 @RequestMapping("/api/chatbot")
 public class ChatbotController {
@@ -30,9 +27,6 @@ public class ChatbotController {
         this.userService = userService;
     }
 
-    /**
-     * Phương thức tiện ích để lấy User đang đăng nhập từ JWT Token
-     */
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
@@ -40,10 +34,6 @@ public class ChatbotController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
     }
 
-    /**
-     * API GỬI CÂU HỎI ĐẾN CHATBOT (FR-5.1)
-     * POST /api/chatbot/message
-     */
     @PostMapping("/message")
     public ResponseEntity<ChatbotResponse> sendMessage(@Valid @RequestBody ChatbotRequest request) {
         User user = getCurrentUser();
@@ -51,10 +41,6 @@ public class ChatbotController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * API LẤY LỊCH SỬ CHAT (FR-1.2.3, FR-5.1)
-     * GET /api/chatbot/history
-     */
     @GetMapping("/history")
     public ResponseEntity<List<ChatbotResponse>> getChatHistory() {
         User user = getCurrentUser();
@@ -62,4 +48,3 @@ public class ChatbotController {
         return ResponseEntity.ok(history);
     }
 }
-

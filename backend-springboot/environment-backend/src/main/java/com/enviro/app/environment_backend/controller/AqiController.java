@@ -18,10 +18,6 @@ public class AqiController {
         this.aqiService = aqiService;
     }
 
-    /**
-     * API Lấy AQI theo Tọa độ GPS (Public API)
-     * GET /api/aqi?lat=...&lon=...
-     */
     @GetMapping
     public ResponseEntity<AqiResponse> getAqiByGps(
         @RequestParam double lat,
@@ -34,17 +30,11 @@ public class AqiController {
         return ResponseEntity.ok(aqiData);
     }
 
-    /**
-     * THÊM MỚI: API Kiểm tra cảnh báo AQI
-     * POST /api/aqi/check-alert
-     */
     @PostMapping("/check-alert")
     public ResponseEntity<AqiAlertResponse> checkAqiAlert(@Valid @RequestBody AqiAlertRequest request) {
-        // 1. Lấy dữ liệu AQI hiện tại
         AqiResponse currentAqi = aqiService.getCurrentAqiByGps(request.getLatitude(), request.getLongitude());
 
         if (currentAqi == null || currentAqi.getAqiValue() < 0) {
-            // Xử lý trường hợp không lấy được dữ liệu AQI
             AqiAlertResponse response = new AqiAlertResponse(
                     false,
                     -1,
@@ -53,14 +43,12 @@ public class AqiController {
             return ResponseEntity.ok(response);
         }
 
-        // 2. So sánh với ngưỡng của người dùng
         int mappedAqiThreshold = mapThresholdLevelToAqi(request.getThreshold());
         boolean shouldAlert = currentAqi.getAqiValue() > mappedAqiThreshold;
         String message = shouldAlert
                 ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getAqiValue() + ") đã vượt ngưỡng an toàn (AQI " + mappedAqiThreshold + ") của bạn."
                 : "Chất lượng không khí đang trong ngưỡng an toàn của bạn (AQI ≤ " + mappedAqiThreshold + ").";
 
-        // 3. Xây dựng và trả về phản hồi
         AqiAlertResponse response = new AqiAlertResponse(
                 shouldAlert,
                 currentAqi.getAqiValue(),
@@ -71,8 +59,6 @@ public class AqiController {
     }
 
     private int mapThresholdLevelToAqi(int level) {
-        // 1: Good (≤50), 2: Moderate (≤100), 3: Unhealthy for Sensitive (≤150)
-        // 4: Unhealthy (≤200), 5: Very Unhealthy (≤300)
         return switch (Math.max(1, Math.min(level, 5))) {
             case 1 -> 50;
             case 2 -> 100;

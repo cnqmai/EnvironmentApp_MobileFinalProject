@@ -33,7 +33,6 @@ public class ReportController {
         this.pdfExportService = pdfExportService;
     }
 
-    // Phương thức tiện ích để lấy User đang đăng nhập từ JWT Token
     private User getCurrentUser() {
         String userEmail = SecurityContextHolder.getContext().getAuthentication().getName(); 
         
@@ -41,22 +40,13 @@ public class ReportController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
     }
 
-    /**
-     * API TẠO BÁO CÁO (Protected - POST /api/reports)
-     */
     @PostMapping
     public ResponseEntity<Report> createReport(@Valid @RequestBody ReportRequest request) {
-        // Đảm bảo User đã đăng nhập
         User user = getCurrentUser();
         Report newReport = reportService.createReport(user, request);
-        
         return new ResponseEntity<>(newReport, HttpStatus.CREATED);
     }
     
-    /**
-     * API LẤY LỊCH SỬ BÁO CÁO CỦA USER HIỆN TẠI (FR-4.2.1)
-     * GET /api/reports/me
-     */
     @GetMapping("/me")
     public ResponseEntity<List<Report>> getMyReports() {
         User user = getCurrentUser();
@@ -64,26 +54,14 @@ public class ReportController {
         return ResponseEntity.ok(reports);
     }
     
-    /**
-     * API QUẢN LÝ TRẠNG THÁI (Protected - PATCH /api/reports/{id}/status)
-     * *LƯU Ý: Trong thực tế, API này cần thêm kiểm tra quyền ADMIN/MODERATOR.*
-     */
     @PatchMapping("/{id}/status")
     public ResponseEntity<Report> updateReportStatus(
             @PathVariable Long id,
             @Valid @RequestBody ReportStatusUpdateRequest request) {
-        
-        // Đảm bảo User đã đăng nhập (Protected bởi SecurityConfig)
-        
         Report updatedReport = reportService.updateReportStatus(id, request.getNewStatus());
-        
         return ResponseEntity.ok(updatedReport);
     }
     
-    /**
-     * API XUẤT BÁO CÁO PDF (FR-13.1.3)
-     * GET /api/reports/export/pdf
-     */
     @GetMapping("/export/pdf")
     public ResponseEntity<byte[]> exportPdf() {
         User user = getCurrentUser();
