@@ -2,9 +2,10 @@ package com.enviro.app.environment_backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
-import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class EnvironmentBackendApplication {
@@ -14,8 +15,15 @@ public class EnvironmentBackendApplication {
     }
 
     /**
-     * BEAN NÀY SẼ ÉP BUỘC SERVER CHẠY VỚI CONTEXT PATH LÀ "/" (RỖNG)
-     * Nó sẽ ghi đè mọi cấu hình trong file properties, yml hoặc cài đặt của IDE.
+     * Bean này cung cấp RestTemplate cho AqiService sử dụng
+     */
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+
+    /**
+     * Giữ lại cấu hình context-path rỗng để tránh lỗi 404 cũ
      */
     @Bean
     public WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> webServerFactoryCustomizer() {

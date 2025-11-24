@@ -28,6 +28,18 @@ public class UserController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
     }
 
+    // --- BỔ SUNG ĐOẠN NÀY ---
+    /**
+     * API LẤY THÔNG TIN CÁ NHÂN (Fix lỗi 405)
+     * GET /api/users/me
+     */
+    @GetMapping("/me")
+    public ResponseEntity<User> getMyProfile() {
+        User currentUser = getCurrentUser();
+        return ResponseEntity.ok(currentUser);
+    }
+    // ------------------------
+
     @PutMapping("/profile")
     public ResponseEntity<User> updateProfile(@RequestBody UpdateProfileRequest request) {
         User currentUser = getCurrentUser();

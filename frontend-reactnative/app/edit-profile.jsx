@@ -1,30 +1,135 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location"; // Import thư viện Location
 import typography from "../styles/typography";
+import { getMyProfile, updateProfile } from "../src/services/userService";
 
 const EditProfileScreen = () => {
   const router = useRouter();
-  const [fullName, setFullName] = useState("Lưu Thuý Anh");
-  const [gender, setGender] = useState("Nữ");
-  const [birthDate, setBirthDate] = useState("01/01/2000");
-  const [location, setLocation] = useState("Thành phố Hồ Chí Minh");
-  const [email, setEmail] = useState("anh123@gmail.com");
-  const [phone, setPhone] = useState("0123456789");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false); // State loading cho nút lấy vị trí
 
-  const handleSave = () => {
-    console.log("Lưu thông tin...");
-    router.back();
+  // State cho các trường thông tin
+  const [fullName, setFullName] = useState("");
+  const [gender, setGender] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [location, setLocation] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // Load dữ liệu khi mở màn hình
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const user = await getMyProfile();
+      setFullName(user.fullName || "");
+      setGender(user.gender || "");
+      setBirthDate(user.dateOfBirth || "");
+      setLocation(user.defaultLocation || "");
+      setEmail(user.email || "");
+      setPhone(user.phoneNumber || "");
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể tải thông tin người dùng.");
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // --- HÀM MỚI: LẤY VỊ TRÍ HIỆN TẠI ---
+  const handleGetCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      // 1. Xin quyền truy cập vị trí
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Quyền truy cập bị từ chối",
+          "Vui lòng cho phép ứng dụng truy cập vị trí để sử dụng tính năng này."
+        );
+        setLocating(false);
+        return;
+      }
+
+      // 2. Lấy tọa độ hiện tại
+      let currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      // 3. Chuyển tọa độ thành địa chỉ (Reverse Geocoding)
+      let addressResponse = await Location.reverseGeocodeAsync({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+
+      if (addressResponse.length > 0) {
+        const addr = addressResponse[0];
+        // Tạo chuỗi địa chỉ từ các thành phần trả về
+        const formattedAddress = [
+          addr.street,
+          addr.subregion, // Quận/Huyện
+          addr.city,      // Thành phố/Tỉnh
+          addr.country    // Quốc gia (có thể bỏ nếu không cần)
+        ]
+          .filter((item) => item) // Lọc bỏ các giá trị null/undefined
+          .join(", ");
+
+        setLocation(formattedAddress);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Lỗi", "Không thể lấy vị trí hiện tại. Vui lòng thử lại.");
+    } finally {
+      setLocating(false);
+    }
+  };
+  // -------------------------------------
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updateData = {
+        fullName,
+        gender,
+        dateOfBirth: birthDate,
+        defaultLocation: location,
+        phoneNumber: phone,
+      };
+
+      await updateProfile(updateData);
+      Alert.alert("Thành công", "Cập nhật hồ sơ thành công!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert("Lỗi", error.message || "Không thể cập nhật hồ sơ.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -51,14 +156,11 @@ const EditProfileScreen = () => {
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
             <MaterialCommunityIcons
-              name="emoticon-happy-outline"
-              size={56}
-              color="#666"
+              name="account-circle"
+              size={80}
+              color="#CCCCCC"
             />
           </View>
-          <TouchableOpacity style={styles.cameraButton} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="camera" size={18} color="#0A0A0A" />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.formSection}>
@@ -79,22 +181,23 @@ const EditProfileScreen = () => {
               style={styles.input}
               value={gender}
               onChangeText={setGender}
-              placeholder="Nhập giới tính"
+              placeholder="Nam / Nữ"
               placeholderTextColor="#999"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ngày sinh</Text>
+            <Text style={styles.label}>Ngày sinh (yyyy-MM-dd)</Text>
             <TextInput
               style={styles.input}
               value={birthDate}
               onChangeText={setBirthDate}
-              placeholder="DD/MM/YYYY"
+              placeholder="Ví dụ: 2000-01-01"
               placeholderTextColor="#999"
             />
           </View>
 
+          {/* --- CẬP NHẬT UI PHẦN KHU VỰC --- */}
           <View style={[styles.inputGroup, { marginBottom: 0 }]}>
             <Text style={styles.label}>Khu vực</Text>
             <View style={styles.inputWithIcon}>
@@ -102,30 +205,36 @@ const EditProfileScreen = () => {
                 style={[styles.input, styles.inputWithIconPadding]}
                 value={location}
                 onChangeText={setLocation}
-                placeholder="Nhập khu vực"
+                placeholder="Nhập địa chỉ hoặc chọn vị trí"
                 placeholderTextColor="#999"
               />
-              <MaterialCommunityIcons
-                name="map-marker"
-                size={20}
-                color="#0A0A0A"
-                style={styles.inputIcon}
-              />
+              <TouchableOpacity 
+                style={styles.inputIconBtn} 
+                onPress={handleGetCurrentLocation}
+                disabled={locating}
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="crosshairs-gps" // Icon định vị
+                    size={24}
+                    color="#007AFF"
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
+          {/* -------------------------------- */}
 
           <View style={styles.divider} />
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: "#F5F5F5", color: "#888" }]}
               value={email}
-              onChangeText={setEmail}
-              placeholder="Nhập email"
-              placeholderTextColor="#999"
-              keyboardType="email-address"
-              autoCapitalize="none"
+              editable={false}
             />
           </View>
 
@@ -143,11 +252,16 @@ const EditProfileScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.saveButton}
+          style={[styles.saveButton, saving && { opacity: 0.7 }]}
           onPress={handleSave}
           activeOpacity={0.8}
+          disabled={saving}
         >
-          <Text style={styles.saveButtonText}>Lưu thông tin</Text>
+          {saving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Lưu thông tin</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -159,11 +273,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F0EFED",
   },
+  center: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: {
     paddingBottom: 40,
     flexGrow: 1,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -196,7 +313,6 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
-
   avatarSection: {
     alignItems: "center",
     paddingVertical: 32,
@@ -216,31 +332,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
-  avatarEmoji: {
-    fontFamily: "SF Pro Display",
-    fontSize: 48,
-    color: "#0A0A0A",
-  },
-  cameraButton: {
-    position: "absolute",
-    bottom: 32,
-    left: "50%",
-    marginLeft: 40,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#DDD",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-
   formSection: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 24,
@@ -282,17 +373,17 @@ const styles = StyleSheet.create({
   },
   inputWithIcon: {
     position: "relative",
+    justifyContent: 'center', // Căn giữa icon theo chiều dọc
   },
   inputWithIconPadding: {
-    paddingRight: 44,
+    paddingRight: 50, // Tăng padding để không bị icon che chữ
   },
-  inputIcon: {
+  inputIconBtn: {
     position: "absolute",
-    right: 16,
-    top: "50%",
-    marginTop: -10,
+    right: 10, // Đặt sát bên phải
+    padding: 5,
+    zIndex: 1,
   },
-
   saveButton: {
     backgroundColor: "#007AFF",
     marginHorizontal: 24,

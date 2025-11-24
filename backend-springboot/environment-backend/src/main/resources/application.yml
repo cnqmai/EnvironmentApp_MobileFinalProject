@@ -6,7 +6,10 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/environment_db
+    # --- SỬA DÒNG NÀY ---
+    # Thêm ?stringtype=unspecified vào cuối URL
+    url: jdbc:postgresql://localhost:5432/environment_db?stringtype=unspecified
+    # ---------------------
     username: env_app_user
     password: "2112"
 
