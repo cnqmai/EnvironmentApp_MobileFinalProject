@@ -3,7 +3,7 @@ package com.enviro.app.environment_backend.controller;
 import com.enviro.app.environment_backend.dto.AqiAlertRequest;
 import com.enviro.app.environment_backend.dto.AqiAlertResponse;
 import com.enviro.app.environment_backend.dto.AqiResponse;
-import com.enviro.app.environment_backend.dto.SavedLocationAqiResponse; // Import thiếu
+import com.enviro.app.environment_backend.dto.SavedLocationAqiResponse;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.AqiService;
 import com.enviro.app.environment_backend.service.SavedLocationService;
@@ -26,7 +26,10 @@ public class AqiController {
     private final SavedLocationService savedLocationService;
     private final UserService userService;
 
-    public AqiController(AqiService aqiService, SavedLocationService savedLocationService, UserService userService) {
+    // Constructor Injection đầy đủ
+    public AqiController(AqiService aqiService, 
+                         SavedLocationService savedLocationService, 
+                         UserService userService) {
         this.aqiService = aqiService;
         this.savedLocationService = savedLocationService;
         this.userService = userService;
@@ -48,10 +51,12 @@ public class AqiController {
         return ResponseEntity.ok(aqiData);
     }
 
+    // API này sẽ gọi service đã được cập nhật logic
     @GetMapping("/saved-locations")
     public ResponseEntity<List<SavedLocationAqiResponse>> getAqiForSavedLocations() {
         User user = getCurrentUser();
         List<SavedLocationAqiResponse> aqiList = savedLocationService.getAqiForAllSavedLocations(user.getId());
+        
         if (aqiList.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }

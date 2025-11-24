@@ -10,8 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -35,13 +34,15 @@ public class AqiService {
         this.restTemplate = restTemplate;
     }
 
+    /**
+     * Lấy thông tin AQI theo tọa độ GPS
+     */
     public AqiResponse getCurrentAqiByGps(double lat, double lon) {
         String url = String.format("%s?lat=%s&lon=%s&appid=%s", baseUrl, lat, lon, apiKey);
         try {
             OpenWeatherMapResponse response = restTemplate.getForObject(url, OpenWeatherMapResponse.class);
 
             if (response != null && response.getList() != null && !response.getList().isEmpty()) {
-                // SỬA: Dùng AqiDataPoint thay vì Main/Component
                 AqiDataPoint dataPoint = response.getList().get(0);
                 
                 int aqi = dataPoint.getMain().getAqi();
@@ -67,15 +68,50 @@ public class AqiService {
         return null;
     }
 
-    // Hàm mới để chuyển đổi địa chỉ thành tọa độ
+    /**
+     * [NÂNG CẤP] Tìm tọa độ từ địa chỉ (Có cơ chế thử lại thông minh)
+     * Nếu địa chỉ chi tiết không tìm thấy, sẽ thử tìm theo Quận/Thành phố.
+     */
     public GeocodingResponse getCoordinatesFromAddress(String address) {
+        // Lần 1: Thử tìm chính xác địa chỉ người dùng nhập
+        GeocodingResponse result = callGeocodingApi(address);
+
+        // Lần 2: Nếu thất bại và địa chỉ có chứa dấu phẩy, thử rút gọn
+        // Ví dụ: "Hẻm 123, Tân Phú, HCM" -> Thử tìm "Tân Phú, HCM"
+        if (result == null && address.contains(",")) {
+            String[] parts = address.split(",", 2); // Cắt bỏ phần đầu tiên trước dấu phẩy
+            if (parts.length > 1) {
+                String simplifiedAddress = parts[1].trim();
+                System.out.println("Không tìm thấy địa chỉ chi tiết. Đang thử lại với: " + simplifiedAddress);
+                result = callGeocodingApi(simplifiedAddress);
+                
+                // Lần 3: Nếu vẫn thất bại, thử rút gọn thêm lần nữa (nếu còn dấu phẩy)
+                if (result == null && simplifiedAddress.contains(",")) {
+                    String[] parts2 = simplifiedAddress.split(",", 2);
+                    if (parts2.length > 1) {
+                        String evenSimpler = parts2[1].trim();
+                        System.out.println("Vẫn không thấy. Thử cấp cao hơn: " + evenSimpler);
+                        result = callGeocodingApi(evenSimpler);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    // Hàm phụ trợ gọi API (tránh lặp code)
+    private GeocodingResponse callGeocodingApi(String address) {
         String directGeoUrl = "http://api.openweathermap.org/geo/1.0/direct";
         try {
-            String encodedAddress = URLEncoder.encode(address, StandardCharsets.UTF_8);
-            String url = String.format("%s?q=%s&limit=1&appid=%s", directGeoUrl, encodedAddress, apiKey);
+            URI uri = UriComponentsBuilder.fromHttpUrl(directGeoUrl)
+                    .queryParam("q", address)
+                    .queryParam("limit", 1)
+                    .queryParam("appid", apiKey)
+                    .build()
+                    .toUri();
 
             ResponseEntity<GeocodingResponse[]> responseEntity = 
-                restTemplate.getForEntity(url, GeocodingResponse[].class);
+                restTemplate.getForEntity(uri, GeocodingResponse[].class);
             
             GeocodingResponse[] responses = responseEntity.getBody();
 
@@ -83,20 +119,22 @@ public class AqiService {
                 return responses[0];
             }
         } catch (Exception e) {
-            System.err.println("Lỗi Geocoding: " + e.getMessage());
+            System.err.println("Geocoding API error cho địa chỉ '" + address + "': " + e.getMessage());
         }
         return null;
     }
 
     private String getCityNameFromGps(double lat, double lon) {
         try {
-            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(geocodingUrl)
+            URI uri = UriComponentsBuilder.fromUriString(geocodingUrl)
                 .queryParam("lat", lat)
                 .queryParam("lon", lon)
                 .queryParam("limit", 1)
-                .queryParam("appid", apiKey);
+                .queryParam("appid", apiKey)
+                .build()
+                .toUri();
 
-            GeocodingResponse[] responses = restTemplate.getForObject(builder.toUriString(), GeocodingResponse[].class);
+            GeocodingResponse[] responses = restTemplate.getForObject(uri, GeocodingResponse[].class);
             if (responses != null && responses.length > 0) {
                 return responses[0].getName();
             }
@@ -117,10 +155,8 @@ public class AqiService {
         };
     }
 
-    // SỬA: Dùng Map<String, Double> thay vì Object Component
     private String findDominantPollutant(Map<String, Double> components) {
         if (components == null) return "N/A";
-        // Logic đơn giản: ưu tiên PM2.5
         if (components.containsKey("pm2_5")) return "PM2.5";
         if (components.containsKey("pm10")) return "PM10";
         return "N/A";

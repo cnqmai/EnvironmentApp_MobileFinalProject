@@ -20,10 +20,9 @@ import com.enviro.app.environment_backend.repository.UserRepository;
 public class SavedLocationService {
 
     private final SavedLocationRepository locationRepository;
-    private final UserRepository userRepository; // Thêm repository này để lấy user info
+    private final UserRepository userRepository;
     private final AqiService aqiService; 
 
-    // Cập nhật Constructor
     public SavedLocationService(SavedLocationRepository locationRepository, 
                                 UserRepository userRepository,
                                 AqiService aqiService) {
@@ -48,7 +47,7 @@ public class SavedLocationService {
     }
 
     /**
-     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile (User default_location)
+     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile
      */
     public List<SavedLocationAqiResponse> getAqiForAllSavedLocations(UUID userId) {
         List<SavedLocationAqiResponse> responseList = new ArrayList<>();
@@ -68,7 +67,7 @@ public class SavedLocationService {
                 
                 if (aqiData != null) {
                     responseList.add(SavedLocationAqiResponse.builder()
-                        .locationId(null) // Không có ID vì không nằm trong bảng saved_locations
+                        .locationId(null) // Không có ID vì là mặc định
                         .locationName(address + " (Mặc định)")
                         .latitude(coords.getLat())
                         .longitude(coords.getLon())
@@ -83,7 +82,7 @@ public class SavedLocationService {
             }
         }
 
-        // 2. Lấy danh sách từ bảng saved_locations (nếu có)
+        // 2. Lấy danh sách từ bảng saved_locations
         List<SavedLocation> savedLocations = locationRepository.findByUserId(userId);
         
         List<SavedLocationAqiResponse> savedList = savedLocations.stream().map(location -> {
@@ -106,7 +105,6 @@ public class SavedLocationService {
                 .build();
         }).collect(Collectors.toList());
 
-        // Gộp 2 danh sách
         responseList.addAll(savedList);
 
         return responseList;
