@@ -1,5 +1,8 @@
 server:
   port: 8080
+  # QUAN TRỌNG: Đặt context-path là / để không bị nhân đôi thành /api/api
+  servlet:
+    context-path: /
 
 spring:
   datasource:
@@ -10,7 +13,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -35,18 +38,15 @@ facebook:
 # --- JWT Configuration ---
 jwt:
   secret:
-    # LƯU Ý: Khóa phải dài và được mã hóa Base64 hợp lệ (Hiện tại khóa quá ngắn)
+    # Key Base64
     key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
-  # THÊM THUỘC TÍNH BỊ THIẾU: 24 giờ (86400000 milliseconds)
   expiration:
     ms: 86400000
 
 # --- AQI API Configuration (OpenWeatherMap) ---
 aqi:
   api:
-    # LƯU Ý: Thay thế YOUR_OPENWEATHERMAP_API_KEY bằng API key thực tế từ https://openweathermap.org/api
+    # Thay thế bằng API Key thật của bạn
     key: 5ad9ae819b67abf939f3e0d4604bd362
-    # URL API để lấy dữ liệu AQI theo tọa độ
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
-    # URL API để lấy tên thành phố từ tọa độ (Geocoding API)
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
