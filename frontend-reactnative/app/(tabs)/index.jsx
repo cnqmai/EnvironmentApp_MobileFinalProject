@@ -1,87 +1,73 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, Alert } from "react-native";
+import React, { useCallback, useState, useEffect } from "react";
+import { StyleSheet, FlatList, View, Text, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import * as Location from 'expo-location';
-
-// Components
 import AQICard from "../../components/AQICard";
 import typography from "../../styles/typography";
 
-// Services
-import { getAqiByGps, getAqiForSavedLocations } from "../../src/services/aqiService";
-import { getToken } from "../../src/utils/apiHelper";
+// Import Service lấy dữ liệu
+import { getAqiForSavedLocations } from "../../src/services/aqiService";
 
 const DashboardScreen = () => {
   const router = useRouter();
+  
+  // States quản lý dữ liệu và trạng thái tải
   const [aqiList, setAqiList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Hàm lấy dữ liệu
-  const fetchData = useCallback(async () => {
+  // Hàm lấy dữ liệu từ API
+  const fetchData = async () => {
     try {
-      setLoading(true);
-      let data = [];
+      const data = await getAqiForSavedLocations();
+      
+      // Ánh xạ dữ liệu từ Backend (SavedLocationAqiResponse) sang format của UI
+      const formattedData = data.map((item, index) => ({
+        id: item.locationId ? item.locationId.toString() : `default-${index}`,
+        location: { 
+            // Ưu tiên lấy tên thành phố đã phân giải, nếu không có thì lấy tên đặt
+            name: item.locationName || "Vị trí chưa đặt tên", 
+            city: item.resolvedCityName || "" 
+        },
+        aqi: item.aqiValue,
+        status: translateStatus(item.status), // Chuyển đổi trạng thái sang tiếng Việt
+        description: item.healthAdvisory,
+        // Logic xác định nhóm nhạy cảm (Ví dụ: AQI > 100 là có hại cho nhóm nhạy cảm)
+        isSensitiveGroup: item.aqiValue > 100, 
+      }));
 
-      // 1. Lấy vị trí hiện tại và AQI tại đó
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const location = await Location.getCurrentPositionAsync({});
-        try {
-          const currentAqi = await getAqiByGps(location.coords.latitude, location.coords.longitude);
-          // Format dữ liệu cho khớp với AQICard
-          if (currentAqi) {
-             data.push({
-              id: 'current',
-              location: { name: "Vị trí hiện tại", city: "" },
-              aqi: currentAqi.aqi,
-              status: currentAqi.level, // Ví dụ: "Tốt", "Kém"
-              description: currentAqi.recommendation,
-              isSensitiveGroup: currentAqi.aqi > 100,
-            });
-          }
-        } catch (e) {
-          console.log("Lỗi lấy AQI GPS:", e);
-        }
-      }
-
-      // 2. Lấy AQI từ các địa điểm đã lưu (nếu đã đăng nhập)
-      const token = await getToken();
-      if (token) {
-        try {
-          const savedLocations = await getAqiForSavedLocations();
-          const formattedSaved = savedLocations.map((item, index) => ({
-            id: `saved-${index}`,
-            location: { name: item.name, city: "" }, // Backend trả về tên địa điểm
-            aqi: item.aqi,
-            status: item.level,
-            description: item.recommendation,
-            isSensitiveGroup: item.aqi > 100,
-          }));
-          data = [...data, ...formattedSaved];
-        } catch (e) {
-          console.log("Chưa đăng nhập hoặc lỗi lấy địa điểm đã lưu");
-        }
-      }
-
-      setAqiList(data);
+      setAqiList(formattedData);
     } catch (error) {
-      console.error(error);
-      Alert.alert("Lỗi", "Không thể tải dữ liệu chất lượng không khí.");
+      console.error("Lỗi tải dashboard:", error);
+      // Có thể thêm Toast hoặc Alert báo lỗi tại đây
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  };
 
+  // Gọi dữ liệu khi mở màn hình
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
 
-  const onRefresh = () => {
+  // Xử lý khi người dùng kéo xuống để làm mới
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
+  }, []);
+
+  // Helper: Dịch trạng thái AQI sang tiếng Việt
+  const translateStatus = (status) => {
+      const map = {
+          "Good": "Tốt",
+          "Fair": "Khá",
+          "Moderate": "Trung bình",
+          "Poor": "Kém",
+          "Very Poor": "Rất kém",
+          "Unknown": "Không rõ"
+      };
+      return map[status] || status;
   };
 
   const renderAQICard = useCallback(
@@ -91,6 +77,7 @@ const DashboardScreen = () => {
         aqi={item.aqi}
         description={item.description}
         isSensitiveGroup={item.isSensitiveGroup}
+        // Khi bấm vào card, chuyển sang trang chi tiết kèm dữ liệu
         onPress={() =>
           router.push({
             pathname: "/detail",
@@ -98,7 +85,9 @@ const DashboardScreen = () => {
               locationName: item.location.name,
               locationCity: item.location.city,
               aqi: item.aqi,
-              isSensitiveGroup: item.isSensitiveGroup,
+              status: item.status,
+              description: item.description,
+              isSensitiveGroup: item.isSensitiveGroup.toString(), // Params nên là string
             },
           })
         }
@@ -106,6 +95,16 @@ const DashboardScreen = () => {
     ),
     [router]
   );
+
+  // Hiển thị màn hình loading khi đang tải lần đầu
+  if (loading && !refreshing) {
+      return (
+          <SafeAreaView style={[styles.container, styles.centerContent]}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={{marginTop: 10, color: "#666"}}>Đang cập nhật dữ liệu AQI...</Text>
+          </SafeAreaView>
+      );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -115,28 +114,30 @@ const DashboardScreen = () => {
 
       <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
 
-      {loading && !refreshing ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-        </View>
-      ) : (
-        <FlatList
-          data={aqiList}
-          renderItem={renderAQICard}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          style={styles.flatListStyle}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <Text style={{ textAlign: 'center', color: '#666', marginTop: 20 }}>
-              Chưa có dữ liệu. Hãy bật GPS hoặc thêm địa điểm.
-            </Text>
-          }
-        />
-      )}
+      <FlatList
+        data={aqiList}
+        renderItem={renderAQICard}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        style={styles.flatListStyle}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={30}
+        initialNumToRender={3}
+        keyboardShouldPersistTaps="handled"
+        // Thêm RefreshControl
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#007AFF" />
+        }
+        // Hiển thị khi danh sách trống
+        ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Chưa có địa điểm nào được lưu.</Text>
+                <Text style={styles.emptySubText}>Hãy cập nhật hồ sơ hoặc thêm địa điểm mới.</Text>
+            </View>
+        )}
+      />
     </SafeAreaView>
   );
 };
@@ -147,10 +148,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0EFED",
     position: "relative",
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
+  centerContent: {
+      justifyContent: 'center',
+      alignItems: 'center'
   },
   header: {
     backgroundColor: "#F0EFED",
@@ -190,6 +190,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     minHeight: 200,
   },
+  emptyContainer: {
+      alignItems: 'center',
+      marginTop: 50,
+      paddingHorizontal: 20
+  },
+  emptyText: {
+      ...typography.h3,
+      color: '#333',
+      marginBottom: 8
+  },
+  emptySubText: {
+      ...typography.body,
+      color: '#999',
+      textAlign: 'center'
+  }
 });
 
 export default DashboardScreen;
