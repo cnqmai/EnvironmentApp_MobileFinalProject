@@ -3,7 +3,6 @@ import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import Modal from "react-native-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-// SỬA ĐƯỜNG DẪN TẠI ĐÂY (chỉ 1 dấu chấm ..)
 import { removeToken } from "../src/utils/apiHelper"; //
 
 // (Component MenuItem được định nghĩa ở dưới)
