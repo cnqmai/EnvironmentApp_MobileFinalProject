@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 30, 
     alignItems: 'center',
-    marginTop: 90,
+    marginTop: 100,
   },
   backToLoginText: {
     color: '#000000',
