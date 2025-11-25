@@ -1,68 +1,99 @@
 import React, { useState, useEffect } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Text } from "react-native";
+import * as Font from 'expo-font'; // Import Font loader
+import * as SplashScreen from 'expo-splash-screen'; // Thường được dùng để kiểm soát splash screen
+
 // Đường dẫn import đúng từ app/_layout.jsx là '../src/...'
 import { getToken } from "../src/utils/apiHelper";
+
+// Tùy chọn: Giữ splash screen hiển thị cho đến khi tài nguyên được tải
+// SplashScreen.preventAutoHideAsync(); 
 
 /**
  * Component này sẽ kiểm tra xác thực và điều hướng người dùng
  */
 const AuthProvider = ({ children }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const segments = useSegments(); // Lấy đường dẫn hiện tại
+    const [isLoading, setIsLoading] = useState(true);
+    const [fontsLoaded, setFontsLoaded] = useState(false); // State mới để kiểm tra font
+    const router = useRouter();
+    const segments = useSegments(); // Lấy đường dẫn hiện tại
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = await getToken();
-        
-        // Kiểm tra xem người dùng có đang ở màn hình login/register không
-        // (tabs) -> login hoặc (tabs) -> register
-        const inAuthGroup = segments[0] === '(tabs)' && (segments[1] === 'login' || segments[1] === 'register');
-
-        if (!token && !inAuthGroup) {
-          // 1. Không có token VÀ không ở trang auth -> Chuyển đến login
-          router.replace("/(tabs)/login");
-        } else if (token && inAuthGroup) {
-          // 2. Có token VÀ đang ở trang auth (ví dụ: vừa login) -> Chuyển đến dashboard
-          router.replace("/(tabs)");
+    // 1. Load Fonts
+    useEffect(() => {
+        async function loadAppResources() {
+            try {
+                // Tải font SF Pro Display
+                // LƯU Ý: Bạn cần đặt các file font SF Pro Display thực tế vào thư mục assets/fonts
+                await Font.loadAsync({
+                    'SF Pro Display': require('../assets/fonts/SF-Pro-Display-Regular.otf'), // Thay bằng đường dẫn file font của bạn
+                    'SF Pro Display-Bold': require('../assets/fonts/SF-Pro-Display-Bold.otf'), 
+                    // Thêm các biến thể font khác nếu cần (ví dụ: Medium, Semibold, Light)
+                });
+            } catch (e) {
+                console.warn("Lỗi khi tải font:", e);
+            } finally {
+                setFontsLoaded(true);
+            }
         }
-        
-      } catch (e) {
-        console.error("Lỗi khi kiểm tra auth:", e);
-        // Nếu có lỗi, vẫn đưa về login
-        router.replace("/(tabs)/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
-    // Kiểm tra auth khi component mount hoặc đường dẫn thay đổi
-    checkAuth();
-  }, [segments, router]); // Chạy lại khi đường dẫn thay đổi
+        loadAppResources();
+    }, []);
 
-  // Hiển thị màn hình loading trong khi kiểm tra token
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#00796B" />
-      </View>
-    );
-  }
+    // 2. Auth Check logic (chỉ chạy khi font đã load)
+    useEffect(() => {
+        if (!fontsLoaded) return; // Đợi font load xong mới check Auth
 
-  // Nếu không loading, hiển thị nội dung (các trang)
-  return children;
+        const checkAuth = async () => {
+            try {
+                const token = await getToken();
+
+                // Kiểm tra Unmatched Routes (login, register, forgot-password)
+                const currentSegment = segments[segments.length - 1];
+                const isAuthScreen = ['login', 'register', 'forgot-password'].includes(currentSegment);
+                const inAppGroup = segments[0] === '(tabs)';
+
+                if (!token && inAppGroup) {
+                    router.replace("/login");
+                } else if (token && isAuthScreen) {
+                    router.replace("/(tabs)");
+                }
+
+            } catch (e) {
+                console.error("Lỗi khi kiểm tra auth:", e);
+                router.replace("/login");
+            } finally {
+                setIsLoading(false);
+                // SplashScreen.hideAsync(); // Tùy chọn: Ẩn splash screen sau khi hoàn tất
+            }
+        };
+
+        checkAuth();
+    }, [segments, router, fontsLoaded]); // Chạy lại khi fontsLoaded thay đổi
+
+    // Hiển thị màn hình loading trong khi kiểm tra token HOẶC đang tải font
+    if (isLoading || !fontsLoaded) {
+        return (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: '#fff' }}>
+                <ActivityIndicator size="large" color="#00796B" />
+                <Text style={{ marginTop: 10 }}>Đang tải tài nguyên...</Text>
+            </View>
+        );
+    }
+
+    // Nếu không loading, hiển thị nội dung (các trang)
+    return children;
 };
 
 export default function RootLayout() {
-  // Bọc toàn bộ ứng dụng trong AuthProvider
-  return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <Slot />
-      </AuthProvider>
-    </SafeAreaProvider>
-  );
+    // Bọc toàn bộ ứng dụng trong AuthProvider
+    return (
+        <SafeAreaProvider>
+            <AuthProvider>
+                {/* Slot mặc định cho các màn hình không khớp (login.jsx) */}
+                <Slot screenOptions={{ headerShown: false }} /> 
+            </AuthProvider>
+        </SafeAreaProvider>
+    );
 }

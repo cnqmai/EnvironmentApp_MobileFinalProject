@@ -5,7 +5,9 @@ import Constants from 'expo-constants';
 // Cách này giúp bạn không cần sửa IP thủ công trong code
 const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
 const localhost = debuggerHost?.split(':')[0] || 'localhost';
-
+console.log('DEBUG - isDevice:', Constants.isDevice);
+console.log('DEBUG - debuggerHost:', debuggerHost);
+console.log('DEBUG - localhost:', localhost);
 let API_BASE_URL;
 
 if (Platform.OS === 'android') {

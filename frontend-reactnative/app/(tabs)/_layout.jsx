@@ -77,30 +77,6 @@ const TabsLayout = () => {
           ),
         }}
       />
-      
-      {/* ===== ẨN TAB TẠM THỜI ===== */}
-      <Tabs.Screen
-        name="login" // Tên tệp: login.jsx
-        options={{
-          title: "Đăng nhập",
-          href: null, // <-- ẨN TAB NÀY KHỎI GIAO DIỆN
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="login" size={28} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="register" // Tên tệp: register.jsx
-        options={{
-          title: "Đăng ký",
-          href: null, // <-- ẨN TAB NÀY KHỎI GIAO DIỆN
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="account-plus" size={28} color={color} />
-          ),
-        }}
-      />
-      {/* ============================== */}
-      
     </Tabs>
   );
 };
