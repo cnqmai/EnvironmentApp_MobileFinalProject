@@ -14,7 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.enviro.app.environmentapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,11 +25,28 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "facebookAppId": "1311344667346639",
+        "facebookDisplayName": "com.enviro.app.environmentapp"
+      },
+      "package": "com.enviro.app.environment_backend"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "google": {
+        "androidClientId": "756858259822-3vc9g8jdee93v1v4vajgo33ghao6rsib.apps.googleusercontent.com",
+        "iosClientId": "756858259822-mvqtudhds35eq2b4h56qn16uefj615jo.apps.googleusercontent.com",
+        "webClientId": "756858259822-kuuqptavpaahrr4lgdfsdv9e365s01q8.apps.googleusercontent.com"
+      },
+      "facebookAppId": "1311344667346639",
+      "router": {},
+      "eas": {
+        "projectId": "cab69579-09d6-4f2a-a9ee-e2d543a42b80"
+      }
     },
     "plugins": [
       "expo-router",
@@ -43,7 +61,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

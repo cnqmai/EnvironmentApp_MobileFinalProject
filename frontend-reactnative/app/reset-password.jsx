@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,36 +11,63 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { requestPasswordReset } from '../src/services/authService'; 
+import { useRouter, useLocalSearchParams } from 'expo-router'; // ĐÃ SỬA: dùng useLocalSearchParams
 import { FONT_FAMILY } from '../styles/typography';
+import { resetPassword } from '../src/services/authService'; 
 
-const ForgotPassword = () => {
-  const [email, setEmail] = useState('');
+const ResetPassword = () => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Lấy token từ URL (ví dụ: /reset-password?token=XYZ)
+  const { token } = useLocalSearchParams(); // ĐÃ SỬA: dùng useLocalSearchParams
+  
   const router = useRouter();
 
-  // FR-1.1.3: Gửi yêu cầu đặt lại mật khẩu
-  const handleSendCode = async () => {
-    if (!email) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email');
+  // Kiểm tra token khi màn hình được load
+  useEffect(() => {
+    if (!token) {
+      // Nếu không có token, chuyển hướng về Forgot Password
+      Alert.alert(
+        'Lỗi', 
+        'Token đặt lại mật khẩu không hợp lệ. Vui lòng thử lại.', 
+        [{ text: 'OK', onPress: () => router.replace('/forgot-password') }]
+      );
+    }
+  }, [token]);
+
+  // Xử lý việc đặt lại mật khẩu
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ Mật khẩu mới và Xác nhận.');
       return;
+    }
+    if (newPassword !== confirmPassword) {
+      // Backend cũng kiểm tra điều này
+      Alert.alert('Lỗi', 'Mật khẩu mới và Xác nhận mật khẩu không khớp.'); 
+      return;
+    }
+    
+    if (!token) {
+        Alert.alert('Lỗi', 'Không tìm thấy token đặt lại mật khẩu.');
+        return;
     }
 
     setLoading(true);
     try {
-      // Gọi API yêu cầu reset mật khẩu
-      await requestPasswordReset(email);
+      // Gọi API reset mật khẩu, gửi token và mật khẩu
+      await resetPassword(token, newPassword, confirmPassword);
       
-      // Phản hồi thành công và điều hướng về login
+      // Phản hồi thành công
       Alert.alert(
         'Thành công', 
-        'Link đặt lại mật khẩu đã được gửi vào email của bạn. Vui lòng kiểm tra hộp thư.', 
-        [{ text: 'OK', onPress: () => router.replace('/login') }] // Dùng replace để đóng màn hình này
+        'Mật khẩu của bạn đã được đặt lại thành công.', 
+        [{ text: 'OK', onPress: () => router.replace('/login') }] 
       );
     } catch (error) {
-      // Hiển thị message lỗi
-      Alert.alert('Lỗi', error.message || 'Không thể gửi yêu cầu.');
+      // Hiển thị lỗi từ Backend (ví dụ: Token không hợp lệ hoặc đã hết hạn)
+      Alert.alert('Lỗi', error.message || 'Không thể đặt lại mật khẩu.');
     } finally {
       setLoading(false);
     }
@@ -54,41 +81,48 @@ const ForgotPassword = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* Title */}
-        <Text style={styles.title}>Quên mật khẩu</Text>
+        <Text style={styles.title}>Đặt lại mật khẩu</Text>
 
         <View style={styles.form}>
             {/* Subtitle mô tả */}
             <Text style={styles.subtitle}>
-              Nhập email của bạn, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.
+              Nhập mật khẩu mới của bạn và xác nhận để hoàn tất.
             </Text>
 
-            {/* Email Input */}
-            <Text style={styles.label}>Email</Text>
+            {/* New Password Input */}
+            <Text style={styles.label}>Mật khẩu mới</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập email"
+              placeholder="Nhập mật khẩu mới"
               placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry={true}
+            />
+            
+            {/* Confirm Password Input */}
+            <Text style={styles.label}>Xác nhận mật khẩu mới</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập lại mật khẩu mới"
+              placeholderTextColor="#999"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={true}
             />
             
             {/* Submit Button */}
             <TouchableOpacity 
               style={[styles.submitButton, loading && styles.buttonDisabled]} 
-              onPress={handleSendCode}
+              onPress={handleResetPassword}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Gửi yêu cầu</Text>
+                <Text style={styles.buttonText}>Đặt lại mật khẩu</Text>
               )}
             </TouchableOpacity>
-
-            {/* View trống để đẩy nội dung lên trên, nếu nội dung ngắn */}
-            <View style={{ flex: 1, marginTop: 50 }} />
 
             {/* Quay lại đăng nhập */}
             <TouchableOpacity 
@@ -104,6 +138,7 @@ const ForgotPassword = () => {
   );
 };
 
+// Sử dụng styles đồng bộ với forgot-password.jsx
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -136,7 +171,6 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
   },
-  // --- LABEL VÀ INPUT (Đồng bộ hóa) ---
   label: {
     fontSize: 16,
     color: '#000000',
@@ -156,7 +190,6 @@ const styles = StyleSheet.create({
     marginBottom: 40, 
     fontFamily: FONT_FAMILY, 
   },
-  // --- SUBMIT BUTTON (Đồng bộ hóa) ---
   submitButton: {
     backgroundColor: '#007bff',
     paddingVertical: 15,
@@ -174,13 +207,12 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
   },
-  // --- QUAY LẠI ĐĂNG NHẬP (Footer/Button) ---
   backToLoginButton: {
     backgroundColor: '#F0EFED',
     paddingVertical: 15,
-    borderRadius: 15, // Dùng 15px để đồng bộ với Guest Button bên login.jsx
+    borderRadius: 15,
     alignItems: 'center',
-    marginTop: 60, // Đẩy lên 60px để có khoảng cách tốt
+    marginTop: 60,
   },
   backToLoginText: {
     color: '#000000',
@@ -190,4 +222,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ForgotPassword;
+export default ResetPassword;

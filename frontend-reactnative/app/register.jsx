@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { register } from '../src/services/authService';
 
 // Import FONT_FAMILY
-import { FONT_FAMILY } from '../styles/typography'; // Giả định typography.js nằm ở ../styles/
+import { FONT_FAMILY } from '../styles/typography'; 
 
 const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -118,7 +118,6 @@ const Register = () => {
             {/* Terms Checkbox */}
             <View style={styles.termsContainer}>
                 <TouchableOpacity style={styles.checkbox} onPress={() => setIsAgreed(!isAgreed)}>
-                    {/* Sử dụng Ionicons để tạo checkbox */}
                     <Ionicons 
                         name={isAgreed ? "radio-button-on" : "ellipse-outline"} 
                         size={24} 
@@ -126,7 +125,7 @@ const Register = () => {
                     />
                 </TouchableOpacity>
                 <Text style={styles.termsText}>
-                    Tôi đồng ý với{' '}
+                    Tôi đồng ý với{' '} 
                     <Text style={styles.termsLink}>Điều khoản & Chính sách</Text>
                 </Text>
             </View>
@@ -199,14 +198,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     fontSize: 16,
     color: '#333',
-    marginBottom: 20, 
+    marginBottom: 25, 
     fontFamily: FONT_FAMILY, 
   },
   // --- TERMS AND CHECKBOX ---
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
     paddingTop: 10,
   },
   checkbox: {
@@ -223,7 +222,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
   },
-  // --- REGISTER BUTTON (Giống style nút Login) ---
+  // --- REGISTER BUTTON (Giống style nút Login) ---\
   registerButton: {
     backgroundColor: '#007bff', 
     paddingVertical: 15,
