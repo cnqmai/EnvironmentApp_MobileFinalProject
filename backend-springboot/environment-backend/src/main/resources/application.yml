@@ -12,6 +12,11 @@ spring:
     # ---------------------
     username: env_app_user
     password: "2112"
+  
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
   jpa:
     show-sql: true
@@ -26,12 +31,18 @@ spring:
       client:
         registration:
           google:
-            client-id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-          
-          # --- Cấu hình cho Facebook ---
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+
           facebook:
-            client-id: "YOUR_FACEBOOK_APP_ID"
-            client-secret: "YOUR_FACEBOOK_APP_SECRET"
+            client-id: ${FACEBOOK_APP_ID}
+            client-secret: ${FACEBOOK_APP_SECRET}
+            scope:
+              - email
+              - public_profile
 
 # --- Cấu hình API của Facebook ---
 facebook:
@@ -53,3 +64,7 @@ aqi:
     key: 5ad9ae819b67abf939f3e0d4604bd362
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
+
+app:
+  upload:
+    dir: uploads

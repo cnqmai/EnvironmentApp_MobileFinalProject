@@ -14,7 +14,6 @@ const ProfileScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
-  // Đã sửa lại stats.points thành stats.currentPoints để khớp với API (UserStatisticsResponse)
   const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, currentPoints: 0 }); 
   const [loading, setLoading] = useState(true);
   
@@ -289,7 +288,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0EFED",
     paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 16,
     alignItems: "flex-end",
     position: "relative",
     zIndex: 1000,
@@ -354,12 +352,11 @@ const styles = StyleSheet.create({
   avatarBlock: {
     alignItems: 'center',
     marginBottom: 20,
-    paddingTop: 10,
   },
   avatarContainer: {
-    width: 120, 
-    height: 120,
-    borderRadius: 60,
+    width: 150, 
+    height: 150,
+    borderRadius: 100,
     backgroundColor: "#FFFFFF", // Nền trắng
     alignItems: "center",
     justifyContent: "center",
@@ -371,14 +368,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   defaultAvatarText: { // Style cho ":-)"
-      fontSize: 32,
-      color: "#666",
-      fontWeight: 'bold',
+    fontSize: 32,
+    color: "#666",
+    fontWeight: 'bold',
   },
   avatarImage: {
-      width: '100%',
-      height: '100%',
-      borderRadius: 60,
+    width: '100%',
+    height: '100%',
+    borderRadius: 100,
   },
   userName: {
     ...typography.h2,

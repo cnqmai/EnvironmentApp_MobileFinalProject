@@ -18,11 +18,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher; // IMPORT QUAN TRỌNG
+import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher; 
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.web.servlet.handler.HandlerMappingIntrospector; // IMPORT QUAN TRỌNG
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector; 
 
 import com.enviro.app.environment_backend.security.JwtAuthenticationFilter;
 import com.enviro.app.environment_backend.security.JwtService;
@@ -62,7 +62,6 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
     
-    // --- 1. CORS FILTER ---
     @Bean
     public CorsFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -77,18 +76,14 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, HandlerMappingIntrospector introspector) throws Exception {
-        // --- GIẢI PHÁP MVC MATCHER ---
-        // Sử dụng MvcRequestMatcher để đồng bộ hóa cách hiểu đường dẫn giữa Security và Controller
         MvcRequestMatcher.Builder mvc = new MvcRequestMatcher.Builder(introspector);
 
-        // Khởi tạo Filter thủ công (không dùng @Bean để tránh đăng ký 2 lần)
         JwtAuthenticationFilter jwtAuthFilter = new JwtAuthenticationFilter(jwtService, customUserDetailsService);
 
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             
-            // Xử lý lỗi trả về 401 rõ ràng
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request, response, authException) -> {
                     System.out.println(">>> [SECURITY BLOCK] Access Denied: " + authException.getMessage());
@@ -98,21 +93,25 @@ public class SecurityConfig {
             )
 
             .authorizeHttpRequests(auth -> auth
-                // 1. Cho phép API AUTH (Thử cả 2 trường hợp có và không có /api để chắc chắn)
+                // 1. Cho phép API AUTH
                 .requestMatchers(mvc.pattern("/api/auth/**")).permitAll()
-                .requestMatchers(mvc.pattern("/auth/**")).permitAll() // <--- THÊM DÒNG NÀY ĐỂ FIX LỖI PATH
+                .requestMatchers(mvc.pattern("/auth/**")).permitAll()
                 
                 // 2. Cho phép API AQI
                 .requestMatchers(mvc.pattern("/api/aqi/**")).permitAll()
                 .requestMatchers(mvc.pattern("/aqi/**")).permitAll()
+
+                // >>> 3. THÊM DÒNG NÀY: CHO PHÉP TRUY CẬP ẢNH UPLOAD <<<
+                .requestMatchers(mvc.pattern("/uploads/**")).permitAll()
+                // ======================================================
                 
-                // 3. Cho phép trang lỗi và Swagger (nếu có)
+                // 4. Cho phép trang lỗi
                 .requestMatchers(mvc.pattern("/error")).permitAll()
                 
-                // 4. Cho phép OPTIONS (CORS)
+                // 5. Cho phép OPTIONS (CORS)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
-                // 5. Các request còn lại bắt buộc đăng nhập
+                // 6. Các request còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
             

@@ -5,11 +5,17 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID; // Sử dụng UUID
+import java.nio.file.Files; 
+import java.nio.file.Path; 
+import java.nio.file.Paths; 
+import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.annotation.Value;
 
 // Thêm các DTO và Model cần thiết
 import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
@@ -32,8 +38,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
     private final SavedLocationRepository savedLocationRepository;
-    // THÊM: Repository còn thiếu
     private final NotificationSettingsRepository notificationSettingsRepository;
+    
+    // Đường dẫn upload (được inject từ application.properties)
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     // CẬP NHẬT: Hàm khởi tạo (Constructor)
     public UserService(UserRepository userRepository, 
@@ -59,6 +68,45 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    public String uploadAvatar(MultipartFile file, UUID userId) {
+        if (file.isEmpty() || file.getOriginalFilename() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được rỗng.");
+        }
+        
+        // 1. Lấy đuôi file và tạo tên file mới (avatar_userId.jpg)
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename.contains(".")) {
+             extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String fileName = "avatar_" + userId.toString() + extension;
+        
+        try {
+            // 2. Định nghĩa đường dẫn lưu trữ
+            // Lưu ý: Cần đảm bảo thư mục này tồn tại hoặc có quyền ghi
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            
+            // 3. Lưu file vào ổ đĩa
+            Path filePath = uploadPath.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            
+            // 4. Trả về URL (Giả định bạn đã cấu hình Static Resource Handler để map /uploads/** tới thư mục này)
+            // Ví dụ URL trả về: http://IP_MAY:8080/uploads/avatar_....jpg
+            // Ở đây trả về đường dẫn tương đối để Frontend ghép với Base URL
+            String publicUrl = "/uploads/" + fileName; 
+            
+            System.out.println(">>> [UPLOAD] Saved file to: " + filePath.toString());
+            
+            return publicUrl;
+        } catch (IOException e) {
+            System.err.println("Error saving file: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi server khi lưu file ảnh.");
+        }
+    }
+
     @Transactional
     public User updateUserProfile(UUID userId, UpdateProfileRequest request) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
@@ -81,7 +129,7 @@ public class UserService {
         }
         if (request.getDateOfBirth() != null) {
             try {
-                user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
+                user.setDateOfBirth(request.getDateOfBirth());
             } catch (DateTimeParseException e) {
                 System.err.println("Invalid date format for dateOfBirth: " + request.getDateOfBirth());
             }
@@ -130,9 +178,7 @@ public class UserService {
                 .build();
     }
 
-    // --- THÊM: Các phương thức bị thiếu (đã cập nhật) ---
-
-    public NotificationSettingsResponse getNotificationSettings(UUID userId) { // SỬA: Dùng UUID
+    public NotificationSettingsResponse getNotificationSettings(UUID userId) {
         NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
         

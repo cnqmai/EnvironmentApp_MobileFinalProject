@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import java.time.LocalDate; // SỬA: Import LocalDate
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -18,7 +18,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -38,14 +37,12 @@ public class User {
     @Column(columnDefinition = "integer default 0")
     private int points;
     
-    // --- THÊM MỚI ---
     private String gender;
 
-    @Column(name = "date_of_birth") // Ánh xạ với cột trong DB
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
     private String phoneNumber;
-    // ----------------
 
     @CreationTimestamp
     private OffsetDateTime createdAt;

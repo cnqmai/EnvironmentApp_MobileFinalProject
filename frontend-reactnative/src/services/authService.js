@@ -1,6 +1,5 @@
 import { API_BASE_URL } from '../constants/api';
-// Lưu ý: Đảm bảo import đúng fetchWithAuth từ file helper của bạn
-import { fetchWithAuth } from '../utils/apiHelper';
+import { saveToken } from '../utils/apiHelper';
 
 /**
  * Xử lý lỗi API an toàn
@@ -52,7 +51,13 @@ export const login = async (email, password) => {
       throw new Error(errorMessage);
     }
 
-    return response.json(); // Trả về { token, user }
+    const data = await response.json();
+    
+    if (data.token) {
+        await saveToken(data.token);
+    }
+
+    return data; 
   } catch (error) {
     throw error;
   }
