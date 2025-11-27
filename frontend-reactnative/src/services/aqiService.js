@@ -58,6 +58,12 @@ export const getAqiForSavedLocations = async () => {
     method: 'GET',
   });
 
+  // --- BẮT ĐẦU SỬA: Xử lý trường hợp 204 No Content ---
+  if (response.status === 204) {
+      return []; // Trả về mảng rỗng ngay lập tức, KHÔNG gọi .json()
+  }
+  // --- KẾT THÚC SỬA ---
+
   if (!response.ok) {
     throw new Error('Không thể lấy dữ liệu AQI cho các địa điểm đã lưu.');
   }

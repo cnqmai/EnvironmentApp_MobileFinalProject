@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 // Import service
 import { register } from '../src/services/authService';
+import { fetchAndSaveUserLocation } from '../src/services/locationService'; // Import mới
 
 // Import FONT_FAMILY
 import { FONT_FAMILY } from '../styles/typography'; 
@@ -25,7 +26,7 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isAgreed, setIsAgreed] = useState(false); // State cho checkbox
+  const [isAgreed, setIsAgreed] = useState(false);
   
   const router = useRouter();
 
@@ -46,9 +47,13 @@ const Register = () => {
 
     setLoading(true);
     try {
-      // Gọi hàm register(fullName, email, password) từ authService
+      // Gọi hàm register
       await register(fullName, email, password);
       
+      // --- CẬP NHẬT MỚI: Xin quyền và lấy vị trí ngay lúc này ---
+      // Việc này giúp "làm nóng" quyền truy cập vị trí trước khi vào app
+      await fetchAndSaveUserLocation();
+
       Alert.alert('Thành công', 'Đăng ký thành công! Vui lòng đăng nhập.', [
         { text: 'OK', onPress: () => router.push('/login') }
       ]);
@@ -64,7 +69,6 @@ const Register = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container} 
     >
-      {/* ScrollView chứa toàn bộ nội dung, bao gồm footer */}
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* Title */}
@@ -125,7 +129,7 @@ const Register = () => {
                     />
                 </TouchableOpacity>
                 <Text style={styles.termsText}>
-                    Tôi đồng ý với{' '} 
+                    Tôi đồng ý với{' '}
                     <Text style={styles.termsLink}>Điều khoản & Chính sách</Text>
                 </Text>
             </View>
@@ -144,7 +148,7 @@ const Register = () => {
               )}
             </TouchableOpacity>
             
-            {/* Login Link (Footer - Nằm trong ScrollView, đồng bộ với Login) */}
+            {/* Login Link */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>Đã có tài khoản? </Text>
               <TouchableOpacity onPress={() => router.push('/login')}>
@@ -158,7 +162,6 @@ const Register = () => {
   );
 };
 
-// Sử dụng style đồng bộ với login.jsx và thêm fontFamily
 const styles = StyleSheet.create({
   // --- LAYOUT CHUNG ---
   container: {
@@ -181,7 +184,7 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
   },
-  // --- LABEL VÀ INPUT (Đồng bộ hóa với Login) ---
+  // --- LABEL VÀ INPUT ---
   label: {
     fontSize: 16,
     color: '#000000',
@@ -198,14 +201,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     fontSize: 16,
     color: '#333',
-    marginBottom: 25, 
+    marginBottom: 20, 
     fontFamily: FONT_FAMILY, 
   },
   // --- TERMS AND CHECKBOX ---
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
     paddingTop: 10,
   },
   checkbox: {
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
   },
-  // --- REGISTER BUTTON (Giống style nút Login) ---\
+  // --- REGISTER BUTTON ---
   registerButton: {
     backgroundColor: '#007bff', 
     paddingVertical: 15,
@@ -241,7 +244,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
   },
-  // --- FOOTER (Nằm trong ScrollView, đồng bộ với Login) ---
+  // --- FOOTER ---
   footer: { 
     flexDirection: 'row',
     justifyContent: 'center',

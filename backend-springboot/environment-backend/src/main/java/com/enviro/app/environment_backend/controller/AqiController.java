@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -26,7 +27,6 @@ public class AqiController {
     private final SavedLocationService savedLocationService;
     private final UserService userService;
 
-    // Constructor Injection đầy đủ
     public AqiController(AqiService aqiService, 
                          SavedLocationService savedLocationService, 
                          UserService userService) {
@@ -51,14 +51,15 @@ public class AqiController {
         return ResponseEntity.ok(aqiData);
     }
 
-    // API này sẽ gọi service đã được cập nhật logic
     @GetMapping("/saved-locations")
     public ResponseEntity<List<SavedLocationAqiResponse>> getAqiForSavedLocations() {
         User user = getCurrentUser();
         List<SavedLocationAqiResponse> aqiList = savedLocationService.getAqiForAllSavedLocations(user.getId());
         
         if (aqiList.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            // --- FIX: Trả về danh sách rỗng thay vì 204 No Content ---
+            // Giúp Frontend không bị lỗi SyntaxError: Unexpected end of input
+            return ResponseEntity.ok(Collections.emptyList());
         }
         return ResponseEntity.ok(aqiList);
     }

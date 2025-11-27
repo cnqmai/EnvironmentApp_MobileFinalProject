@@ -14,33 +14,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants'; 
+import { login } from '../src/services/authService'; 
+import { FONT_FAMILY } from '../styles/typography';
 
-// Import các thư viện cần thiết cho OAuth2
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook';
-
-// Import service
-import { login, loginWithGoogle, loginWithFacebook } from '../src/services/authService'; 
+// --- QUAN TRỌNG: Import saveToken từ apiHelper để đồng bộ key lưu trữ ---
 import { saveToken } from '../src/utils/apiHelper'; 
+// -----------------------------------------------------------------------
 
-// Import FONT_FAMILY
-import { FONT_FAMILY } from '../styles/typography'; 
-
-// PHẢI GỌI: Hoàn tất phiên xác thực web trước đó
-WebBrowser.maybeCompleteAuthSession();
-
-// Lấy cấu hình từ app.json/app.config.js
-const SCHEME = Constants.expoConfig?.scheme || 'finalproject';
-const { google, facebookAppId } = Constants.expoConfig?.extra || {}; 
-
-// Tính toán Redirect URI chính xác dựa trên Scheme
-const redirectUri = AuthSession.makeRedirectUri({
-  native: `${SCHEME}://redirect`, 
-});
-// console.log("OAuth Redirect URI:", redirectUri); // Debug URI
+import { updateProfile } from '../src/services/userService';
+import { getCurrentDeviceAddress } from '../src/services/locationService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -49,90 +31,7 @@ const Login = () => {
   
   const router = useRouter();
 
-  // ------------------------------------------
-  // 1. Hook Google 
-  // ------------------------------------------
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    responseType: 'id_token', 
-    androidClientId: google?.androidClientId || 'YOUR_GOOGLE_ANDROID_CLIENT_ID',
-    iosClientId: google?.iosClientId || 'YOUR_GOOGLE_IOS_CLIENT_ID',
-    webClientId: google?.webClientId || 'YOUR_GOOGLE_WEB_CLIENT_ID',
-    scopes: ['profile', 'email'],
-    // Không cần redirectUri cho Google nếu đã cấu hình đúng các Client ID
-  });
-
-  // ------------------------------------------
-  // 2. Hook Facebook 
-  // ------------------------------------------
-  const [facebookRequest, facebookResponse, promptFacebookAsync] = Facebook.useAuthRequest({
-    clientId: facebookAppId || 'YOUR_FACEBOOK_APP_ID',
-    scopes: ['public_profile', 'email'],
-    redirectUri: redirectUri, // SỬ DỤNG REDIRECT URI ĐÃ TẠO
-  });
-
-  // ------------------------------------------
-  // 3. Hàm lưu token & chuyển hướng
-  // ------------------------------------------
-  const finishLogin = async (data) => {
-    if (data.token) {
-      await saveToken(data.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(data.user || {}));
-    }
-    router.replace('/(tabs)');
-  };
-
-  // ------------------------------------------
-  // 4. Effect theo dõi response Google
-  // ------------------------------------------
-  React.useEffect(() => {
-    if (googleResponse?.type === 'success' && googleResponse.authentication?.idToken) {
-      handleSocialLoginFlow('google', googleResponse.authentication.idToken);
-    } else if (googleResponse?.type === 'error') {
-      Alert.alert('Lỗi Google Login', 'Xác thực Google thất bại.');
-      setLoading(false);
-    }
-  }, [googleResponse]);
-
-  // ------------------------------------------
-  // 5. Effect theo dõi response Facebook
-  // ------------------------------------------
-  React.useEffect(() => {
-    if (facebookResponse?.type === 'success' && facebookResponse.authentication?.accessToken) {
-      handleSocialLoginFlow('facebook', facebookResponse.authentication.accessToken);
-    } else if (facebookResponse?.type === 'error') {
-      Alert.alert('Lỗi Facebook Login', 'Xác thực Facebook thất bại.');
-      setLoading(false);
-    }
-  }, [facebookResponse]);
-
-  // ------------------------------------------
-  // 6. Hàm gọi API Backend sau khi có token
-  // ------------------------------------------
-  const handleSocialLoginFlow = async (provider, token) => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      let data;
-      if (provider === 'google') {
-        data = await loginWithGoogle(token); 
-      } else if (provider === 'facebook') {
-        data = await loginWithFacebook(token);
-      }
-      
-      await finishLogin(data);
-      
-    } catch (error) {
-      Alert.alert(`Lỗi Đăng nhập ${provider}`, error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // ------------------------------------------
-  // 7. Email/Password Login (FR-1.1.1)
-  // ------------------------------------------
-  const handleLogin = async () => { 
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Thông báo', 'Vui lòng nhập email và mật khẩu');
       return;
@@ -140,45 +39,54 @@ const Login = () => {
 
     setLoading(true);
     try {
+      // 1. Gọi API đăng nhập
       const data = await login(email, password);
-      await finishLogin(data); 
+      
+      if (data.token) {
+        // --- SỬA LỖI 401: Dùng saveToken thay vì AsyncStorage.setItem thủ công ---
+        await saveToken(data.token); 
+        // -----------------------------------------------------------------------
+        
+        let userData = data.user;
+
+        // --- TÍNH NĂNG: Tự động cập nhật vị trí ---
+        try {
+          console.log("Đang lấy vị trí hiện tại...");
+          const currentAddress = await getCurrentDeviceAddress();
+          
+          if (currentAddress) {
+            console.log("Đã lấy được vị trí:", currentAddress);
+            
+            // Cập nhật lên server (Lúc này token đã được lưu đúng nên API này sẽ chạy OK)
+            await updateProfile({ defaultLocation: currentAddress });
+            
+            // Cập nhật vào biến cục bộ để lưu xuống máy
+            if (userData) {
+                userData = { ...userData, defaultLocation: currentAddress };
+            }
+          }
+        } catch (locError) {
+          console.warn("Không thể tự động cập nhật vị trí:", locError);
+          // Không chặn đăng nhập nếu lỗi vị trí
+        }
+        // ------------------------------------------
+
+        // Lưu thông tin user để hiển thị offline/profile
+        if (userData) {
+             await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        }
+      }
+
+      // Điều hướng vào trong App
+      router.replace('/(tabs)'); 
+
     } catch (error) {
-      Alert.alert('Lỗi đăng nhập', error.message);
+      console.error("Login Error:", error);
+      Alert.alert('Lỗi đăng nhập', error.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
   };
-  
-  // ------------------------------------------
-  // 8. Kích hoạt Google Login
-  // ------------------------------------------
-  const handleGoogleLogin = () => {
-    if (loading || !googleRequest) return;
-    promptGoogleAsync();
-  };
-
-  // ------------------------------------------
-  // 9. Kích hoạt Facebook Login
-  // ------------------------------------------
-  const handleFacebookLogin = () => {
-    if (loading || !facebookRequest) return;
-    promptFacebookAsync();
-  };
-
-  // ------------------------------------------
-  // 10. Chế độ khách (FR-1.1.2)
-  // ------------------------------------------
-  const handleGuestLogin = async () => {
-    try {
-      // Lưu token giả cho Guest Mode (dữ liệu lưu cục bộ, token không dùng cho API)
-      await saveToken('GUEST_MODE_LOCAL_TOKEN'); 
-      await AsyncStorage.setItem('isGuest', 'true');
-      router.replace('/(tabs)');
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể vào chế độ khách.');
-    }
-  };
-
 
   return (
     <KeyboardAvoidingView 
@@ -187,13 +95,10 @@ const Login = () => {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Title */}
         <Text style={styles.title}>Đăng nhập</Text>
 
-        {/* Form */}
         <View style={styles.form}>
           
-          {/* Email Input */}
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
@@ -205,7 +110,6 @@ const Login = () => {
             autoCapitalize="none"
           />
 
-          {/* Password Input */}
           <Text style={styles.label}>Mật khẩu</Text>
           <TextInput
             style={styles.input}
@@ -216,12 +120,10 @@ const Login = () => {
             onChangeText={setPassword}
           />
 
-          {/* FR-1.1.3: Forgot Password */}
           <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.forgotContainer}>
             <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
 
-          {/* Login Button */}
           <TouchableOpacity 
               style={[styles.loginButton, loading && styles.buttonDisabled]} 
               onPress={handleLogin}
@@ -234,32 +136,20 @@ const Login = () => {
             )}
           </TouchableOpacity>
 
-          {/* Divider "hoặc đăng nhập với" */}
           <View style={styles.dividerContainer}>
             <View style={styles.line} />
             <Text style={styles.dividerText}>hoặc đăng nhập với</Text>
             <View style={styles.line} />
           </View>
 
-          {/* FR-1.1.1: Social Icons */}
           <View style={styles.socialContainer}>
-            {/* Facebook Button */}
-            <TouchableOpacity 
-              style={styles.socialButton} 
-              onPress={handleFacebookLogin}
-              disabled={loading || !facebookRequest} 
-            >
+            <TouchableOpacity style={styles.socialButton}>
               <Image 
                 source={{uri: 'https://img.icons8.com/color/48/000000/facebook-new.png'}} 
                 style={styles.socialIcon} 
               />
             </TouchableOpacity>
-            {/* Google Button */}
-            <TouchableOpacity 
-              style={styles.socialButton} 
-              onPress={handleGoogleLogin}
-              disabled={loading || !googleRequest} 
-            >
+            <TouchableOpacity style={styles.socialButton}>
                <Image 
                 source={{uri: 'https://img.icons8.com/color/48/000000/google-logo.png'}} 
                 style={styles.socialIcon} 
@@ -267,12 +157,10 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* FR-1.1.2: Guest Button */}
-          <TouchableOpacity style={styles.guestButton} onPress={handleGuestLogin}>
+          <TouchableOpacity style={styles.guestButton}>
             <Text style={styles.guestText}>Tiếp tục với chế độ khách</Text>
           </TouchableOpacity>
 
-          {/* Register Link */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Chưa có tài khoản? </Text>
             <TouchableOpacity onPress={() => router.push('/register')}>
@@ -375,11 +263,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   socialButton: {
-    flex: 1, 
-    paddingVertical: 15,
+    paddingVertical: 5,
+    paddingHorizontal: 84,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#ccc', 
+    borderColor: '#007bff',
+    width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 10,
