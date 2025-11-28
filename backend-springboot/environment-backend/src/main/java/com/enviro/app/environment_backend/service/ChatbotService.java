@@ -1,10 +1,17 @@
 package com.enviro.app.environment_backend.service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
@@ -12,36 +19,47 @@ import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
 /**
- * Service xử lý logic Chatbot AI (FR-5.x)
- * 
- * LƯU Ý: Service này hiện tại chỉ trả về câu trả lời mẫu.
- * Để tích hợp AI thực sự, bạn cần:
- * 1. Tích hợp OpenAI API hoặc Google Gemini API
- * 2. Hoặc tạo một service AI riêng để xử lý
+ * Service xử lý logic Chatbot AI tích hợp Google Gemini
  */
 @Service
 public class ChatbotService {
 
     private final ChatbotHistoryRepository chatbotHistoryRepository;
+    private final RestTemplate restTemplate;
+
+    @Value("${gemini.api.key}")
+    private String geminiApiKey;
+
+    @Value("${gemini.api.url}")
+    private String geminiApiUrl;
 
     public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository) {
         this.chatbotHistoryRepository = chatbotHistoryRepository;
+        this.restTemplate = new RestTemplate();
     }
 
     /**
-     * Xử lý câu hỏi từ user và trả về phản hồi từ chatbot (FR-5.1)
-     * 
-     * TODO: Tích hợp với AI Service thực sự (OpenAI/Gemini)
+     * Xử lý câu hỏi từ user và trả về phản hồi từ chatbot AI
      */
     @Transactional
     public ChatbotResponse processMessage(User user, ChatbotRequest request) {
         String userQuery = request.getMessage();
-        String botResponse = generateBotResponse(userQuery);
+        String botResponse;
+
+        try {
+            botResponse = callGeminiAI(userQuery);
+        } catch (Exception e) {
+            e.printStackTrace();
+            botResponse = "Xin lỗi, hiện tại tôi đang gặp sự cố kết nối với bộ não AI. Vui lòng thử lại sau.";
+        }
 
         // Lưu vào lịch sử
         ChatbotHistory history = new ChatbotHistory(user, userQuery, botResponse);
-
         ChatbotHistory savedHistory = chatbotHistoryRepository.save(history);
 
         return new ChatbotResponse(
@@ -53,60 +71,39 @@ public class ChatbotService {
     }
 
     /**
-     * Tạo phản hồi từ chatbot (Hiện tại chỉ là logic đơn giản)
-     * TODO: Thay thế bằng AI Service thực sự
+     * Gọi API Google Gemini để lấy câu trả lời
      */
-    private String generateBotResponse(String userQuery) {
-        String query = userQuery.toLowerCase().trim();
+    private String callGeminiAI(String text) {
+        // Tạo URL với API Key
+        String url = geminiApiUrl + "?key=" + geminiApiKey;
 
-        // Logic đơn giản để trả lời một số câu hỏi thường gặp
-        if (query.contains("phân loại rác") || query.contains("rác thải")) {
-            return "Để phân loại rác đúng cách, bạn nên:\n" +
-                   "1. Rác hữu cơ: Thức ăn thừa, lá cây → Ủ phân hoặc bỏ vào thùng rác hữu cơ\n" +
-                   "2. Rác tái chế: Giấy, nhựa, kim loại → Bỏ vào thùng rác tái chế\n" +
-                   "3. Rác nguy hại: Pin, bóng đèn, thiết bị điện tử → Mang đến điểm thu gom đặc biệt\n" +
-                   "4. Rác thải khác: Không thể tái chế → Bỏ vào thùng rác thông thường";
+        // Tạo headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Tạo body request theo format của Gemini API
+        // Cấu trúc JSON: { "contents": [{ "parts": [{ "text": "câu hỏi" }] }] }
+        GeminiRequest requestBody = new GeminiRequest(
+            Collections.singletonList(new GeminiContent(
+                Collections.singletonList(new GeminiPart(text))
+            ))
+        );
+
+        HttpEntity<GeminiRequest> entity = new HttpEntity<>(requestBody, headers);
+
+        // Gửi request POST
+        ResponseEntity<GeminiResponse> response = restTemplate.postForEntity(url, entity, GeminiResponse.class);
+
+        // Xử lý response để lấy text trả về
+        if (response.getBody() != null && !response.getBody().getCandidates().isEmpty()) {
+            return response.getBody().getCandidates().get(0).getContent().getParts().get(0).getText();
         }
-
-        if (query.contains("chất lượng không khí") || query.contains("aqi")) {
-            return "Chỉ số AQI (Air Quality Index) đo chất lượng không khí:\n" +
-                   "• 0-50: Tốt (Xanh lá) - Không khí trong lành\n" +
-                   "• 51-100: Trung bình (Vàng) - Nhạy cảm nhẹ có thể gặp vấn đề\n" +
-                   "• 101-150: Không tốt cho nhóm nhạy cảm (Cam) - Tránh hoạt động ngoài trời\n" +
-                   "• 151-200: Không tốt (Đỏ) - Mọi người có thể gặp vấn đề sức khỏe\n" +
-                   "• >200: Rất nguy hại (Tím) - Tránh tất cả hoạt động ngoài trời";
-        }
-
-        if (query.contains("bảo vệ môi trường") || query.contains("sống xanh")) {
-            return "Một số cách bảo vệ môi trường bạn có thể làm:\n" +
-                   "• Giảm sử dụng nhựa dùng một lần\n" +
-                   "• Tái chế rác thải đúng cách\n" +
-                   "• Tiết kiệm điện, nước\n" +
-                   "• Sử dụng phương tiện công cộng hoặc đi bộ\n" +
-                   "• Trồng cây xanh\n" +
-                   "• Tham gia các hoạt động tình nguyện môi trường";
-        }
-
-        if (query.contains("luật") || query.contains("quy định")) {
-            return "Các luật bảo vệ môi trường quan trọng ở Việt Nam:\n" +
-                   "• Luật Bảo vệ Môi trường 2020\n" +
-                   "• Nghị định về xử phạt vi phạm hành chính trong lĩnh vực môi trường\n" +
-                   "• Quy định về phân loại, thu gom và xử lý rác thải\n" +
-                   "Bạn có thể báo cáo vi phạm môi trường qua ứng dụng này!";
-        }
-
-        // Trả lời mặc định
-        return "Xin chào! Tôi là chatbot hỗ trợ về môi trường.\n" +
-               "Tôi có thể giúp bạn với:\n" +
-               "• Phân loại rác thải\n" +
-               "• Chất lượng không khí (AQI)\n" +
-               "• Cách bảo vệ môi trường\n" +
-               "• Luật và quy định môi trường\n\n" +
-               "Hãy hỏi tôi bất kỳ câu hỏi nào về môi trường!";
+        
+        return "Tôi không hiểu câu hỏi của bạn.";
     }
 
     /**
-     * Lấy lịch sử chat của user (FR-1.2.3, FR-5.1)
+     * Lấy lịch sử chat của user
      */
     public List<ChatbotResponse> getChatHistory(User user) {
         List<ChatbotHistory> historyList = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
@@ -119,5 +116,39 @@ public class ChatbotService {
                         h.getCreatedAt()))
                 .collect(Collectors.toList());
     }
-}
 
+    // --- Các class DTO nội bộ để map JSON của Gemini API ---
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    private static class GeminiRequest {
+        private List<GeminiContent> contents;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    private static class GeminiContent {
+        private List<GeminiPart> parts;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    private static class GeminiPart {
+        private String text;
+    }
+
+    @Data
+    @NoArgsConstructor
+    private static class GeminiResponse {
+        private List<GeminiCandidate> candidates;
+    }
+
+    @Data
+    @NoArgsConstructor
+    private static class GeminiCandidate {
+        private GeminiContent content;
+    }
+}
