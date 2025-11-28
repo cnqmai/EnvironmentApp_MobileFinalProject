@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
@@ -18,10 +19,7 @@ import com.enviro.app.environment_backend.dto.ChatbotResponse;
 import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
-
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * Service xử lý logic Chatbot AI tích hợp Google Gemini
@@ -32,11 +30,12 @@ public class ChatbotService {
     private final ChatbotHistoryRepository chatbotHistoryRepository;
     private final RestTemplate restTemplate;
 
+    // Lấy API Key từ file application.properties
     @Value("${gemini.api.key}")
     private String geminiApiKey;
 
-    @Value("${gemini.api.url}")
-    private String geminiApiUrl;
+    // CẬP NHẬT QUAN TRỌNG: Sử dụng model 'gemini-2.5-flash' thay vì 'gemini-1.5-flash' (đã bị khai tử)
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
 
     public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository) {
         this.chatbotHistoryRepository = chatbotHistoryRepository;
@@ -44,21 +43,16 @@ public class ChatbotService {
     }
 
     /**
-     * Xử lý câu hỏi từ user và trả về phản hồi từ chatbot AI
+     * Xử lý tin nhắn từ user
      */
     @Transactional
     public ChatbotResponse processMessage(User user, ChatbotRequest request) {
         String userQuery = request.getMessage();
-        String botResponse;
+        
+        // Gọi Gemini AI để lấy câu trả lời
+        String botResponse = callGeminiAI(userQuery);
 
-        try {
-            botResponse = callGeminiAI(userQuery);
-        } catch (Exception e) {
-            e.printStackTrace();
-            botResponse = "Xin lỗi, hiện tại tôi đang gặp sự cố kết nối với bộ não AI. Vui lòng thử lại sau.";
-        }
-
-        // Lưu vào lịch sử
+        // Lưu lịch sử chat vào database
         ChatbotHistory history = new ChatbotHistory(user, userQuery, botResponse);
         ChatbotHistory savedHistory = chatbotHistoryRepository.save(history);
 
@@ -71,43 +65,56 @@ public class ChatbotService {
     }
 
     /**
-     * Gọi API Google Gemini để lấy câu trả lời
+     * Hàm gọi trực tiếp đến Google Gemini API
      */
     private String callGeminiAI(String text) {
-        // Tạo URL với API Key
-        String url = geminiApiUrl + "?key=" + geminiApiKey;
+        try {
+            String url = GEMINI_API_URL + geminiApiKey;
 
-        // Tạo headers
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+            // Tạo headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // Tạo body request theo format của Gemini API
-        // Cấu trúc JSON: { "contents": [{ "parts": [{ "text": "câu hỏi" }] }] }
-        GeminiRequest requestBody = new GeminiRequest(
-            Collections.singletonList(new GeminiContent(
-                Collections.singletonList(new GeminiPart(text))
-            ))
-        );
+            // Tạo body request đúng chuẩn Google Gemini
+            GeminiPart part = new GeminiPart(text);
+            GeminiContent content = new GeminiContent(Collections.singletonList(part));
+            GeminiRequest requestBody = new GeminiRequest(Collections.singletonList(content));
 
-        HttpEntity<GeminiRequest> entity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<GeminiRequest> entity = new HttpEntity<>(requestBody, headers);
 
-        // Gửi request POST
-        ResponseEntity<GeminiResponse> response = restTemplate.postForEntity(url, entity, GeminiResponse.class);
+            // Gửi request POST
+            ResponseEntity<GeminiResponse> response = restTemplate.postForEntity(url, entity, GeminiResponse.class);
 
-        // Xử lý response để lấy text trả về
-        if (response.getBody() != null && !response.getBody().getCandidates().isEmpty()) {
-            return response.getBody().getCandidates().get(0).getContent().getParts().get(0).getText();
+            // Xử lý response trả về
+            if (response.getBody() != null && 
+                response.getBody().candidates != null && 
+                !response.getBody().candidates.isEmpty()) {
+                
+                GeminiCandidate candidate = response.getBody().candidates.get(0);
+                if (candidate.content != null && 
+                    candidate.content.parts != null && 
+                    !candidate.content.parts.isEmpty()) {
+                    return candidate.content.parts.get(0).text;
+                }
+            }
+            
+            return "Xin lỗi, tôi không thể trả lời câu hỏi này lúc này.";
+
+        } catch (HttpClientErrorException e) {
+            e.printStackTrace();
+            // Trả về thông báo lỗi chi tiết để dễ debug hơn trên App
+            return "Lỗi kết nối AI: " + e.getStatusCode() + " - " + e.getResponseBodyAsString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Đã xảy ra lỗi hệ thống khi xử lý tin nhắn.";
         }
-        
-        return "Tôi không hiểu câu hỏi của bạn.";
     }
 
     /**
-     * Lấy lịch sử chat của user
+     * Lấy lịch sử chat
      */
     public List<ChatbotResponse> getChatHistory(User user) {
         List<ChatbotHistory> historyList = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
-        
         return historyList.stream()
                 .map(h -> new ChatbotResponse(
                         h.getId(),
@@ -117,38 +124,34 @@ public class ChatbotService {
                 .collect(Collectors.toList());
     }
 
-    // --- Các class DTO nội bộ để map JSON của Gemini API ---
+    // ==========================================
+    // Các Inner Class (DTO) để map dữ liệu JSON của Gemini
+    // ==========================================
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    private static class GeminiRequest {
-        private List<GeminiContent> contents;
+    public static class GeminiRequest {
+        public List<GeminiContent> contents;
+        public GeminiRequest(List<GeminiContent> contents) { this.contents = contents; }
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    private static class GeminiContent {
-        private List<GeminiPart> parts;
+    public static class GeminiContent {
+        public List<GeminiPart> parts;
+        public GeminiContent() {} 
+        public GeminiContent(List<GeminiPart> parts) { this.parts = parts; }
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    private static class GeminiPart {
-        private String text;
+    public static class GeminiPart {
+        public String text;
+        public GeminiPart() {}
+        public GeminiPart(String text) { this.text = text; }
     }
 
-    @Data
-    @NoArgsConstructor
-    private static class GeminiResponse {
-        private List<GeminiCandidate> candidates;
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class GeminiResponse {
+        public List<GeminiCandidate> candidates;
     }
 
-    @Data
-    @NoArgsConstructor
-    private static class GeminiCandidate {
-        private GeminiContent content;
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class GeminiCandidate {
+        public GeminiContent content;
     }
 }
