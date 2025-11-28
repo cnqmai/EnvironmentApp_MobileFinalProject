@@ -1,7 +1,8 @@
 import React, { useCallback, useState, useEffect } from "react";
-import { StyleSheet, FlatList, View, Text, RefreshControl, ActivityIndicator } from "react-native";
+import { StyleSheet, FlatList, View, Text, RefreshControl, ActivityIndicator, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons"; // CẦN THÊM: Icon
 import AQICard from "../../components/AQICard";
 import typography from "../../styles/typography";
 
@@ -21,65 +22,48 @@ const DashboardScreen = () => {
     try {
       const data = await getAqiForSavedLocations();
       
-      // Ánh xạ dữ liệu từ Backend (SavedLocationAqiResponse) sang format của UI
       const formattedData = data.map((item, index) => ({
         id: item.locationId ? item.locationId.toString() : `default-${index}`,
         location: { 
-            // Ưu tiên lấy tên thành phố đã phân giải, nếu không có thì lấy tên đặt
             name: item.locationName || "Vị trí chưa đặt tên", 
             city: item.resolvedCityName || "" 
         },
         aqi: item.aqiValue,
-        status: translateStatus(item.status), // Chuyển đổi trạng thái sang tiếng Việt
+        status: translateStatus(item.status),
         description: item.healthAdvisory,
-        // Logic xác định nhóm nhạy cảm (Ví dụ: AQI > 100 là có hại cho nhóm nhạy cảm)
         isSensitiveGroup: item.aqiValue > 100, 
       }));
 
       setAqiList(formattedData);
     } catch (error) {
-      //console.error("Lỗi tải dashboard:", error);
-      // Có thể thêm Toast hoặc Alert báo lỗi tại đây
+      // console.error("Lỗi tải dashboard:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Gọi dữ liệu khi mở màn hình
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Xử lý khi người dùng kéo xuống để làm mới
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
   }, []);
 
-  // Helper: Dịch trạng thái AQI sang tiếng Việt
   const translateStatus = (status) => {
-      const map = {
-          "Good": "Tốt",
-          "Fair": "Khá",
-          "Moderate": "Trung bình",
-          "Poor": "Kém",
-          "Very Poor": "Rất kém",
-          "Unknown": "Không rõ"
-      };
+      const map = { "Good": "Tốt", "Fair": "Khá", "Moderate": "Trung bình", "Poor": "Kém", "Very Poor": "Rất kém", "Unknown": "Không rõ" };
       return map[status] || status;
   };
 
-  const renderAQICard = useCallback(
-    ({ item }) => (
+  const renderAQICard = useCallback(({ item }) => (
       <AQICard
         location={item.location}
         aqi={item.aqi}
         description={item.description}
         isSensitiveGroup={item.isSensitiveGroup}
-        // Khi bấm vào card, chuyển sang trang chi tiết kèm dữ liệu
-        onPress={() =>
-          router.push({
+        onPress={() => router.push({
             pathname: "/detail",
             params: {
               locationName: item.location.name,
@@ -87,16 +71,68 @@ const DashboardScreen = () => {
               aqi: item.aqi,
               status: item.status,
               description: item.description,
-              isSensitiveGroup: item.isSensitiveGroup.toString(), // Params nên là string
+              isSensitiveGroup: item.isSensitiveGroup.toString(),
             },
           })
         }
       />
-    ),
-    [router]
+    ), [router]);
+
+  // --- PHẦN MỚI: HEADER CHỨA CÁC NÚT ĐIỀU HƯỚNG ---
+  const DashboardHeader = () => (
+    <View>
+      {/* 1. Header Title Gốc */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Dashboard</Text>
+      </View>
+
+      {/* 2. KHU VỰC TÍNH NĂNG MỚI (SHORTCUTS) */}
+      <View style={styles.featuresContainer}>
+        
+        {/* Card to: Mẹo sống xanh */}
+        <TouchableOpacity 
+          style={styles.tipCard}
+          onPress={() => router.push('/features/daily-tip')}
+          activeOpacity={0.9}
+        >
+          <View style={styles.tipIconBox}>
+             <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FFF" />
+          </View>
+          <View style={styles.tipContent}>
+             <Text style={styles.tipLabel}>Mẹo hôm nay</Text>
+             <Text style={styles.tipTitle}>Mang túi vải đi chợ</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#004D40" />
+        </TouchableOpacity>
+
+        {/* Hàng 2 nút: Quiz & Thư viện */}
+        <View style={styles.rowButtons}>
+            <TouchableOpacity 
+                style={[styles.featureBtn, { backgroundColor: '#E0F2F1' }]} // Màu xanh nhạt
+                onPress={() => router.push('/features/quiz')}
+            >
+                <MaterialCommunityIcons name="gamepad-variant-outline" size={28} color="#00695C" />
+                <Text style={styles.featureBtnText}>Mini Quiz</Text>
+                <Text style={styles.featureBtnSub}>Kiếm điểm thưởng</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+                style={[styles.featureBtn, { backgroundColor: '#E3F2FD' }]} // Màu xanh dương nhạt
+                onPress={() => router.push('/features/knowledge')}
+            >
+                <MaterialCommunityIcons name="book-open-page-variant-outline" size={28} color="#0277BD" />
+                <Text style={styles.featureBtnText}>Thư viện</Text>
+                <Text style={styles.featureBtnSub}>Kiến thức xanh</Text>
+            </TouchableOpacity>
+        </View>
+
+      </View>
+
+      {/* 3. Title AQI cũ */}
+      <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
+    </View>
   );
 
-  // Hiển thị màn hình loading khi đang tải lần đầu
   if (loading && !refreshing) {
       return (
           <SafeAreaView style={[styles.container, styles.centerContent]}>
@@ -108,29 +144,19 @@ const DashboardScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-      </View>
-
-      <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
-
       <FlatList
         data={aqiList}
         renderItem={renderAQICard}
         keyExtractor={(item) => item.id}
+        // --- TÍCH HỢP HEADER VÀO ĐÂY ---
+        ListHeaderComponent={DashboardHeader} 
+        // -------------------------------
         contentContainerStyle={styles.listContent}
         style={styles.flatListStyle}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={30}
-        initialNumToRender={3}
-        keyboardShouldPersistTaps="handled"
-        // Thêm RefreshControl
         refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#007AFF" />
         }
-        // Hiển thị khi danh sách trống
         ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>Chưa có địa điểm nào được lưu.</Text>
@@ -146,53 +172,111 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
-    position: "relative",
   },
   centerContent: {
       justifyContent: 'center',
-      alignItems: 'center'
+      alignItems: 'center',
+      flex: 1, // Fix loading layout
   },
   header: {
-    backgroundColor: "#F0EFED",
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomWidth: 0,
-    zIndex: 2,
+    paddingBottom: 10, // Giảm padding bottom để gom nhóm đẹp hơn
   },
   headerTitle: {
     ...typography.h2,
-    fontSize: 20,
+    fontSize: 24, // Tăng size một chút cho nổi bật
     fontWeight: "700",
     color: "#0A0A0A",
     letterSpacing: -0.3,
   },
+  // --- STYLES MỚI CHO CÁC NÚT TÍNH NĂNG ---
+  featuresContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  tipCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    elevation: 2, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  tipIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFB300', // Màu vàng cho bóng đèn
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  tipTitle: {
+    fontSize: 16,
+    color: '#0A0A0A',
+    fontWeight: 'bold',
+  },
+  rowButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  featureBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    elevation: 2, 
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  featureBtnText: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0A0A0A',
+  },
+  featureBtnSub: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 2,
+  },
   dashboardTitle: {
     ...typography.h1,
-    fontSize: 36,
-    fontWeight: "900",
+    fontSize: 22, // Giảm size một chút cho cân đối với header trên
+    fontWeight: "800",
     marginHorizontal: 24,
-    marginTop: 8,
-    marginBottom: 32,
+    marginTop: 10,
+    marginBottom: 16,
     color: "#0A0A0A",
-    letterSpacing: -0.8,
-    lineHeight: 42,
-    zIndex: 1,
   },
   flatListStyle: {
     flex: 1,
-    zIndex: 0,
   },
   listContent: {
-    paddingBottom: 120,
-    paddingTop: 16,
-    paddingHorizontal: 4,
-    flexGrow: 1,
-    minHeight: 200,
+    paddingBottom: 40,
   },
   emptyContainer: {
       alignItems: 'center',
-      marginTop: 50,
+      marginTop: 30,
       paddingHorizontal: 20
   },
   emptyText: {

@@ -3,7 +3,6 @@ import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import Modal from "react-native-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { removeToken } from "../src/utils/apiHelper"; //
 
 // (Component MenuItem được định nghĩa ở dưới)
 
@@ -22,13 +21,8 @@ const TabOverflowMenu = (props) => {
 
   const navigateAndClose = (path) => {
     toggleModal();
+    // Điều hướng đến màn hình tương ứng
     router.push(path);
-  };
-
-  const handleLogout = async () => {
-    toggleModal();
-    await removeToken(); 
-    router.replace("/(tabs)/login"); 
   };
 
   // Nút bấm gốc trên Tab Bar
@@ -76,12 +70,12 @@ const TabOverflowMenu = (props) => {
             onPress={() => navigateAndClose("/settings")}
           />
 
-          {/* Nút "Đăng xuất" chỉ hiển thị khi đã đăng nhập */}
+          {/* --- NÚT BẢN ĐỒ (Đã sửa đường dẫn thành /map/map) --- */}
           {!inAuthScreen && (
             <MenuItem
-              icon="logout"
-              text="Đăng xuất"
-              onPress={handleLogout}
+              icon="map-search-outline"
+              text="Bản đồ xanh"
+              onPress={() => navigateAndClose("/map/map")} 
             />
           )}
         </View>
