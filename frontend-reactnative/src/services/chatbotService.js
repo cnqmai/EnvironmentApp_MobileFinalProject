@@ -1,46 +1,37 @@
 import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
-/**
- * Gửi tin nhắn đến Chatbot
- * Endpoint: POST /api/chatbot/message
- */
-export const sendMessageToBot = async (message) => {
-    try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/message`, {
-            method: 'POST',
-            body: JSON.stringify({ message: message }), // Key 'message' khớp với ChatbotRequest.java
-        });
+// Gửi tin nhắn (kèm sessionId nếu có)
+export const sendChatbotMessage = async (message, sessionId = null) => {
+    const body = { message };
+    if (sessionId) body.sessionId = sessionId;
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Lỗi kết nối với Chatbot');
-        }
-
-        return response.json(); // Trả về ChatbotResponse (userQuery, botResponse...)
-    } catch (error) {
-        console.error("Chatbot Error:", error);
-        throw error;
-    }
+    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error('Lỗi gửi tin nhắn');
+    return response.json();
 };
 
-/**
- * Lấy lịch sử trò chuyện
- * Endpoint: GET /api/chatbot/history
- */
-export const getChatHistory = async () => {
-    try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/history`, {
-            method: 'GET',
-        });
+// Lấy danh sách các cuộc hội thoại
+export const getChatSessions = async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/sessions`, { method: 'GET' });
+    if (!response.ok) throw new Error('Lỗi lấy danh sách hội thoại');
+    return response.json();
+};
 
-        if (!response.ok) {
-            throw new Error('Không thể tải lịch sử chat');
-        }
+// Lấy chi tiết tin nhắn của 1 hội thoại
+export const getSessionMessages = async (sessionId) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/session/${sessionId}`, { method: 'GET' });
+    if (!response.ok) throw new Error('Lỗi tải nội dung chat');
+    return response.json();
+};
 
-        return response.json(); // Trả về List<ChatbotResponse>
-    } catch (error) {
-        console.error("History Error:", error);
-        return []; // Trả về mảng rỗng nếu lỗi để không crash app
-    }
+// Xóa hội thoại
+export const deleteChatSession = async (sessionId) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/session/${sessionId}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Lỗi xóa hội thoại');
+    return true;
 };

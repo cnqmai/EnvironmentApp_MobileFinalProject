@@ -1,3 +1,4 @@
+// File: .../repository/ChatbotHistoryRepository.java
 package com.enviro.app.environment_backend.repository;
 
 import com.enviro.app.environment_backend.model.ChatbotHistory;
@@ -10,15 +11,12 @@ import java.util.UUID;
 
 @Repository
 public interface ChatbotHistoryRepository extends JpaRepository<ChatbotHistory, UUID> {
-    
-    /**
-     * Lấy lịch sử chat của một user, sắp xếp theo thời gian mới nhất
-     */
+    // Lấy toàn bộ lịch sử để phân nhóm
     List<ChatbotHistory> findByUserOrderByCreatedAtDesc(User user);
-    
-    /**
-     * Lấy lịch sử chat của một user theo user_id
-     */
-    List<ChatbotHistory> findByUserIdOrderByCreatedAtDesc(UUID userId);
-}
 
+    // [MỚI] Lấy chi tiết tin nhắn của một cuộc hội thoại cụ thể
+    List<ChatbotHistory> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+    
+    // [MỚI] Xóa cả cuộc hội thoại
+    void deleteBySessionId(String sessionId);
+}

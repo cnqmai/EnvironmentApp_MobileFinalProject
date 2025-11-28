@@ -1,135 +1,140 @@
-import React, { useState, useCallback } from 'react';
-import { 
-  View, Text, FlatList, StyleSheet, TouchableOpacity, 
-  ActivityIndicator, RefreshControl 
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { getChatHistory } from '../../src/services/chatbotService';
+// File: app/chat/chat-history.jsx
+import React, { useState, useEffect, useRef } from "react";
+import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, IconButton, Avatar } from "react-native-paper";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import typography from "../../styles/typography";
+import { sendChatbotMessage, getSessionMessages } from "../../src/services/chatbotService";
 
-const ChatHistoryScreen = () => {
+const ChatHistory = () => {
   const router = useRouter();
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { sessionId, title, isNew } = useLocalSearchParams();
+  
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(!isNew); // Nếu là chat mới thì không cần load
+  const [sending, setSending] = useState(false);
+  const flatListRef = useRef(null);
 
-  // Hàm tải dữ liệu từ Backend
-  const loadHistory = async () => {
+  // Tải lịch sử chat của session này
+  useEffect(() => {
+    if (isNew === "true" || !sessionId) return; // Chat mới chưa có lịch sử
+
+    const loadMessages = async () => {
+      try {
+        const data = await getSessionMessages(sessionId);
+        // Convert dữ liệu backend thành format hiển thị (User -> Bot)
+        const uiMessages = [];
+        data.forEach((item, index) => {
+            // Tin nhắn User
+            uiMessages.push({ id: `u-${index}`, text: item.userQuery, from: 'user' });
+            // Tin nhắn Bot
+            uiMessages.push({ id: `b-${index}`, text: item.botResponse, from: 'bot' });
+        });
+        setMessages(uiMessages);
+      } catch (error) {
+        console.error("Lỗi load chat:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMessages();
+  }, [sessionId]);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const userText = input.trim();
+    setInput(""); // Clear input ngay lập tức
+
+    // Hiển thị tạm tin nhắn user
+    const tempUserMsg = { id: `temp-${Date.now()}`, text: userText, from: 'user' };
+    setMessages(prev => [...prev, tempUserMsg]);
+    setSending(true);
+
     try {
-      const data = await getChatHistory();
-      setHistory(data);
+      // Gửi tin nhắn lên Backend kèm sessionId
+      const response = await sendChatbotMessage(userText, sessionId);
+      
+      // Nhận phản hồi và hiển thị
+      const botMsg = { id: `b-${Date.now()}`, text: response.botResponse, from: 'bot' };
+      setMessages(prev => [...prev, botMsg]);
     } catch (error) {
-      console.error("Lỗi tải lịch sử:", error);
+      console.error(error);
+      // Có thể hiển thị thông báo lỗi hoặc nút thử lại
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setSending(false);
     }
   };
 
-  // Tự động tải lại mỗi khi màn hình này được focus (quay lại từ màn hình khác)
-  useFocusEffect(
-    useCallback(() => {
-      loadHistory();
-    }, [])
-  );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadHistory();
+  const renderMessage = ({ item }) => {
+    const isBot = item.from === "bot";
+    return (
+      <View style={[styles.msgRow, isBot ? styles.botRow : styles.userRow]}>
+        {isBot && <Avatar.Icon size={32} icon="leaf" style={{backgroundColor: '#E8F5E9'}} color="#2E7D32" />}
+        <View style={[styles.bubble, isBot ? styles.botBubble : styles.userBubble]}>
+          <Text style={isBot ? styles.botText : styles.userText}>{item.text}</Text>
+        </View>
+      </View>
+    );
   };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleString('vi-VN', { 
-      hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' 
-    });
-  };
-
-  // Render từng thẻ lịch sử
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <MaterialCommunityIcons name="clock-outline" size={16} color="#666" />
-        <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
-      </View>
-      
-      <View style={styles.qaSection}>
-        <Text style={styles.label}>Hỏi:</Text>
-        <Text style={styles.questionText} numberOfLines={2}>{item.userQuery}</Text>
-      </View>
-
-      <View style={styles.divider} />
-
-      <View style={styles.qaSection}>
-        <Text style={[styles.label, { color: '#4CAF50' }]}>Đáp:</Text>
-        <Text style={styles.answerText} numberOfLines={3}>{item.botResponse}</Text>
-      </View>
-    </View>
-  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Lịch sử trò chuyện</Text>
-        <View style={{ width: 24 }} /> 
+        <TouchableOpacity onPress={() => router.back()}><IconButton icon="arrow-left" /></TouchableOpacity>
+        <Text style={styles.title}>{decodeURIComponent(title || "Hội thoại")}</Text>
+        <View style={{width: 40}} />
       </View>
 
-      {/* Nội dung danh sách */}
-      {loading && !refreshing ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+      {/* Message List */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{flex: 1}}>
+        {loading ? (
+            <ActivityIndicator style={{marginTop: 20}} color="#4CAF50" />
+        ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={item => item.id}
+              contentContainerStyle={{padding: 16}}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+            />
+        )}
+
+        {/* Input Area */}
+        <View style={styles.inputContainer}>
+          <TextInput 
+            style={styles.input} 
+            value={input} 
+            onChangeText={setInput} 
+            placeholder="Nhập tin nhắn..." 
+            onSubmitEditing={handleSend}
+          />
+          <TouchableOpacity onPress={handleSend} disabled={!input.trim() || sending}>
+             <IconButton icon="send" iconColor="#4CAF50" />
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={(item) => item.historyId || item.id || Math.random().toString()}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4CAF50']} />
-          }
-          ListEmptyComponent={
-            <View style={styles.centerContainer}>
-              <MaterialCommunityIcons name="message-text-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
-            </View>
-          }
-        />
-      )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee',
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  backButton: { padding: 4 },
-  listContent: { padding: 16 },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  emptyText: { marginTop: 16, fontSize: 16, color: '#888' },
-  
-  // Card Styles
-  card: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  dateText: { marginLeft: 6, fontSize: 12, color: '#888' },
-  qaSection: { marginBottom: 6 },
-  label: { fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 2 },
-  questionText: { fontSize: 16, color: '#333', fontWeight: '500' },
-  answerText: { fontSize: 15, color: '#444' },
-  divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 8 },
+  container: { flex: 1, backgroundColor: "#F6F7F8" },
+  header: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'white', borderBottomWidth: 1, borderColor: '#eee' },
+  title: { fontWeight: 'bold', fontSize: 18 },
+  msgRow: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
+  botRow: { alignSelf: 'flex-start' },
+  userRow: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
+  bubble: { padding: 12, borderRadius: 20, maxWidth: '80%' },
+  botBubble: { backgroundColor: 'white', marginLeft: 8 },
+  userBubble: { backgroundColor: '#4CAF50' },
+  botText: { color: 'black' },
+  userText: { color: 'white' },
+  inputContainer: { flexDirection: 'row', padding: 8, backgroundColor: 'white', alignItems: 'center' },
+  input: { flex: 1, backgroundColor: '#f0f0f0', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 }
 });
 
-export default ChatHistoryScreen;
+export default ChatHistory;

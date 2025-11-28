@@ -1,62 +1,53 @@
 package com.enviro.app.environment_backend.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
+import lombok.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "chatbot_history")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ChatbotHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "user_query", nullable = false, columnDefinition = "TEXT")
+    // --- [QUAN TRỌNG] BẠN ĐANG THIẾU TRƯỜNG NÀY ---
+    @Column(name = "session_id")
+    private String sessionId; 
+    // ----------------------------------------------
+
+    @Column(name = "user_query", length = 1000)
     private String userQuery;
 
-    @Column(name = "bot_response", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "bot_response", length = 4000)
     private String botResponse;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
-    // Explicit constructors and getters to avoid Lombok dependency in IDE
-    public ChatbotHistory() {}
-
-    public ChatbotHistory(UUID id, User user, String userQuery, String botResponse, OffsetDateTime createdAt) {
-        this.id = id;
-        this.user = user;
-        this.userQuery = userQuery;
-        this.botResponse = botResponse;
-        this.createdAt = createdAt;
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = OffsetDateTime.now();
     }
-
-    public ChatbotHistory(User user, String userQuery, String botResponse) {
+    
+    // Constructor tiện ích (Cần cập nhật thêm sessionId vào đây)
+    public ChatbotHistory(User user, String sessionId, String userQuery, String botResponse) {
         this.user = user;
+        this.sessionId = sessionId; // Nhớ gán giá trị này
         this.userQuery = userQuery;
         this.botResponse = botResponse;
     }
-
-    public UUID getId() { return id; }
-    public User getUser() { return user; }
-    public String getUserQuery() { return userQuery; }
-    public String getBotResponse() { return botResponse; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-
-    public void setUser(User user) { this.user = user; }
-    public void setUserQuery(String userQuery) { this.userQuery = userQuery; }
-    public void setBotResponse(String botResponse) { this.botResponse = botResponse; }
 }
-
