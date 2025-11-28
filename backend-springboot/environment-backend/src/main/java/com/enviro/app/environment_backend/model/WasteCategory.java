@@ -1,3 +1,4 @@
+// File: src/main/java/com/enviro/app/environment_backend/model/WasteCategory.java
 package com.enviro.app.environment_backend.model;
 
 import jakarta.persistence.*;
@@ -19,19 +20,23 @@ public class WasteCategory {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name; // Ví dụ: "Rác hữu cơ"
-
-    @Column(nullable = false, unique = true)
-    private String slug; // Dùng để map với frontend (organic, recyclable, hazardous...)
-
-    private String subtitle; // Ví dụ: "Thực phẩm thừa, vỏ trái cây..."
+    private String name; // Ví dụ: "Rác thải nhựa"
 
     @Column(columnDefinition = "TEXT")
-    private String guidelines; // Hướng dẫn xử lý (Các bước phân tách bằng dấu xuống dòng \n)
+    private String description; // Mô tả
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    // [MỚI] Hướng dẫn xử lý (VD: "Rửa sạch, phơi khô...")
+    @Column(name = "disposal_guideline", columnDefinition = "TEXT")
+    private String disposalGuideline;
 
-    // Màu sắc đại diện (nếu muốn lưu DB luôn thay vì switch-case ở frontend)
-    private String backgroundColorCode; 
+    // [MỚI] Hướng dẫn tái chế (VD: "Có thể tái chế thành chậu cây...")
+    @Column(name = "recycling_guideline", columnDefinition = "TEXT")
+    private String recyclingGuideline;
+
+    // [MỚI] Loại điểm thu gom tương ứng (để liên kết với WasteCollectionPoint)
+    // Giá trị này nên khớp với Enum CollectionPointType (VD: "PLASTIC", "ORGANIC")
+    @Column(name = "collection_point_type")
+    private String collectionPointType;
+
+    private String iconUrl;
 }

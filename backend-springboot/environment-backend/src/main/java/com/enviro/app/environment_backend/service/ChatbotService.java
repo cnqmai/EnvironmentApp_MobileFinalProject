@@ -1,90 +1,115 @@
-// File: .../service/ChatbotService.java
 package com.enviro.app.environment_backend.service;
-
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
 import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatbotService {
 
     private final ChatbotHistoryRepository chatbotHistoryRepository;
+    private final GeminiService geminiService; // Service gọi AI
 
-    public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository) {
+    public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository, GeminiService geminiService) {
         this.chatbotHistoryRepository = chatbotHistoryRepository;
+        this.geminiService = geminiService;
     }
 
+    /**
+     * Xử lý tin nhắn từ người dùng:
+     * 1. Tạo session ID nếu chưa có.
+     * 2. Gọi Google Gemini để lấy câu trả lời thông minh.
+     * 3. Lưu vào database.
+     */
     @Transactional
     public ChatbotResponse processMessage(User user, ChatbotRequest request) {
         String userQuery = request.getMessage();
-        // Nếu không có sessionId (Chat mới), tự tạo UUID mới
+        
+        // Nếu client không gửi sessionId (chat mới), tự tạo UUID mới
         String sessionId = (request.getSessionId() == null || request.getSessionId().isEmpty()) 
                             ? UUID.randomUUID().toString() 
                             : request.getSessionId();
 
-        String botResponse = generateBotResponse(userQuery);
+        // [QUAN TRỌNG] Gọi AI thay vì dùng if-else cứng nhắc
+        String botResponse = geminiService.callGemini(
+            "Bạn là trợ lý môi trường Enviminds. Hãy trả lời ngắn gọn, thân thiện (dưới 200 từ) câu hỏi sau: " + userQuery
+        );
 
+        // Lưu lịch sử
         ChatbotHistory history = new ChatbotHistory(user, sessionId, userQuery, botResponse);
         ChatbotHistory saved = chatbotHistoryRepository.save(history);
 
-        return new ChatbotResponse(saved.getId(), saved.getSessionId(), saved.getUserQuery(), saved.getBotResponse(), saved.getCreatedAt());
-    }
-
-    // Logic giả lập AI (Giữ nguyên hoặc tùy chỉnh)
-    private String generateBotResponse(String userQuery) {
-        String q = userQuery.toLowerCase();
-        if (q.contains("xin chào")) return "Chào bạn! Tôi có thể giúp gì?";
-        if (q.contains("rác")) return "Hãy phân loại rác: Hữu cơ, Tái chế và Còn lại.";
-        if (q.contains("aqi")) return "Chỉ số AQI thể hiện chất lượng không khí.";
-        return "Tôi ghi nhận câu hỏi: " + userQuery;
+        // Trả về kết quả
+        return new ChatbotResponse(
+            saved.getId(), 
+            saved.getSessionId(), 
+            saved.getUserQuery(), 
+            saved.getBotResponse(), 
+            saved.getCreatedAt()
+        );
     }
 
     /**
-     * [QUAN TRỌNG] Lấy danh sách hội thoại (Mỗi session chỉ lấy tin nhắn mới nhất làm đại diện)
+     * Lấy danh sách các cuộc hội thoại (Sessions).
+     * Logic: Chỉ lấy tin nhắn mới nhất của mỗi session để hiển thị ngoài danh sách.
      */
     public List<ChatbotResponse> getChatSessions(User user) {
+        // Lấy tất cả lịch sử của user, sắp xếp mới nhất lên đầu
         List<ChatbotHistory> allHistory = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
 
-        // Map để lọc trùng sessionId, chỉ giữ lại tin nhắn mới nhất của mỗi session
+        // Dùng Map để lọc trùng sessionId (chỉ giữ bản ghi đầu tiên/mới nhất gặp được)
         Map<String, ChatbotHistory> uniqueSessions = new LinkedHashMap<>();
         
         for (ChatbotHistory h : allHistory) {
+            // Nếu có sessionId và chưa có trong map thì thêm vào
             if (h.getSessionId() != null && !uniqueSessions.containsKey(h.getSessionId())) {
                 uniqueSessions.put(h.getSessionId(), h);
             }
         }
 
+        // Chuyển đổi sang DTO
         return uniqueSessions.values().stream()
-                .map(h -> new ChatbotResponse(h.getId(), h.getSessionId(), h.getUserQuery(), h.getBotResponse(), h.getCreatedAt()))
+                .map(h -> new ChatbotResponse(
+                    h.getId(), 
+                    h.getSessionId(), 
+                    h.getUserQuery(), 
+                    h.getBotResponse(), 
+                    h.getCreatedAt()
+                ))
                 .collect(Collectors.toList());
     }
 
     /**
-     * [MỚI] Lấy chi tiết tin nhắn trong 1 hội thoại
+     * Lấy chi tiết toàn bộ tin nhắn trong một cuộc hội thoại cụ thể.
      */
     public List<ChatbotResponse> getSessionMessages(String sessionId) {
-        return chatbotHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream()
-                .map(h -> new ChatbotResponse(h.getId(), h.getSessionId(), h.getUserQuery(), h.getBotResponse(), h.getCreatedAt()))
+        // Lấy list tin nhắn theo sessionId, sắp xếp cũ -> mới để hiển thị đúng thứ tự chat
+        List<ChatbotHistory> sessionHistory = chatbotHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        
+        return sessionHistory.stream()
+                .map(h -> new ChatbotResponse(
+                    h.getId(), 
+                    h.getSessionId(), 
+                    h.getUserQuery(), 
+                    h.getBotResponse(), 
+                    h.getCreatedAt()
+                ))
                 .collect(Collectors.toList());
     }
 
     /**
-     * [MỚI] Xóa hội thoại
+     * Xóa toàn bộ cuộc hội thoại theo Session ID.
      */
     @Transactional
     public void deleteSession(String sessionId, User user) {
-        // Cần check quyền sở hữu (ở đây làm đơn giản)
+        // Lưu ý: Trong thực tế nên check xem sessionId này có thuộc về user không để bảo mật
         chatbotHistoryRepository.deleteBySessionId(sessionId);
     }
 }
