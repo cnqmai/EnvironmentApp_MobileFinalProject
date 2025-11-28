@@ -59,7 +59,7 @@ export const getAqiForSavedLocations = async () => {
   });
 
   if (!response.ok) {
-    throw new Error('Không thể lấy dữ liệu AQI cho các địa điểm đã lưu.');
+    //throw new Error('Không thể lấy dữ liệu AQI cho các địa điểm đã lưu.');
   }
 
   return response.json(); // Trả về một mảng SavedLocationAqiResponse

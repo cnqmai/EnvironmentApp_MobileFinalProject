@@ -38,7 +38,7 @@ const DashboardScreen = () => {
 
       setAqiList(formattedData);
     } catch (error) {
-      console.error("Lỗi tải dashboard:", error);
+      //console.error("Lỗi tải dashboard:", error);
       // Có thể thêm Toast hoặc Alert báo lỗi tại đây
     } finally {
       setLoading(false);

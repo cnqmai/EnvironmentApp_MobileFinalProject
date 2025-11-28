@@ -1,15 +1,11 @@
 server:
   port: 8080
-  # QUAN TRỌNG: Đặt context-path là / để không bị nhân đôi thành /api/api
   servlet:
     context-path: /
 
 spring:
   datasource:
-    # --- SỬA DÒNG NÀY ---
-    # Thêm ?stringtype=unspecified vào cuối URL
     url: jdbc:postgresql://localhost:5432/environment_db?stringtype=unspecified
-    # ---------------------
     username: env_app_user
     password: "2112"
   
@@ -25,6 +21,19 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
   
   security:
     oauth2:
@@ -65,6 +74,32 @@ aqi:
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
 
+# Cấu hình Upload file
 app:
   upload:
     dir: uploads
+
+  security:
+    google:
+      client-ids: "756858259822-3vc9g8jdee93v1v4vajgo33ghao6rsib.apps.googleusercontent.com,756858259822-mvqtudhds35eq2b4h56qn16uefj615jo.apps.googleusercontent.com,756858259822-f887rof3qh7enulq6dkt5hv7d8r4lorj.apps.googleusercontent.com"
+      
+      # [MỚI] Lấy trong Google Console -> Credentials -> Web Client -> Client Secret
+      client-secret: ${GOOGLE_CLIENT_SECRET}
+      
+      # [MỚI] Link Ngrok của bạn (Phải khớp 100% với code frontend và Google Console)
+      redirect-uri: "https://eructative-prodeportation-nikola.ngrok-free.dev/api/auth/callback/google"
+
+
+# Cấu hình Reset Password
+password:
+  reset:
+    expiration:
+      minutes: 15
+      
+  frontend:
+    # Link Deep Link mở App (thay link Tunnel của bạn vào đây)
+    reset-password-url: "exp://duqqiw0-cnqmai-8081.exp.direct/--/reset-password"
+    
+    # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
+    # Trừ khi bạn cài ngrok cho cả Spring Boot
+    backend-url: "http://192.168.100.190:8080"

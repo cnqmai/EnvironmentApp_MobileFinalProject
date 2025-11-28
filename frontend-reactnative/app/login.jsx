@@ -1,283 +1,187 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Image, 
-  Alert, 
-  ActivityIndicator, 
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants'; 
-
-// Import các thư viện cần thiết cho OAuth2
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook';
+import * as Linking from 'expo-linking'; // Import thêm Linking
 
-// Import service
-import { login, loginWithGoogle, loginWithFacebook } from '../src/services/authService'; 
+import { login, loginWithGoogle } from '../src/services/authService'; 
 import { saveToken } from '../src/utils/apiHelper'; 
+import { FONT_FAMILY } from '../styles/typography';
 
-// Import FONT_FAMILY
-import { FONT_FAMILY } from '../styles/typography'; 
-
-// PHẢI GỌI: Hoàn tất phiên xác thực web trước đó
+// Bắt buộc để nhận Deep Link quay về
 WebBrowser.maybeCompleteAuthSession();
-
-// Lấy cấu hình từ app.json/app.config.js
-const SCHEME = Constants.expoConfig?.scheme || 'finalproject';
-const { google, facebookAppId } = Constants.expoConfig?.extra || {}; 
-
-// Tính toán Redirect URI chính xác dựa trên Scheme
-const redirectUri = AuthSession.makeRedirectUri({
-  native: `${SCHEME}://redirect`, 
-});
-// console.log("OAuth Redirect URI:", redirectUri); // Debug URI
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
+  const [googleStatus, setGoogleStatus] = useState('');
   const router = useRouter();
+  
+  // Lấy params từ Deep Link (Ngrok trả về token ở đây)
+  const { token, email: emailFromDeepLink, error } = useLocalSearchParams();
+  
+  // Cấu hình NGROK và Google
+  const NGROK_URL = "https://eructative-prodeportation-nikola.ngrok-free.dev";
+  const { google } = Constants.expoConfig?.extra || {};
+  const webClientId = google?.webClientId; // Chỉ cần Web Client ID
 
-  // ------------------------------------------
-  // 1. Hook Google 
-  // ------------------------------------------
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    responseType: 'id_token', 
-    androidClientId: google?.androidClientId || 'YOUR_GOOGLE_ANDROID_CLIENT_ID',
-    iosClientId: google?.iosClientId || 'YOUR_GOOGLE_IOS_CLIENT_ID',
-    webClientId: google?.webClientId || 'YOUR_GOOGLE_WEB_CLIENT_ID',
-    scopes: ['profile', 'email'],
-    // Không cần redirectUri cho Google nếu đã cấu hình đúng các Client ID
-  });
+  // --- XỬ LÝ KHI APP ĐƯỢC MỞ LẠI TỪ NGROK ---
+  useEffect(() => {
+    const handleUrl = ({ url }) => {
+      console.log(">>> Link nhận được:", url);
 
-  // ------------------------------------------
-  // 2. Hook Facebook 
-  // ------------------------------------------
-  const [facebookRequest, facebookResponse, promptFacebookAsync] = Facebook.useAuthRequest({
-    clientId: facebookAppId || 'YOUR_FACEBOOK_APP_ID',
-    scopes: ['public_profile', 'email'],
-    redirectUri: redirectUri, // SỬ DỤNG REDIRECT URI ĐÃ TẠO
-  });
+      // 1. QUAN TRỌNG: Nếu là link Reset Password thì bỏ qua ngay
+      // Để cho Expo Router tự điều hướng sang trang ResetPassword
+      if (url && url.includes('reset-password')) {
+        console.log(">>> Đây là link Reset Password, Login component sẽ bỏ qua.");
+        return; 
+      }
 
-  // ------------------------------------------
-  // 3. Hàm lưu token & chuyển hướng
-  // ------------------------------------------
-  const finishLogin = async (data) => {
-    if (data.token) {
-      await saveToken(data.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(data.user || {}));
-    }
-    router.replace('/(tabs)');
-  };
+      // 2. Logic cũ: Chỉ xử lý nếu là Google Login
+      if (url && url.includes('token=')) {
+        try {
+          const { queryParams } = Linking.parse(url);
+          const token = queryParams?.token;
+          const email = queryParams?.email;
+          const error = queryParams?.error;
 
-  // ------------------------------------------
-  // 4. Effect theo dõi response Google
-  // ------------------------------------------
-  React.useEffect(() => {
-    if (googleResponse?.type === 'success' && googleResponse.authentication?.idToken) {
-      handleSocialLoginFlow('google', googleResponse.authentication.idToken);
-    } else if (googleResponse?.type === 'error') {
-      Alert.alert('Lỗi Google Login', 'Xác thực Google thất bại.');
-      setLoading(false);
-    }
-  }, [googleResponse]);
+          if (error) {
+            Alert.alert("Lỗi", decodeURIComponent(error));
+            setLoading(false);
+          } else if (token) {
+            handleDeepLinkLogin(token, email);
+          }
+        } catch (e) {
+          console.error("Lỗi xử lý link:", e);
+          setLoading(false);
+        }
+      }
+    };
 
-  // ------------------------------------------
-  // 5. Effect theo dõi response Facebook
-  // ------------------------------------------
-  React.useEffect(() => {
-    if (facebookResponse?.type === 'success' && facebookResponse.authentication?.accessToken) {
-      handleSocialLoginFlow('facebook', facebookResponse.authentication.accessToken);
-    } else if (facebookResponse?.type === 'error') {
-      Alert.alert('Lỗi Facebook Login', 'Xác thực Facebook thất bại.');
-      setLoading(false);
-    }
-  }, [facebookResponse]);
+    const sub = Linking.addEventListener('url', handleUrl);
+    Linking.getInitialURL().then((url) => {
+        if (url) handleUrl({ url });
+    });
 
-  // ------------------------------------------
-  // 6. Hàm gọi API Backend sau khi có token
-  // ------------------------------------------
-  const handleSocialLoginFlow = async (provider, token) => {
-    if (loading) return;
+    return () => sub.remove();
+  }, []);
+
+  // --- HÀM BẮT ĐẦU ĐĂNG NHẬP ---
+  const handleSignInGoogle = async () => {
     setLoading(true);
     try {
-      let data;
-      if (provider === 'google') {
-        data = await loginWithGoogle(token); 
-      } else if (provider === 'facebook') {
-        data = await loginWithFacebook(token);
-      }
+      // Tự tạo URL đăng nhập Google thủ công
+      // Lý do: Để ép Google trả về link Ngrok của bạn
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${webClientId}` +
+        `&redirect_uri=${encodeURIComponent(`${NGROK_URL}/api/auth/callback/google`)}` +
+        `&response_type=code` + // Lấy code để Backend tự xử lý lấy Token
+        `&scope=email%20profile%20openid`;
+
+      console.log("🚀 Đang mở trình duyệt đến:", googleAuthUrl);
+
+      // --- SỬA CHỖ 2: Dùng openBrowserAsync ---
+      await WebBrowser.openBrowserAsync(googleAuthUrl);
       
-      await finishLogin(data);
-      
+      // Loading vẫn quay để chờ App quay lại và useEffect bắt được Token
     } catch (error) {
-      Alert.alert(`Lỗi Đăng nhập ${provider}`, error.message);
-    } finally {
+      console.log('❌ Lỗi mở trình duyệt:', error);
       setLoading(false);
     }
   };
 
-
-  // ------------------------------------------
-  // 7. Email/Password Login (FR-1.1.1)
-  // ------------------------------------------
-  const handleLogin = async () => { 
-    if (!email || !password) {
-      Alert.alert('Thông báo', 'Vui lòng nhập email và mật khẩu');
-      return;
+  const handleDeepLinkLogin = async (jwtToken, userEmail) => {
+    try {
+      // Token này là do Backend (Spring Boot) đã xử lý và tạo ra
+      await saveToken(jwtToken);
+      
+      // Nếu Backend trả về email thì lưu, không thì thôi
+      const userData = userEmail ? { email: userEmail } : {};
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      
+      setLoading(false);
+      Alert.alert("Thành công", "Đăng nhập Google hoàn tất!");
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.log('❌ Lỗi lưu token:', error);
+      Alert.alert('Lỗi', 'Không thể lưu phiên đăng nhập');
+      setLoading(false);
     }
+  };
 
+  // --- Các hàm Login khác giữ nguyên ---
+  const finishLogin = async (data) => {
+    if (data && data.token) {
+      await saveToken(data.token);
+      await AsyncStorage.setItem('userData', JSON.stringify(data.user || {}));
+      setLoading(false);
+      router.replace('/(tabs)');
+    } else {
+        setLoading(false);
+        Alert.alert("Lỗi", "Server không trả về token.");
+    }
+  };
+
+  const handleLogin = async () => { 
+    if (!email || !password) { Alert.alert('Thông báo', 'Nhập email/pass'); return; }
     setLoading(true);
     try {
       const data = await login(email, password);
       await finishLogin(data); 
     } catch (error) {
-      Alert.alert('Lỗi đăng nhập', error.message);
-    } finally {
+      Alert.alert('Lỗi', "Sai thông tin đăng nhập");
       setLoading(false);
     }
   };
-  
-  // ------------------------------------------
-  // 8. Kích hoạt Google Login
-  // ------------------------------------------
-  const handleGoogleLogin = () => {
-    if (loading || !googleRequest) return;
-    promptGoogleAsync();
-  };
 
-  // ------------------------------------------
-  // 9. Kích hoạt Facebook Login
-  // ------------------------------------------
-  const handleFacebookLogin = () => {
-    if (loading || !facebookRequest) return;
-    promptFacebookAsync();
-  };
-
-  // ------------------------------------------
-  // 10. Chế độ khách (FR-1.1.2)
-  // ------------------------------------------
   const handleGuestLogin = async () => {
-    try {
-      // Lưu token giả cho Guest Mode (dữ liệu lưu cục bộ, token không dùng cho API)
-      await saveToken('GUEST_MODE_LOCAL_TOKEN'); 
-      await AsyncStorage.setItem('isGuest', 'true');
-      router.replace('/(tabs)');
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể vào chế độ khách.');
-    }
+    try { await saveToken('GUEST'); await AsyncStorage.setItem('isGuest', 'true'); router.replace('/(tabs)'); } catch(e){}
   };
-
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Title */}
         <Text style={styles.title}>Đăng nhập</Text>
-
-        {/* Form */}
         <View style={styles.form}>
-          
-          {/* Email Input */}
           <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập email"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          {/* Password Input */}
+          <TextInput style={styles.input} placeholder="Nhập email" value={email} onChangeText={setEmail} autoCapitalize="none"/>
           <Text style={styles.label}>Mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập mật khẩu"
-            placeholderTextColor="#999"
-            secureTextEntry={true}
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          {/* FR-1.1.3: Forgot Password */}
+          <TextInput style={styles.input} placeholder="Nhập mật khẩu" secureTextEntry={true} value={password} onChangeText={setPassword}/>
+          
           <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.forgotContainer}>
             <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
 
-          {/* Login Button */}
-          <TouchableOpacity 
-              style={[styles.loginButton, loading && styles.buttonDisabled]} 
-              onPress={handleLogin}
-              disabled={loading}
-          >
-            {loading ? (
-               <ActivityIndicator color="#fff" />
-            ) : (
-               <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            )}
+          <TouchableOpacity style={[styles.loginButton, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
+             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Đăng nhập</Text>}
           </TouchableOpacity>
 
-          {/* Divider "hoặc đăng nhập với" */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.line} />
-            <Text style={styles.dividerText}>hoặc đăng nhập với</Text>
-            <View style={styles.line} />
-          </View>
+          <View style={styles.dividerContainer}><View style={styles.line} /><Text style={styles.dividerText}>hoặc đăng nhập với</Text><View style={styles.line} /></View>
 
-          {/* FR-1.1.1: Social Icons */}
           <View style={styles.socialContainer}>
-            {/* Facebook Button */}
-            <TouchableOpacity 
-              style={styles.socialButton} 
-              onPress={handleFacebookLogin}
-              disabled={loading || !facebookRequest} 
-            >
-              <Image 
-                source={{uri: 'https://img.icons8.com/color/48/000000/facebook-new.png'}} 
-                style={styles.socialIcon} 
-              />
-            </TouchableOpacity>
-            {/* Google Button */}
-            <TouchableOpacity 
-              style={styles.socialButton} 
-              onPress={handleGoogleLogin}
-              disabled={loading || !googleRequest} 
-            >
-               <Image 
-                source={{uri: 'https://img.icons8.com/color/48/000000/google-logo.png'}} 
-                style={styles.socialIcon} 
-              />
+            <TouchableOpacity style={styles.socialButton} onPress={handleSignInGoogle} disabled={loading}>
+               <Image source={{uri: 'https://img.icons8.com/color/48/000000/google-logo.png'}} style={styles.socialIcon} />
+               <Text style={styles.socialText}>Google</Text>
             </TouchableOpacity>
           </View>
+          {googleStatus ? (
+            <View style={{alignItems: 'center', marginBottom: 8}}>
+              <Text style={{color: '#666'}}>{googleStatus}</Text>
+            </View>
+          ) : null}
 
-          {/* FR-1.1.2: Guest Button */}
           <TouchableOpacity style={styles.guestButton} onPress={handleGuestLogin}>
             <Text style={styles.guestText}>Tiếp tục với chế độ khách</Text>
           </TouchableOpacity>
 
-          {/* Register Link */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Chưa có tài khoản? </Text>
-            <TouchableOpacity onPress={() => router.push('/register')}>
-              <Text style={styles.registerLink}>Đăng ký</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/register')}><Text style={styles.registerLink}>Đăng ký</Text></TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -375,6 +279,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   socialButton: {
+    flexDirection: 'row', // Thêm dòng này để icon và text nằm ngang
     flex: 1, 
     paddingVertical: 15,
     borderRadius: 15,
@@ -388,6 +293,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     resizeMode: 'contain',
+    marginRight: 10, // Thêm khoảng cách giữa icon và text
+  },
+  socialText: { // Thêm style cho text Google
+    fontSize: 16,
+    color: '#000',
+    fontFamily: FONT_FAMILY,
+    fontWeight: '600',
   },
   guestButton: {
     backgroundColor: '#F0EFED',

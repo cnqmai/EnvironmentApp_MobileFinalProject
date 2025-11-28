@@ -14,8 +14,8 @@ import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location"; 
-import * as ImagePicker from 'expo-image-picker'; // THÊM: Image Picker
-import * as FileSystem from 'expo-file-system'; // THÊM: File System
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import typography from "../styles/typography";
 import { API_BASE_URL } from '../src/constants/api';
 import { getMyProfile, updateProfile } from "../src/services/userService";

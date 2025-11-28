@@ -25,6 +25,12 @@ public class EnvironmentBackendApplication {
         if (dotenv.get("FACEBOOK_APP_SECRET") != null) {
             System.setProperty("FACEBOOK_APP_SECRET", dotenv.get("FACEBOOK_APP_SECRET"));
         }
+        if (dotenv.get("MAIL_USERNAME") != null) {
+            System.setProperty("MAIL_USERNAME", dotenv.get("MAIL_USERNAME"));
+        }
+        if (dotenv.get("MAIL_PASSWORD") != null) {
+            System.setProperty("MAIL_PASSWORD", dotenv.get("MAIL_PASSWORD"));
+        }
         SpringApplication.run(EnvironmentBackendApplication.class, args);
     }
 
