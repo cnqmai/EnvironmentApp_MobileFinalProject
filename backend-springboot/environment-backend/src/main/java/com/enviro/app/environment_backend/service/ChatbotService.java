@@ -1,123 +1,104 @@
 package com.enviro.app.environment_backend.service;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
 import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
+import com.enviro.app.environment_backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-/**
- * Service xử lý logic Chatbot AI (FR-5.x)
- * 
- * LƯU Ý: Service này hiện tại chỉ trả về câu trả lời mẫu.
- * Để tích hợp AI thực sự, bạn cần:
- * 1. Tích hợp OpenAI API hoặc Google Gemini API
- * 2. Hoặc tạo một service AI riêng để xử lý
- */
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 @Service
 public class ChatbotService {
 
-    private final ChatbotHistoryRepository chatbotHistoryRepository;
+    private final ChatbotHistoryRepository historyRepository;
+    private final UserRepository userRepository;
+    private final RestTemplate restTemplate;
 
-    public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository) {
-        this.chatbotHistoryRepository = chatbotHistoryRepository;
+    @Value("${gemini.api.key}")
+    private String geminiApiKey;
+
+    @Value("${gemini.api.url}")
+    private String geminiApiUrl;
+
+    public ChatbotService(ChatbotHistoryRepository historyRepository, UserRepository userRepository, RestTemplate restTemplate) {
+        this.historyRepository = historyRepository;
+        this.userRepository = userRepository;
+        this.restTemplate = restTemplate;
     }
 
-    /**
-     * Xử lý câu hỏi từ user và trả về phản hồi từ chatbot (FR-5.1)
-     * 
-     * TODO: Tích hợp với AI Service thực sự (OpenAI/Gemini)
-     */
-    @Transactional
-    public ChatbotResponse processMessage(User user, ChatbotRequest request) {
-        String userQuery = request.getMessage();
-        String botResponse = generateBotResponse(userQuery);
+    public ChatbotResponse processChat(UUID userId, String userMessage) {
+        // 1. Gọi Google Gemini API để lấy câu trả lời
+        String botReply = callGeminiAi(userMessage);
 
-        // Lưu vào lịch sử
-        ChatbotHistory history = new ChatbotHistory(user, userQuery, botResponse);
+        // 2. Lưu lịch sử chat vào Database
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            ChatbotHistory history = ChatbotHistory.builder()
+                    .user(user)
+                    .userMessage(userMessage)
+                    .botResponse(botReply)
+                    .build();
+            historyRepository.save(history);
+        }
 
-        ChatbotHistory savedHistory = chatbotHistoryRepository.save(history);
-
-        return new ChatbotResponse(
-                savedHistory.getId(),
-                savedHistory.getUserQuery(),
-                savedHistory.getBotResponse(),
-                savedHistory.getCreatedAt()
-        );
+        // 3. Trả về kết quả
+        return new ChatbotResponse(botReply);
     }
 
-    /**
-     * Tạo phản hồi từ chatbot (Hiện tại chỉ là logic đơn giản)
-     * TODO: Thay thế bằng AI Service thực sự
-     */
-    private String generateBotResponse(String userQuery) {
-        String query = userQuery.toLowerCase().trim();
+    private String callGeminiAi(String prompt) {
+        try {
+            String url = geminiApiUrl + "?key=" + geminiApiKey;
 
-        // Logic đơn giản để trả lời một số câu hỏi thường gặp
-        if (query.contains("phân loại rác") || query.contains("rác thải")) {
-            return "Để phân loại rác đúng cách, bạn nên:\n" +
-                   "1. Rác hữu cơ: Thức ăn thừa, lá cây → Ủ phân hoặc bỏ vào thùng rác hữu cơ\n" +
-                   "2. Rác tái chế: Giấy, nhựa, kim loại → Bỏ vào thùng rác tái chế\n" +
-                   "3. Rác nguy hại: Pin, bóng đèn, thiết bị điện tử → Mang đến điểm thu gom đặc biệt\n" +
-                   "4. Rác thải khác: Không thể tái chế → Bỏ vào thùng rác thông thường";
+            // Cấu trúc Request Body theo chuẩn của Gemini API
+            Map<String, Object> content = new HashMap<>();
+            Map<String, String> parts = new HashMap<>();
+            parts.put("text", "Bạn là một trợ lý ảo về môi trường xanh. Hãy trả lời ngắn gọn và hữu ích câu hỏi sau: " + prompt);
+            
+            content.put("parts", Collections.singletonList(parts));
+            
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("contents", Collections.singletonList(content));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+
+            // Parse Response để lấy text trả lời
+            if (response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
+                if (candidates != null && !candidates.isEmpty()) {
+                    Map<String, Object> contentRes = (Map<String, Object>) candidates.get(0).get("content");
+                    List<Map<String, Object>> partsRes = (List<Map<String, Object>>) contentRes.get("parts");
+                    if (partsRes != null && !partsRes.isEmpty()) {
+                        return (String) partsRes.get(0).get("text");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Xin lỗi, hiện tại tôi không thể kết nối với hệ thống AI. Vui lòng thử lại sau.";
         }
-
-        if (query.contains("chất lượng không khí") || query.contains("aqi")) {
-            return "Chỉ số AQI (Air Quality Index) đo chất lượng không khí:\n" +
-                   "• 0-50: Tốt (Xanh lá) - Không khí trong lành\n" +
-                   "• 51-100: Trung bình (Vàng) - Nhạy cảm nhẹ có thể gặp vấn đề\n" +
-                   "• 101-150: Không tốt cho nhóm nhạy cảm (Cam) - Tránh hoạt động ngoài trời\n" +
-                   "• 151-200: Không tốt (Đỏ) - Mọi người có thể gặp vấn đề sức khỏe\n" +
-                   "• >200: Rất nguy hại (Tím) - Tránh tất cả hoạt động ngoài trời";
-        }
-
-        if (query.contains("bảo vệ môi trường") || query.contains("sống xanh")) {
-            return "Một số cách bảo vệ môi trường bạn có thể làm:\n" +
-                   "• Giảm sử dụng nhựa dùng một lần\n" +
-                   "• Tái chế rác thải đúng cách\n" +
-                   "• Tiết kiệm điện, nước\n" +
-                   "• Sử dụng phương tiện công cộng hoặc đi bộ\n" +
-                   "• Trồng cây xanh\n" +
-                   "• Tham gia các hoạt động tình nguyện môi trường";
-        }
-
-        if (query.contains("luật") || query.contains("quy định")) {
-            return "Các luật bảo vệ môi trường quan trọng ở Việt Nam:\n" +
-                   "• Luật Bảo vệ Môi trường 2020\n" +
-                   "• Nghị định về xử phạt vi phạm hành chính trong lĩnh vực môi trường\n" +
-                   "• Quy định về phân loại, thu gom và xử lý rác thải\n" +
-                   "Bạn có thể báo cáo vi phạm môi trường qua ứng dụng này!";
-        }
-
-        // Trả lời mặc định
-        return "Xin chào! Tôi là chatbot hỗ trợ về môi trường.\n" +
-               "Tôi có thể giúp bạn với:\n" +
-               "• Phân loại rác thải\n" +
-               "• Chất lượng không khí (AQI)\n" +
-               "• Cách bảo vệ môi trường\n" +
-               "• Luật và quy định môi trường\n\n" +
-               "Hãy hỏi tôi bất kỳ câu hỏi nào về môi trường!";
+        return "Tôi không hiểu câu hỏi của bạn.";
     }
-
-    /**
-     * Lấy lịch sử chat của user (FR-1.2.3, FR-5.1)
-     */
-    public List<ChatbotResponse> getChatHistory(User user) {
-        List<ChatbotHistory> historyList = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
-        
-        return historyList.stream()
-                .map(h -> new ChatbotResponse(
-                        h.getId(),
-                        h.getUserQuery(),
-                        h.getBotResponse(),
-                        h.getCreatedAt()))
-                .collect(Collectors.toList());
+    
+    // Lấy lịch sử chat
+    public List<ChatbotHistory> getUserHistory(UUID userId) {
+        return historyRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 }
-

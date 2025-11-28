@@ -1,121 +1,75 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import typography from "../styles/typography";
+import { getCategoryBySlug } from "../src/services/categoryService"; // Import service
 
 const RecycleGuideScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { type, title, subtitle: customSubtitle } = params;
+  // type chính là slug (organic, recyclable, v.v.)
+  const { type, title: paramTitle } = params; 
 
-  const getDefaultSubtitle = (type) => {
-    switch (type) {
-      case "organic":
-        return "VD: Thực phẩm thừa, vỏ trái cây, lá cây";
-      case "recyclable":
-        return "VD: Chai nhựa, giấy, kim loại";
-      case "hazardous":
-        return "VD: Pin, hóa chất, thuốc trừ sâu";
-      case "electronic":
-        return "VD: Điện thoại, laptop, TV cũ";
-      case "glass":
-        return "VD: Chai lọ thủy tinh, kính vỡ";
-      case "textile":
-        return "VD: Quần áo cũ, vải vụn, khăn trải";
-      default:
-        return "Thông tin đang cập nhật";
-    }
+  const [categoryData, setCategoryData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Gọi API lấy dữ liệu thật
+  useEffect(() => {
+    const fetchGuideData = async () => {
+      try {
+        if (type) {
+          const data = await getCategoryBySlug(type);
+          setCategoryData(data);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy hướng dẫn tái chế:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGuideData();
+  }, [type]);
+
+  // Xử lý hiển thị màu sắc (Vẫn có thể giữ logic màu ở frontend hoặc lấy từ DB nếu có trường color)
+  const getBackgroundColor = (slugType) => {
+    const colors = {
+      organic: "#E8F5E9",
+      recyclable: "#E3F2FD",
+      hazardous: "#FFF3E0",
+      electronic: "#EDE7F6",
+      glass: "#E0F7FA",
+      textile: "#FCE4EC",
+      default: "#F5F5F5"
+    };
+    return colors[slugType] || colors.default;
   };
 
-  const getGuideContent = () => {
-    const displaySubtitle = customSubtitle || getDefaultSubtitle(type);
-
-    switch (type) {
-      case "organic":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "Phân loại riêng khỏi rác khác",
-            "Có thể ủ compost tại nhà",
-            "Bỏ vào thùng rác màu xanh lá",
-          ],
-        };
-      case "recyclable":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "Rửa sạch chai, loại bỏ nhãn và nắp",
-            "Đặt vào thùng rác tái chế màu xanh",
-            "Hoặc đem đến điểm thu gom gần nhất",
-          ],
-        };
-      case "hazardous":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "KHÔNG bỏ chung với rác thường",
-            "Mang đến điểm thu gom chuyên dụng",
-            "Liên hệ cơ quan môi trường địa phương",
-          ],
-        };
-      case "electronic":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "Xóa dữ liệu cá nhân trước khi thanh lý",
-            "Mang đến cửa hàng có thu hồi",
-            "Liên hệ đơn vị thu gom chuyên nghiệp",
-          ],
-        };
-      case "glass":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "Rửa sạch trước khi bỏ",
-            "Tách riêng nắp kim loại/nhựa",
-            "Bỏ vào thùng riêng để tránh vỡ",
-          ],
-        };
-      case "textile":
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: [
-            "Quần áo còn tốt: quyên góp từ thiện",
-            "Vải vụn: mang đến điểm thu gom",
-            "Tìm thùng thu gom quần áo cũ",
-          ],
-        };
-      default:
-        return {
-          subtitle: displaySubtitle,
-          howToRecycle: ["Vui lòng quay lại sau"],
-        };
+  // Xử lý tách chuỗi hướng dẫn thành mảng (Do DB lưu dạng text ngăn cách bởi \n)
+  const getSteps = () => {
+    if (categoryData && categoryData.guidelines) {
+      // Tách chuỗi bằng ký tự xuống dòng
+      return categoryData.guidelines.split('\n').filter(step => step.trim() !== '');
     }
+    return ["Thông tin đang cập nhật"];
   };
 
-  const getBackgroundColor = (type) => {
-    switch (type) {
-      case "organic":
-        return "#E8F5E9";
-      case "recyclable":
-        return "#E3F2FD";
-      case "hazardous":
-        return "#FFF3E0";
-      case "electronic":
-        return "#EDE7F6";
-      case "glass":
-        return "#E0F7FA";
-      case "textile":
-        return "#FCE4EC";
-      default:
-        return "#F5F5F5";
-    }
-  };
+  // Nếu đang tải
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
-  const content = getGuideContent();
+  // Tiêu đề và subtitle ưu tiên lấy từ API, nếu không có thì lấy từ params hoặc mặc định
+  const displayTitle = categoryData?.name || paramTitle || "Chi tiết";
+  const displaySubtitle = categoryData?.subtitle || "Thông tin đang cập nhật";
+  const steps = getSteps();
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -146,13 +100,13 @@ const RecycleGuideScreen = () => {
               <MaterialCommunityIcons name="check" size={28} color="#4CAF50" />
             </View>
           </View>
-          <Text style={styles.resultTitle}>{title}</Text>
-          <Text style={styles.resultSubtitle}>{content.subtitle}</Text>
+          <Text style={styles.resultTitle}>{displayTitle}</Text>
+          <Text style={styles.resultSubtitle}>{displaySubtitle}</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Hướng dẫn xử lí</Text>
         <View style={styles.stepsContainer}>
-          {content.howToRecycle.map((step, index) => (
+          {steps.map((step, index) => (
             <View key={index} style={styles.stepCard}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>{index + 1}</Text>
@@ -169,11 +123,12 @@ const RecycleGuideScreen = () => {
             color="#007AFF"
           />
           <Text style={styles.infoText}>
-            Bạn có thể tái sử dụng chai đựa để trồng cây hoặc làm đồ handmade!
+            Hãy chung tay bảo vệ môi trường bằng cách phân loại rác đúng quy định!
           </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Điểm thu gom gần bạn</Text>
+        {/* Phần này tạm thời giữ tĩnh hoặc gọi API LocationService nếu cần */}
         <View style={styles.locationCard}>
           <TouchableOpacity
             style={styles.locationTouchable}
@@ -215,6 +170,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     paddingHorizontal: 16,
@@ -279,6 +238,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 15,
     color: "#666666",
+    textAlign: "center", // Canh giữa subtitle
   },
   sectionTitle: {
     ...typography.h3,

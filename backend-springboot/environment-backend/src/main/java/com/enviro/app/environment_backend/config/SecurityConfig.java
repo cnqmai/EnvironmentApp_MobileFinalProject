@@ -18,11 +18,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher; 
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector; 
 
 import com.enviro.app.environment_backend.security.JwtAuthenticationFilter;
 import com.enviro.app.environment_backend.security.JwtService;
@@ -97,27 +97,24 @@ public class SecurityConfig {
                 .requestMatchers(mvc.pattern("/api/auth/**")).permitAll()
                 .requestMatchers(mvc.pattern("/auth/**")).permitAll()
                 
-                // --- PHẦN ĐÃ SỬA ---
-                // Chỉ cho phép các API công khai cụ thể, KHÔNG dùng /** cho toàn bộ /aqi
+                // 2. Cho phép API AQI (nhưng chặn saved-locations trong AqiController bằng logic riêng nếu cần, 
+                //    tuy nhiên AqiController hiện tại đang dùng SecurityContextHolder nên cần login cho các API con khác
+                //    -> Tốt nhất chỉ public những cái cần thiết)
+                .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/aqi")).permitAll() // Chỉ public GET AQI theo GPS
+                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll() // Public check alert
                 
-                // GET /api/aqi (Lấy theo GPS) -> Public
-                .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/aqi")).permitAll()
-                .requestMatchers(mvc.pattern(HttpMethod.GET, "/aqi")).permitAll()
-
-                // POST /api/aqi/check-alert -> Public (nếu không cần login)
-                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll()
-                .requestMatchers(mvc.pattern(HttpMethod.POST, "/aqi/check-alert")).permitAll()
-
-                // LƯU Ý: Không khai báo /api/aqi/saved-locations ở đây -> Nó sẽ rơi vào authenticated() bên dưới
-                // -------------------
+                // --- 3. THÊM MỚI: Cho phép API CATEGORIES (Public) ---
+                .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
+                .requestMatchers(mvc.pattern("/categories/**")).permitAll()
+                // -----------------------------------------------------
                 
-                // 3. Cho phép trang lỗi
+                // 4. Cho phép trang lỗi
                 .requestMatchers(mvc.pattern("/error")).permitAll()
                 
-                // 4. Cho phép OPTIONS
+                // 5. Cho phép OPTIONS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
-                // 5. Các request còn lại bắt buộc đăng nhập
+                // 6. Các request còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
             

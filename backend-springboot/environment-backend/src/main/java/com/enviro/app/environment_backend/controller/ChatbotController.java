@@ -2,10 +2,10 @@ package com.enviro.app.environment_backend.controller;
 
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
+import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.ChatbotService;
 import com.enviro.app.environment_backend.service.UserService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,20 +31,19 @@ public class ChatbotController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return userService.findByEmail(userEmail)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
-    @PostMapping("/message")
-    public ResponseEntity<ChatbotResponse> sendMessage(@Valid @RequestBody ChatbotRequest request) {
+    @PostMapping("/chat")
+    public ResponseEntity<ChatbotResponse> chat(@RequestBody ChatbotRequest request) {
         User user = getCurrentUser();
-        ChatbotResponse response = chatbotService.processMessage(user, request);
+        ChatbotResponse response = chatbotService.processChat(user.getId(), request.getMessage());
         return ResponseEntity.ok(response);
     }
-
+    
     @GetMapping("/history")
-    public ResponseEntity<List<ChatbotResponse>> getChatHistory() {
+    public ResponseEntity<List<ChatbotHistory>> getHistory() {
         User user = getCurrentUser();
-        List<ChatbotResponse> history = chatbotService.getChatHistory(user);
-        return ResponseEntity.ok(history);
+        return ResponseEntity.ok(chatbotService.getUserHistory(user.getId()));
     }
 }

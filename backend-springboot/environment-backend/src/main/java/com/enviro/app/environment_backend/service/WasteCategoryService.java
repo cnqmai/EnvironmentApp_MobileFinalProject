@@ -5,6 +5,7 @@ import com.enviro.app.environment_backend.repository.WasteCategoryRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class WasteCategoryService {
@@ -15,10 +16,12 @@ public class WasteCategoryService {
         this.categoryRepository = categoryRepository;
     }
 
-    /**
-     * Lấy tất cả danh mục rác hiện có.
-     */
     public List<WasteCategory> findAllCategories() {
         return categoryRepository.findAll();
+    }
+
+    // --- THÊM MỚI ---
+    public Optional<WasteCategory> findBySlug(String slug) {
+        return categoryRepository.findBySlug(slug);
     }
 }
