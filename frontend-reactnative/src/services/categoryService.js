@@ -1,22 +1,51 @@
 import { API_BASE_URL } from '../constants/api';
-// Không cần fetchWithAuth vì đây là public API, nhưng nếu bạn muốn bảo mật thì đổi thành fetchWithAuth
-import { fetchWithAuth } from '../utils/apiHelper'; 
 
 export const getAllCategories = async () => {
-    const response = await fetch(`${API_BASE_URL}/categories`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Không thể lấy danh sách danh mục');
-    return response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        return await response.json();
+    } catch (error) {
+        return [];
+    }
 };
 
-// --- THÊM MỚI ---
-export const getCategoryBySlug = async (slug) => {
-    const response = await fetch(`${API_BASE_URL}/categories/${slug}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Không thể lấy thông tin danh mục');
-    return response.json();
+export const searchCategories = async (keyword) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories/search?keyword=${encodeURIComponent(keyword)}`);
+        return await response.json();
+    } catch (error) {
+        return [];
+    }
+};
+
+export const classifyWasteByText = async (description) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories/classify/text?description=${encodeURIComponent(description)}`, { method: 'POST' });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
+};
+
+export const classifyWasteByImage = async (imageUri) => {
+    try {
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('image', { uri: imageUri, name: filename, type });
+
+        const response = await fetch(`${API_BASE_URL}/categories/classify/image`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
 };
