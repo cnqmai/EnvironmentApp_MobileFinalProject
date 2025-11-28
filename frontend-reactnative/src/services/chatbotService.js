@@ -2,40 +2,45 @@ import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
 /**
- * Gửi câu hỏi đến chatbot (FR-5.1)
- * POST /api/chatbot/message
+ * Gửi tin nhắn đến Chatbot
+ * Endpoint: POST /api/chatbot/message
  */
-export const sendChatbotMessage = async (message) => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/message`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message }),
-    });
+export const sendMessageToBot = async (message) => {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/message`, {
+            method: 'POST',
+            body: JSON.stringify({ message: message }), // Key 'message' khớp với ChatbotRequest.java
+        });
 
-    if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi gửi tin nhắn' }));
-        throw new Error(errorDetail.message || 'Không thể gửi tin nhắn đến chatbot.');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Lỗi kết nối với Chatbot');
+        }
+
+        return response.json(); // Trả về ChatbotResponse (userQuery, botResponse...)
+    } catch (error) {
+        console.error("Chatbot Error:", error);
+        throw error;
     }
-
-    return response.json();
 };
 
 /**
- * Lấy lịch sử chat của user hiện tại (FR-1.2.3, FR-5.1)
- * GET /api/chatbot/history
+ * Lấy lịch sử trò chuyện
+ * Endpoint: GET /api/chatbot/history
  */
 export const getChatHistory = async () => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/history`, {
-        method: 'GET',
-    });
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/chatbot/history`, {
+            method: 'GET',
+        });
 
-    if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy lịch sử chat' }));
-        throw new Error(errorDetail.message || 'Không thể lấy lịch sử chat.');
+        if (!response.ok) {
+            throw new Error('Không thể tải lịch sử chat');
+        }
+
+        return response.json(); // Trả về List<ChatbotResponse>
+    } catch (error) {
+        console.error("History Error:", error);
+        return []; // Trả về mảng rỗng nếu lỗi để không crash app
     }
-
-    return response.json();
 };
-
