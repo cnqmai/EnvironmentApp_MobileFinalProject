@@ -6,7 +6,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 
 @RestController
@@ -35,7 +34,6 @@ public class WasteCategoryController {
         return category != null ? ResponseEntity.ok(category) : ResponseEntity.notFound().build();
     }
 
-    // API nhận ảnh từ Camera/Thư viện
     @PostMapping(value = "/classify/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<WasteCategory> classifyByImage(@RequestParam("image") MultipartFile image) {
         WasteCategory category = categoryService.classifyWasteByImage(image);
@@ -44,8 +42,6 @@ public class WasteCategoryController {
     
     @GetMapping("/{id}")
     public ResponseEntity<WasteCategory> getCategoryById(@PathVariable Long id) {
-        return categoryService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return categoryService.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 }
