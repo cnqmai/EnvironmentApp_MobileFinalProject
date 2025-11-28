@@ -1,4 +1,3 @@
-// File: src/main/java/com/enviro/app/environment_backend/service/WasteCategoryService.java
 package com.enviro.app.environment_backend.service;
 
 import com.enviro.app.environment_backend.model.WasteCategory;
@@ -14,51 +13,56 @@ import java.util.Optional;
 public class WasteCategoryService {
 
     private final WasteCategoryRepository categoryRepository;
-    private final GeminiService geminiService; // [MỚI]
 
-    public WasteCategoryService(WasteCategoryRepository categoryRepository, GeminiService geminiService) {
+    public WasteCategoryService(WasteCategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
-        this.geminiService = geminiService;
     }
 
-    // [MỚI] AI phân loại rác thông minh
-    public WasteCategory classifyWasteByText(String description) {
-        // 1. Lấy danh sách tên các danh mục có trong DB để AI chọn
-        List<WasteCategory> allCategories = categoryRepository.findAll();
-        String categoriesList = allCategories.stream()
-                .map(WasteCategory::getName)
-                .reduce((a, b) -> a + ", " + b)
-                .orElse("");
-
-        // 2. Tạo prompt (câu lệnh) cho AI
-        String prompt = String.format(
-            "Tôi có món rác sau: '%s'. " +
-            "Hãy phân loại nó vào đúng MỘT trong các danh mục sau: [%s]. " +
-            "Chỉ trả về đúng tên danh mục, không giải thích thêm. Nếu không chắc chắn, trả về 'null'.",
-            description, categoriesList
-        );
-
-        // 3. Gọi AI
-        String resultName = geminiService.callGemini(prompt).trim().replace("\n", "");
-
-        // 4. Tìm trong DB dựa trên kết quả AI trả về
-        return categoryRepository.findByNameIgnoreCase(resultName).orElse(null);
+    public List<WasteCategory> findAllCategories() {
+        return categoryRepository.findAll();
     }
 
-    // Các hàm khác GIỮ NGUYÊN ...
-    public List<WasteCategory> findAllCategories() { return categoryRepository.findAll(); }
-    
+    // Tìm kiếm theo từ khóa
     public List<WasteCategory> searchCategories(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) return new ArrayList<>();
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
         return categoryRepository.searchByKeyword(keyword.trim());
     }
 
-    public Optional<WasteCategory> findById(Long id) { return categoryRepository.findById(id); }
-    
-    public Optional<WasteCategory> findByName(String name) { return categoryRepository.findByNameIgnoreCase(name); }
+    // Tìm theo ID
+    public Optional<WasteCategory> findById(Long id) {
+        return categoryRepository.findById(id);
+    }
 
+    // [MỚI] Tìm theo Tên
+    public Optional<WasteCategory> findByName(String name) {
+        return categoryRepository.findByNameIgnoreCase(name);
+    }
+
+    // Giả lập AI phân loại rác qua văn bản
+    public WasteCategory classifyWasteByText(String description) {
+        String descLower = description.toLowerCase();
+        
+        // Logic đơn giản để demo (Bạn có thể mở rộng thêm)
+        if (descLower.contains("chai") || descLower.contains("nhựa") || descLower.contains("túi nilon")) {
+            return categoryRepository.findByNameIgnoreCase("Rác thải nhựa").orElse(null);
+        } else if (descLower.contains("vỏ chuối") || descLower.contains("cơm") || descLower.contains("thức ăn")) {
+            return categoryRepository.findByNameIgnoreCase("Rác hữu cơ").orElse(null);
+        } else if (descLower.contains("pin") || descLower.contains("điện thoại")) {
+            return categoryRepository.findByNameIgnoreCase("Rác thải điện tử").orElse(null);
+        } else if (descLower.contains("giấy") || descLower.contains("bìa")) {
+            return categoryRepository.findByNameIgnoreCase("Giấy").orElse(null);
+        } else if (descLower.contains("lon") || descLower.contains("kim loại")) {
+            return categoryRepository.findByNameIgnoreCase("Kim loại").orElse(null);
+        }
+
+        return null;
+    }
+
+    // Giả lập AI phân loại rác qua hình ảnh
     public WasteCategory classifyWasteByImage(MultipartFile image) {
-        // Ảnh phức tạp hơn, tạm thời trả về null hoặc tích hợp Gemini Vision sau
+        // TODO: Tích hợp AI thật ở đây
         return null; 
     }
 }
