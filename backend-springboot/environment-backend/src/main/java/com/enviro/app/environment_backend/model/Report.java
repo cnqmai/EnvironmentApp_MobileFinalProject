@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -36,12 +38,12 @@ public class Report {
     @Column(nullable = false)
     private double longitude; // Kinh độ GPS
 
-    @Enumerated(EnumType.STRING) // Lưu Enum dưới dạng chuỗi
     @Column(nullable = false)
     private ReportStatus status; // Trạng thái hiện tại của báo cáo
 
     // Liên kết với ReportMedia (một-nhiều)
     @OneToMany(mappedBy = "report", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
     private List<ReportMedia> reportMedia; 
     
     @ManyToOne(fetch = FetchType.LAZY)

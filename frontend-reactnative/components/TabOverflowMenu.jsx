@@ -57,8 +57,8 @@ const TabOverflowMenu = (props) => {
               />
               <MenuItem
                 icon="flag"
-                text="Báo cáo vi phạm"
-                onPress={() => navigateAndClose("/report")}
+                text="Báo cáo" 
+                onPress={() => navigateAndClose("/reports")}
               />
             </>
           )}
