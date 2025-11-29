@@ -3,42 +3,49 @@ import { View, StyleSheet } from "react-native";
 import { Card, Text, Button } from "react-native-paper";
 import typography, { FONT_FAMILY } from "../styles/typography";
 
+// CẬP NHẬT LOGIC HIỂN THỊ THEO YÊU CẦU
 export const getAqiInfo = (aqi) => {
-  if (aqi <= 50)
+  if (aqi <= 50) {
     return {
-      color: "#4CAF50",
+      color: "#4CAF50", // Xanh lá
       status: "Tốt",
-      description: "Chất lượng không khí tốt",
+      description: "Không khí trong lành.",
     };
-  if (aqi <= 100)
+  } else if (aqi <= 100) {
     return {
-      color: "#FFC107",
+      color: "#FFC107", // Vàng
       status: "Trung bình",
-      description: "Không tốt cho nhóm nhạy cảm",
+      description: "Chất lượng chấp nhận được.",
     };
-  if (aqi <= 150)
+  } else if (aqi <= 150) {
     return {
-      color: "#FF9800",
+      color: "#FF9800", // Cam
       status: "Kém",
-      description: "Ảnh hưởng đến sức khỏe",
+      description: "Nhóm nhạy cảm cần lưu ý.",
     };
-  if (aqi <= 200)
+  } else if (aqi <= 200) {
     return {
-      color: "#F44336",
+      color: "#F44336", // Đỏ
       status: "Xấu",
-      description: "Ảnh hưởng nghiêm trọng",
+      description: "Có hại cho sức khỏe.",
     };
-  if (aqi <= 300)
-    return { color: "#9C27B0", status: "Rất xấu", description: "Nguy hiểm" };
-  return {
-    color: "#795548",
-    status: "Nguy hiểm",
-    description: "Cực kỳ nguy hiểm",
-  };
+  } else if (aqi <= 300) { // Khoảng 201-300
+    return {
+      color: "#9C27B0", // Tím
+      status: "Rất xấu",
+      description: "Cảnh báo khẩn cấp.",
+    };
+  } else {
+    return {
+      color: "#7E0023", // Nâu đỏ (Maroon)
+      status: "Nguy hiểm", // Đúng tên gọi yêu cầu
+      description: "Báo động! Tránh ra ngoài.",
+    };
+  }
 };
 
 const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
-  const { color, status } = getAqiInfo(aqi);
+  const { color, status, description: defaultDesc } = getAqiInfo(aqi);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleExpansion = () => {
@@ -50,6 +57,8 @@ const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
       onPress();
     }
   };
+
+  const displayDesc = description || defaultDesc;
 
   return (
     <Card
@@ -72,6 +81,7 @@ const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
         </View>
 
         <Text style={[styles.statusText, { color }]}>{status}</Text>
+        <Text style={styles.descText}>{displayDesc}</Text>
 
         {isExpanded && (
           <View style={styles.expandedContent}>
@@ -80,27 +90,31 @@ const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
             </Text>
 
             <View style={styles.recommendationItem}>
-              <View style={styles.iconContainer}>
+              <View style={[styles.iconContainer, { backgroundColor: color }]}>
                 <Text style={styles.iconText}>😷</Text>
               </View>
               <Text style={styles.recommendationText}>
-                Người già, trẻ em, người có bệnh hô hấp nên hạn chế ra ngoài
+                {aqi > 100 
+                  ? "Nên đeo khẩu trang chống bụi mịn khi ra ngoài." 
+                  : "Không cần khẩu trang chuyên dụng."}
               </Text>
             </View>
 
             <View style={styles.recommendationItem}>
-              <View style={styles.iconContainer}>
-                <Text style={styles.iconText}>😷</Text>
+              <View style={[styles.iconContainer, { backgroundColor: color }]}>
+                <Text style={styles.iconText}>🏠</Text>
               </View>
               <Text style={styles.recommendationText}>
-                Đeo khẩu trang chống bụi mịn khi ra ngoài
+                {aqi > 150 
+                  ? "Nên đóng kín cửa sổ và hạn chế ra ngoài." 
+                  : "Mở cửa sổ để không khí lưu thông."}
               </Text>
             </View>
 
             <Button
               mode="contained"
               onPress={handleDetailPress}
-              style={styles.detailButton}
+              style={[styles.detailButton, { backgroundColor: color }]}
               labelStyle={styles.detailButtonLabel}
               contentStyle={styles.detailButtonContent}
             >
@@ -124,9 +138,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
-    alignSelf: "stretch",
-    flexShrink: 1,
-    transform: [{ scale: 1 }],
   },
   cardExpanded: {
     elevation: 6,
@@ -146,59 +157,53 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     flex: 1,
+    paddingRight: 10,
   },
   locationText: {
     ...typography.h2,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#0A0A0A",
-    lineHeight: 26,
-    letterSpacing: -0.4,
   },
   cityText: {
     ...typography.body,
-    fontSize: 15,
+    fontSize: 14,
     color: "#666",
     fontWeight: "600",
-    letterSpacing: -0.1,
   },
   aqiContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 70,
+    minWidth: 65,
     backgroundColor: "#fff",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   aqiText: {
     ...typography.h1,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "900",
-    lineHeight: 32,
-    letterSpacing: -0.6,
   },
   aqiLabel: {
     ...typography.small,
     fontSize: 10,
     color: "#666",
     fontWeight: "700",
-    letterSpacing: 1.0,
-    textTransform: "uppercase",
   },
   statusText: {
     ...typography.h3,
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: "800",
     marginTop: 8,
-    letterSpacing: -0.2,
+    textTransform: "uppercase",
+  },
+  descText: {
+    ...typography.body,
+    fontSize: 14,
+    color: "#555",
+    marginTop: 4,
   },
   expandedContent: {
     marginTop: 16,
@@ -208,56 +213,46 @@ const styles = StyleSheet.create({
   },
   recommendationTitle: {
     ...typography.h3,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
-    color: "#0A0A0A",
-    marginBottom: 16,
-    letterSpacing: -0.3,
+    marginBottom: 12,
   },
   recommendationItem: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-    paddingVertical: 4,
+    alignItems: "center",
+    marginBottom: 10,
   },
   iconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FFA726",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   iconText: {
-    fontSize: 12,
+    fontSize: 14,
   },
   recommendationText: {
     ...typography.body,
     flex: 1,
     fontSize: 14,
-    color: "#0A0A0A",
-    lineHeight: 20,
-    letterSpacing: -0.1,
+    color: "#333",
   },
   detailButton: {
     alignSelf: "flex-end",
-    marginTop: 20,
-    marginBottom: 4,
-    backgroundColor: "#007AFF",
+    marginTop: 15,
     borderRadius: 20,
-    elevation: 2,
   },
   detailButtonContent: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    height: 36,
   },
   detailButtonLabel: {
     ...typography.h3,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "700",
     color: "#fff",
-    letterSpacing: -0.2,
   },
 });
 
