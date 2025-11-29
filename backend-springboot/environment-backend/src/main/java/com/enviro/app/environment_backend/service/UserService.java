@@ -4,16 +4,14 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.UUID; // Sử dụng UUID
 
 import org.springframework.http.HttpStatus;
-// 1. THÊM IMPORT SECURITY
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Thêm các DTO và Model cần thiết
 import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
 import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
@@ -22,6 +20,7 @@ import com.enviro.app.environment_backend.model.NotificationSettings;
 import com.enviro.app.environment_backend.model.Report;
 import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
+// Thêm các Repository cần thiết
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
@@ -33,19 +32,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
     private final SavedLocationRepository savedLocationRepository;
+    // THÊM: Repository còn thiếu
     private final NotificationSettingsRepository notificationSettingsRepository;
 
+    // CẬP NHẬT: Hàm khởi tạo (Constructor)
     public UserService(UserRepository userRepository, 
                       ReportRepository reportRepository,
                       SavedLocationRepository savedLocationRepository,
-                      NotificationSettingsRepository notificationSettingsRepository) {
+                      NotificationSettingsRepository notificationSettingsRepository) { // THÊM
         this.userRepository = userRepository;
         this.reportRepository = reportRepository;
         this.savedLocationRepository = savedLocationRepository;
-        this.notificationSettingsRepository = notificationSettingsRepository;
+        this.notificationSettingsRepository = notificationSettingsRepository; // THÊM
     }
 
-    public Optional<User> findById(UUID id) {
+    public Optional<User> findById(UUID id) { // SỬA: Dùng UUID
         return userRepository.findById(id);
     }
 
@@ -53,12 +54,13 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    // Cần phương thức này cho AuthController
     public User save(User user) {
         return userRepository.save(user);
     }
 
     @Transactional
-    public User updateUserProfile(UUID userId, UpdateProfileRequest request) {
+    public User updateUserProfile(UUID userId, UpdateProfileRequest request) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
@@ -89,14 +91,14 @@ public class UserService {
     }
     
     @Transactional
-    public void deleteUser(UUID userId) {
+    public void deleteUser(UUID userId) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
         userRepository.delete(user);
     }
     
-    public UserStatisticsResponse getUserStatistics(UUID userId) {
+    public UserStatisticsResponse getUserStatistics(UUID userId) { // SỬA: Dùng UUID
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
@@ -115,6 +117,7 @@ public class UserService {
                 .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
                 .sum();
         
+        // SỬA: Dùng @Builder (vì DTO UserStatisticsResponse không có setters)
         return UserStatisticsResponse.builder()
                 .totalReports(totalReports)
                 .reportsReceived(reportsReceived)
@@ -127,10 +130,13 @@ public class UserService {
                 .build();
     }
 
-    public NotificationSettingsResponse getNotificationSettings(UUID userId) {
+    // --- THÊM: Các phương thức bị thiếu (đã cập nhật) ---
+
+    public NotificationSettingsResponse getNotificationSettings(UUID userId) { // SỬA: Dùng UUID
         NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
         
+        // SỬA: Dùng tên trường mới (ví dụ: getAqiAlertEnabled)
         return NotificationSettingsResponse.builder()
             .aqiAlertEnabled(settings.getAqiAlertEnabled())
             .aqiThreshold(settings.getAqiThreshold())
@@ -143,10 +149,11 @@ public class UserService {
     }
 
     @Transactional
-    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) {
+    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { // SỬA: Dùng UUID
         NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
         
+        // SỬA: Dùng tên trường mới (ví dụ: setAqiAlertEnabled)
         if (request.getAqiAlertEnabled() != null) {
             settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
         }
@@ -180,20 +187,5 @@ public class UserService {
             .badgeNotificationsEnabled(updatedSettings.getBadgeNotificationsEnabled())
             .reportStatusNotificationsEnabled(updatedSettings.getReportStatusNotificationsEnabled())
             .build();
-    }
-
-    // 2. THÊM PHƯƠNG THỨC MỚI NÀY ĐỂ SỬA LỖI
-    /**
-     * Lấy User hiện tại đang đăng nhập từ Security Context.
-     * Trả về null nếu không có ai đăng nhập hoặc không tìm thấy user.
-     */
-    public User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-        String email = authentication.getName();
-        // Tìm user theo email lấy được từ token
-        return userRepository.findByEmail(email).orElse(null);
     }
 }
