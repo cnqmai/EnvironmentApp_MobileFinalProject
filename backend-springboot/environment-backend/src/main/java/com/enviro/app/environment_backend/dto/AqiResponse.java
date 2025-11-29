@@ -1,35 +1,25 @@
 package com.enviro.app.environment_backend.dto;
 
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import java.util.Map;
 
-/**
- * DTO trả về dữ liệu AQI (Chỉ số Chất lượng Không khí) cho client.
- */
-@Value // Dùng @Value để tạo lớp bất biến (immutable)
-@Builder // Dùng Builder Pattern để dễ dàng tạo đối tượng trong Service
+@Data
+@Builder
 public class AqiResponse {
+    // 1. Dữ liệu tính toán (Thang 0-500)
+    private int calculatedAqiValue; // Mới: Giá trị AQI đã tính theo chuẩn Mỹ (0-500)
 
-    // --- Thông tin chung ---
-    int aqiValue; // Chỉ số AQI chính
-    String status; // Ví dụ: "Good", "Moderate", "Unhealthy"
-    String dominantPollutant; // Chất gây ô nhiễm chính (Ví dụ: PM2.5, O3)
+    // 2. Dữ liệu gốc và cơ bản
+    private int owmAqiValue; // Gốc: Giá trị AQI OWM (1-5)
+    private String status;
+    private String dominantPollutant;
+    private double latitude;
+    private double longitude;
+    private String city;
+    private String timeObservation;
+    private String healthAdvisory;
     
-    // --- Thông tin địa lý ---
-    double latitude;
-    double longitude;
-    String city; 
-    
-    // --- Thông tin sức khỏe và thời gian ---
-    String healthAdvisory; // Lời khuyên sức khỏe dựa trên AQI
-    String timeObservation; // Thời gian quan sát dữ liệu (Ví dụ: "2025-10-10T14:00:00Z")
-
-    // --- Dữ liệu chi tiết về các chất ô nhiễm (tùy chọn) ---
-    // double pm25;
-    // double o3;
-
-    // Explicit getter to avoid reliance on Lombok in IDE
-    public int getAqiValue() {
-        return aqiValue;
-    }
+    // 3. Toàn bộ dữ liệu nồng độ chi tiết
+    private Map<String, Double> components; 
 }

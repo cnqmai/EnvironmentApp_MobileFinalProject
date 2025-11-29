@@ -94,7 +94,7 @@ const MenuItem = ({ icon, text, onPress }) => (
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 0.84,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     margin: 0,
     position: "absolute",
-    bottom: 120, 
+    bottom: 100, 
     right: 20,
     width: 250,
   },

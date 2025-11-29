@@ -67,21 +67,25 @@ public class AqiController {
     public ResponseEntity<AqiAlertResponse> checkAqiAlert(@Valid @RequestBody AqiAlertRequest request) {
         AqiResponse currentAqi = aqiService.getCurrentAqiByGps(request.getLatitude(), request.getLongitude());
 
-        if (currentAqi == null || currentAqi.getAqiValue() < 0) {
+        // FIX 1: Đổi getAqiValue() sang getCalculatedAqiValue()
+        if (currentAqi == null || currentAqi.getCalculatedAqiValue() < 0) { 
             AqiAlertResponse response = new AqiAlertResponse(false, -1, request.getThreshold(), "Không thể lấy dữ liệu AQI.");
             return ResponseEntity.ok(response);
         }
 
         int mappedAqiThreshold = mapThresholdLevelToAqi(request.getThreshold());
-        boolean shouldAlert = currentAqi.getAqiValue() > mappedAqiThreshold;
+        // FIX 2: Đổi getAqiValue() sang getCalculatedAqiValue()
+        boolean shouldAlert = currentAqi.getCalculatedAqiValue() > mappedAqiThreshold; 
         String message = shouldAlert
-                ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getAqiValue() + ") đã vượt ngưỡng an toàn."
+                // FIX 3: Đổi getAqiValue() sang getCalculatedAqiValue() trong chuỗi thông báo
+                ? "Cảnh báo! Chỉ số AQI hiện tại (" + currentAqi.getCalculatedAqiValue() + ") đã vượt ngưỡng an toàn."
                 : "Chất lượng không khí đang trong ngưỡng an toàn.";
 
-        return ResponseEntity.ok(new AqiAlertResponse(shouldAlert, currentAqi.getAqiValue(), request.getThreshold(), message));
+        return ResponseEntity.ok(new AqiAlertResponse(shouldAlert, currentAqi.getCalculatedAqiValue(), request.getThreshold(), message));
     }
 
     private int mapThresholdLevelToAqi(int level) {
+        // Hàm này không cần sửa
         return switch (Math.max(1, Math.min(level, 5))) {
             case 1 -> 50;
             case 2 -> 100;

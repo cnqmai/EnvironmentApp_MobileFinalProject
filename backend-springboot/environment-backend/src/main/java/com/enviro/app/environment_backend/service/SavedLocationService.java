@@ -47,7 +47,7 @@ public class SavedLocationService {
     }
 
     /**
-     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile
+     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile (ĐÃ SỬA LỖI COMPILATION)
      */
     public List<SavedLocationAqiResponse> getAqiForAllSavedLocations(UUID userId) {
         List<SavedLocationAqiResponse> responseList = new ArrayList<>();
@@ -71,12 +71,13 @@ public class SavedLocationService {
                         .locationName(address + " (Mặc định)")
                         .latitude(coords.getLat())
                         .longitude(coords.getLon())
-                        .aqiValue(aqiData.getAqiValue())
+                        .aqiValue(aqiData.getCalculatedAqiValue())
                         .status(aqiData.getStatus())
                         .dominantPollutant(aqiData.getDominantPollutant())
                         .healthAdvisory(aqiData.getHealthAdvisory())
                         .timeObservation(aqiData.getTimeObservation())
                         .resolvedCityName(aqiData.getCity())
+                        .components(aqiData.getComponents())
                         .build());
                 }
             }
@@ -96,12 +97,13 @@ public class SavedLocationService {
                 .locationName(location.getName())
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
-                .aqiValue(aqiData != null ? aqiData.getAqiValue() : -1)
+                .aqiValue(aqiData != null ? aqiData.getCalculatedAqiValue() : -1)
                 .status(aqiData != null ? aqiData.getStatus() : "N/A")
                 .dominantPollutant(aqiData != null ? aqiData.getDominantPollutant() : "N/A")
                 .healthAdvisory(aqiData != null ? aqiData.getHealthAdvisory() : "Không thể lấy dữ liệu.")
                 .timeObservation(aqiData != null ? aqiData.getTimeObservation() : "N/A")
                 .resolvedCityName(aqiData != null ? aqiData.getCity() : location.getName())
+                .components(aqiData != null ? aqiData.getComponents() : null)
                 .build();
         }).collect(Collectors.toList());
 
