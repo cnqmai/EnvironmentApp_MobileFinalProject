@@ -87,6 +87,30 @@ export default function RootLayout() {
             name="settings/user-guide"
             options={{ headerShown: false, title: "Hướng dẫn sử dụng" }}
           />
+          <Stack.Screen
+            name="community/index"
+            options={{ headerShown: false, title: "Cộng đồng" }}
+          />
+          <Stack.Screen
+            name="community/create-post"
+            options={{ headerShown: false, title: "Tạo bài viết" }}
+          />
+          <Stack.Screen
+            name="community/[id]"
+            options={{ headerShown: false, title: "Chỉnh sửa bài viết" }}
+          />
+          <Stack.Screen
+            name="community/post/[id]"
+            options={{ headerShown: false, title: "Chi tiết bài viết" }}
+          />
+          <Stack.Screen
+            name="community/[id]/events"
+            options={{ headerShown: false, title: "Sự kiện cộng đồng" }}
+          />
+          <Stack.Screen
+            name="community/[id]/events/[eventId]"
+            options={{ headerShown: false, title: "Chi tiết sự kiện" }}
+          />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>

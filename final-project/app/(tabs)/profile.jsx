@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
 
 const ProfileScreen = () => {
@@ -218,6 +218,85 @@ const ProfileScreen = () => {
                 color="#0A0A0A"
               />
               <Text style={styles.statText}>8 câu hỏi chatbot</Text>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Phân loại rác</Text>
+            <Text style={styles.sectionSubtitle}>Tháng 11, 2025</Text>
+
+            <View style={styles.chartContainer}>
+              <View style={styles.chartLegend}>
+                <View style={styles.legendItem}>
+                  <View
+                    style={[styles.legendDot, { backgroundColor: "#E3F2FD" }]}
+                  />
+                  <Text style={styles.legendText}>Trung bình</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View
+                    style={[styles.legendDot, { backgroundColor: "#007AFF" }]}
+                  />
+                  <Text style={styles.legendText}>Hôm nay (30)</Text>
+                </View>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chartScrollView}
+                contentContainerStyle={styles.chartBars}
+              >
+                {Array.from({ length: 30 }, (_, i) => {
+                  const day = i + 1;
+                  const isToday = day === 30;
+                  const height = isToday
+                    ? "90%"
+                    : `${Math.floor(Math.random() * 40 + 40)}%`;
+
+                  return (
+                    <View key={day} style={styles.barGroup}>
+                      <View style={styles.barContainer}>
+                        <View
+                          style={[
+                            styles.bar,
+                            isToday ? styles.barDark : styles.barLight,
+                            { height },
+                          ]}
+                        />
+                        {isToday && <View style={styles.chartDot} />}
+                      </View>
+                      <Text
+                        style={[
+                          styles.barLabel,
+                          isToday && styles.barLabelActive,
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+
+          <View style={styles.badgeSection}>
+            <Text style={styles.sectionTitle}>Huy hiệu của bạn</Text>
+
+            <View style={styles.badgeCard}>
+              <View style={styles.badgeIconContainer}>
+                <MaterialCommunityIcons
+                  name="shield-star"
+                  size={48}
+                  color="#FFFFFF"
+                />
+              </View>
+              <View style={styles.badgeContent}>
+                <Text style={styles.badgeTitle}>Cảnh sát môi trường</Text>
+                <Text style={styles.badgeDescription}>10 báo cáo</Text>
+              </View>
+              <MaterialCommunityIcons name="medal" size={32} color="#F0EFED" />
             </View>
           </View>
         </ScrollView>
@@ -485,6 +564,159 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     letterSpacing: -0.2,
+  },
+
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0A0A0A",
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  sectionSubtitle: {
+    ...typography.body,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+    marginBottom: 20,
+  },
+
+  chartContainer: {
+    marginTop: 10,
+  },
+  chartLegend: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 20,
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    ...typography.small,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#666",
+  },
+  chartScrollView: {
+    flexGrow: 0,
+  },
+  chartBars: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+    paddingTop: 16,
+    gap: 4,
+  },
+  barGroup: {
+    alignItems: "center",
+  },
+  barContainer: {
+    width: 32,
+    height: 150,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    position: "relative",
+  },
+  bar: {
+    width: "100%",
+    borderRadius: 8,
+  },
+  barLight: {
+    backgroundColor: "#E3F2FD",
+  },
+  barDark: {
+    backgroundColor: "#007AFF",
+  },
+  chartDot: {
+    position: "absolute",
+    top: -6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#007AFF",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  barLabel: {
+    ...typography.body,
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#999",
+    marginTop: 8,
+  },
+  barLabelActive: {
+    fontWeight: "700",
+    color: "#0A0A0A",
+  },
+
+  badgeSection: {
+    marginHorizontal: 20,
+    marginBottom: 30,
+  },
+  badgeCard: {
+    flexDirection: "row",
+    backgroundColor: "#34C759",
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    marginTop: 12,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  badgeIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  badgeContent: {
+    flex: 1,
+  },
+  badgeTitle: {
+    ...typography.h3,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  badgeDescription: {
+    ...typography.body,
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#FFFFFF",
+    opacity: 0.9,
   },
 
   guestHeader: {
