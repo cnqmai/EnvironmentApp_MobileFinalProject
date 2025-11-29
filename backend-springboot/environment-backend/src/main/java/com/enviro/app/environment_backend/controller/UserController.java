@@ -1,5 +1,8 @@
 package com.enviro.app.environment_backend.controller;
 
+import com.enviro.app.environment_backend.dto.DeleteAccountRequest;
+import com.enviro.app.environment_backend.dto.PrivacySettingsRequest;
+import com.enviro.app.environment_backend.dto.PrivacySettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
 import com.enviro.app.environment_backend.dto.UploadResponse;
 import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
@@ -64,9 +67,13 @@ public class UserController {
     }
     
     @DeleteMapping("/me")
-    public ResponseEntity<String> deleteMyAccount() {
+    public ResponseEntity<String> deleteMyAccount(
+        // Cần body để gửi mật khẩu xác nhận
+        @RequestBody DeleteAccountRequest request
+    ) {
         User currentUser = getCurrentUser();
-        userService.deleteUser(currentUser.getId());
+        // Gọi service mới đã được cập nhật logic kiểm tra mật khẩu
+        userService.deleteUserAccount(currentUser.getId(), request); 
         return ResponseEntity.ok("Tài khoản đã được xóa thành công.");
     }
     
@@ -75,5 +82,27 @@ public class UserController {
         User currentUser = getCurrentUser();
         UserStatisticsResponse statistics = userService.getUserStatistics(currentUser.getId());
         return ResponseEntity.ok(statistics);
+    }
+
+    /**
+     * API LẤY CÀI ĐẶT RIÊNG TƯ
+     * GET /api/users/me/privacy
+     */
+    @GetMapping("/me/privacy")
+    public ResponseEntity<PrivacySettingsResponse> getMyPrivacySettings() {
+        User currentUser = getCurrentUser();
+        PrivacySettingsResponse settings = userService.getPrivacySettings(currentUser.getId());
+        return ResponseEntity.ok(settings);
+    }
+
+    /**
+     * API CẬP NHẬT CÀI ĐẶT RIÊNG TƯ
+     * PUT /api/users/me/privacy
+     */
+    @PutMapping("/me/privacy")
+    public ResponseEntity<PrivacySettingsResponse> updateMyPrivacySettings(@RequestBody PrivacySettingsRequest request) {
+        User currentUser = getCurrentUser();
+        PrivacySettingsResponse updatedSettings = userService.updatePrivacySettings(currentUser.getId(), request);
+        return ResponseEntity.ok(updatedSettings);
     }
 }

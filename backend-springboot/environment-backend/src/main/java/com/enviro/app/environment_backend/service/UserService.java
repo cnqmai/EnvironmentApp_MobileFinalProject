@@ -11,15 +11,19 @@ import java.nio.file.Paths;
 import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.enviro.app.environment_backend.dto.DeleteAccountRequest;
 // Thêm các DTO và Model cần thiết
 import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
 import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
+import com.enviro.app.environment_backend.dto.PrivacySettingsRequest;
+import com.enviro.app.environment_backend.dto.PrivacySettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
 import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
 import com.enviro.app.environment_backend.model.NotificationSettings;
@@ -30,6 +34,7 @@ import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
+import com.enviro.app.environment_backend.repository.UserBadgeRepository;
 import com.enviro.app.environment_backend.repository.UserRepository;
 
 @Service
@@ -39,6 +44,8 @@ public class UserService {
     private final ReportRepository reportRepository;
     private final SavedLocationRepository savedLocationRepository;
     private final NotificationSettingsRepository notificationSettingsRepository;
+    private final UserBadgeRepository userBadgeRepository; // *** Cần inject ***
+    private final PasswordEncoder passwordEncoder;
     
     // Đường dẫn upload (được inject từ application.properties)
     @Value("${app.upload.dir:uploads}")
@@ -48,11 +55,15 @@ public class UserService {
     public UserService(UserRepository userRepository, 
                       ReportRepository reportRepository,
                       SavedLocationRepository savedLocationRepository,
-                      NotificationSettingsRepository notificationSettingsRepository) { // THÊM
+                      NotificationSettingsRepository notificationSettingsRepository,
+                      UserBadgeRepository userBadgeRepository, // *** THÊM ***
+                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.reportRepository = reportRepository;
         this.savedLocationRepository = savedLocationRepository;
-        this.notificationSettingsRepository = notificationSettingsRepository; // THÊM
+        this.notificationSettingsRepository = notificationSettingsRepository;
+        this.userBadgeRepository = userBadgeRepository; // Gán
+        this.passwordEncoder = passwordEncoder;
     }
 
     public Optional<User> findById(UUID id) { // SỬA: Dùng UUID
@@ -233,5 +244,77 @@ public class UserService {
             .badgeNotificationsEnabled(updatedSettings.getBadgeNotificationsEnabled())
             .reportStatusNotificationsEnabled(updatedSettings.getReportStatusNotificationsEnabled())
             .build();
+    }
+
+    /**
+     * Lấy cài đặt Quyền riêng tư của người dùng.
+     */
+    public PrivacySettingsResponse getPrivacySettings(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        // Giả định bạn đã tạo PrivacySettingsResponse DTO
+        return PrivacySettingsResponse.builder()
+                .userId(user.getId())
+                .sharePersonalData(user.isSharePersonalData()) // Giả sử Lombok tạo isSharePersonalData()
+                .shareLocation(user.isShareLocation())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * Cập nhật cài đặt Quyền riêng tư.
+     */
+    @Transactional
+    public PrivacySettingsResponse updatePrivacySettings(UUID userId, PrivacySettingsRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        if (request.getSharePersonalData() != null) {
+            user.setSharePersonalData(request.getSharePersonalData());
+        }
+        if (request.getShareLocation() != null) {
+            user.setShareLocation(request.getShareLocation());
+        }
+
+        User updatedUser = userRepository.save(user);
+
+        return PrivacySettingsResponse.builder()
+                .userId(updatedUser.getId())
+                .sharePersonalData(updatedUser.isSharePersonalData())
+                .shareLocation(updatedUser.isShareLocation())
+                .updatedAt(updatedUser.getUpdatedAt())
+                .build();
+    }
+    
+    /**
+     * Xóa tài khoản và tất cả dữ liệu liên quan.
+     */
+    @Transactional
+    public void deleteUserAccount(UUID userId, DeleteAccountRequest request) { 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+        
+        // 1. Kiểm tra mật khẩu
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mật khẩu không chính xác.");
+        }
+        
+        // 2. Kiểm tra chuỗi xác nhận (từ delete-account.jsx)
+        if (!"xoataikhoan".equals(request.getConfirmationText())) {
+             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chuỗi xác nhận không đúng.");
+        }
+        
+        // 3. Xóa dữ liệu liên quan: QUAN TRỌNG!
+        // Xóa các bản ghi liên quan đến user trước (CASCADE DELETE)
+        
+        // * Giả định các Repository có phương thức deleteBy... (Nếu không, phải dùng Query trong Repository)
+        reportRepository.deleteByUser(user);
+        savedLocationRepository.deleteByUserId(userId);
+        notificationSettingsRepository.deleteByUser(user);
+        userBadgeRepository.deleteByUser(user); // Xóa Badge đã đạt được
+        
+        // 4. Xóa bản ghi User cuối cùng
+        userRepository.delete(user);
     }
 }

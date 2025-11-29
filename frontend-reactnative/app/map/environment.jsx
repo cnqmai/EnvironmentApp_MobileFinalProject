@@ -46,7 +46,8 @@ const EnvironmentDataScreen = () => {
   // State chung
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false); 
-  
+  const [privacySettings, setPrivacySettings] = useState(null);
+
   // --- LOGIC GỢI Ý TÌM KIẾM ---
   const fetchSuggestions = async (query) => {
     if (query.length < 3) {
@@ -95,26 +96,51 @@ const EnvironmentDataScreen = () => {
 
   // --- HÀM 1: LẤY DỮ LIỆU VỊ TRÍ HIỆN TẠI (GPS) ---
   const fetchCurrentLocationData = async () => {
-    try {
-        setLoading(true);
-        const { lat, lon } = await getUserLocation(); 
-        
-        const [aqiRes, noiseRes, waterRes] = await Promise.all([
-            axios.get(`${BASE_URL}/aqi`, { params: { lat, lon } }),
-            axios.get(`${BASE_URL}/environmental-data/noise`, { params: { lat, lon } }),
-            axios.get(`${BASE_URL}/environmental-data/water`, { params: { lat, lon } }),
-        ]);
+    try {
+        setLoading(true);
 
-        setCurrentAqi(aqiRes.data);
-        setCurrentNoise(noiseRes.data);
-        setCurrentWater(waterRes.data);
+        // 1. Lấy cài đặt Quyền riêng tư
+        const privacyRes = await getPrivacySettings();
+        setPrivacySettings(privacyRes); 
 
-    } catch (e) {
-        console.error("Lỗi khi lấy dữ liệu GPS:", e);
-    } finally {
-        setLoading(false);
-    }
-  };
+        // 2. Lấy tọa độ GPS thật
+        const { lat, lon } = await getUserLocation(); 
+        let finalLat = lat;
+        let finalLon = lon;
+        let isLocationShared = true; // Biến cờ
+
+        // 3. KIỂM TRA QUYỀN RIÊNG TƯ (FR-7.3)
+        if (!privacyRes.shareLocation) { 
+            console.warn("Location sharing is disabled. Using default coordinates.");
+            // Sử dụng tọa độ mặc định (ví dụ: trung tâm khu vực) để lấy dữ liệu chung
+            finalLat = 10.762622; // TP. HCM
+            finalLon = 106.660172; 
+            isLocationShared = false;
+        }
+        
+        // 4. Gọi API với tọa độ đã được kiểm tra/mặc định
+        const [aqiRes, noiseRes, waterRes] = await Promise.all([
+            axios.get(`${BASE_URL}/aqi`, { params: { lat: finalLat, lon: finalLon } }),
+            axios.get(`${BASE_BASE}/environmental-data/noise`, { params: { lat: finalLat, lon: finalLon } }),
+            axios.get(`${BASE_BASE}/environmental-data/water`, { params: { lat: finalLat, lon: finalLon } }),
+        ]);
+
+        // 5. Cập nhật state (có thể thêm cờ vào state nếu muốn hiển thị thông báo)
+        setCurrentAqi(aqiRes.data);
+        setCurrentNoise(noiseRes.data);
+        setCurrentWater(waterRes.data);
+
+        // Hiển thị cảnh báo UX nếu vị trí bị buộc về mặc định
+        if (!isLocationShared) {
+             Alert.alert("Lưu ý", "Dữ liệu môi trường đang hiển thị cho vị trí chung vì bạn đã tắt 'Chia sẻ vị trí' trong Cài đặt Quyền riêng tư.");
+        }
+
+    } catch (e) {
+        console.error("Lỗi khi lấy dữ liệu GPS:", e);
+    } finally {
+        setLoading(false);
+    }
+  };
 
   // --- HÀM 2: LẤY DỮ LIỆU CHO MỘT TỌA ĐỘ CỤ THỂ ---
   const fetchAreaDetails = async (lat, lon, name) => {

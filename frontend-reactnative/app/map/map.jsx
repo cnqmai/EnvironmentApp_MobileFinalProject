@@ -13,8 +13,13 @@ import axios from 'axios'; // Import axios
 import { API_BASE_URL } from '../../src/constants/api'; // Import BASE_URL
 import { getAqiStatusText, getAqiColor } from '../../src/utils/aqiUtils'; // Import helper AQI
 
+import { getPrivacySettings } from '../../src/services/userService';
 // Khai báo lại BASE_URL
 const BASE_URL = API_BASE_URL;
+
+// --- DÙNG TỌA ĐỘ MẶC ĐỊNH NẾU CHIA SẺ VỊ TRÍ TẮT (VD: Trung tâm TP.HCM) ---
+const DEFAULT_LAT = 10.762622;
+const DEFAULT_LON = 106.660172;
 
 // --- HÀM MAPPING DÙNG CHUNG (Giữ nguyên) ---
 const mapVietnameseToEnum = (name) => {
@@ -61,6 +66,7 @@ const MapScreen = () => {
   const [loadingMapData, setLoadingMapData] = useState(false);
 
   const [aqiData, setAqiData] = useState({ aqi: '...', status: '(Đang tải)' });
+  const [shareLocationEnabled, setShareLocationEnabled] = useState(true);
 
   const [pickedLocation, setPickedLocation] = useState(
     params.initialLat && params.initialLng 
@@ -77,74 +83,99 @@ const MapScreen = () => {
     longitudeDelta: 0.0421,
   });
 
-  // --- HÀM FETCH AQI ---
-  const fetchAqiData = async (lat, lon) => {
-    try {
-        const response = await axios.get(`${BASE_URL}/aqi`, {
-            params: { lat, lon }
-        });
-        const calculatedAqi = response.data.calculatedAqiValue;
-        setAqiData({
-            aqi: calculatedAqi,
-            status: getAqiStatusText(calculatedAqi)
-        });
-    } catch (e) {
-        console.error("Lỗi tải AQI:", e);
-        setAqiData({ aqi: 'N/A', status: '(Không tải được)' });
-    }
-  };
+  // --- HÀM FETCH AQI (Cập nhật để chấp nhận tọa độ mặc định) ---
+  const fetchAqiData = async (lat, lon) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/aqi`, {
+            params: { lat, lon }
+        });
+        const calculatedAqi = response.data.calculatedAqiValue;
+        setAqiData({
+            aqi: calculatedAqi,
+            status: getAqiStatusText(calculatedAqi)
+        });
+    } catch (e) {
+        console.error("Lỗi tải AQI:", e);
+        setAqiData({ aqi: 'N/A', status: '(Không tải được)' });
+    }
+  };
 
-  // --- LOGIC GPS & FETCH DATA ---
-  const fetchMapData = async (lat, lon, type) => {
-    setLoadingMapData(true);
-    try {
-        const [points, categories] = await Promise.all([
-            getCollectionPoints(lat, lon, type),
-            getWasteCategories(), 
-        ]);
-        
-        setCollectionPoints(points);
-        
-        const mappedCategories = categories.map(cat => ({
-            id: cat.id, 
-            name: cat.name, 
-            type: mapVietnameseToEnum(cat.name),
-        }));
+  // --- LOGIC GPS & FETCH DATA (Cập nhật để kiểm tra Quyền riêng tư) ---
+  const fetchMapData = async (lat, lon, type) => {
+    setLoadingMapData(true);
+    try {
+        const [points, categories] = await Promise.all([
+            getCollectionPoints(lat, lon, type),
+            getWasteCategories(), 
+        ]);
+        
+        setCollectionPoints(points);
+        
+        const mappedCategories = categories.map(cat => ({
+            id: cat.id, 
+            name: cat.name, 
+            type: mapVietnameseToEnum(cat.name),
+        }));
 
-        setWasteCategories([{ id: 0, name: 'Tất cả', type: 'ALL' }, ...mappedCategories]);
+        setWasteCategories([{ id: 0, name: 'Tất cả', type: 'ALL' }, ...mappedCategories]);
 
-    } catch (e) {
-        Alert.alert("Lỗi tải dữ liệu", "Không thể tải điểm thu gom.");
-        console.error("Map Data Fetch Error:", e);
-    } finally {
-        setLoadingMapData(false);
-    }
-  };
+    } catch (e) {
+        Alert.alert("Lỗi tải dữ liệu", "Không thể tải điểm thu gom.");
+        console.error("Map Data Fetch Error:", e);
+    } finally {
+        setLoadingMapData(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      let currentLocation = await Location.getCurrentPositionAsync({});
-      setCurrentLocation(currentLocation);
-      const lat = currentLocation.coords.latitude;
-      const lon = currentLocation.coords.longitude;
+    (async () => {
+      // 1. Lấy cài đặt Quyền riêng tư
+      let privacySettings = await getPrivacySettings();
+      // Backend trả về share_location (snake_case)
+      let isLocationShared = privacySettings.share_location; 
+      setShareLocationEnabled(isLocationShared);
 
-      if (!params.initialLat && mapRef.current) {
-        mapRef.current.animateToRegion({ latitude: lat, longitude: lon, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+      let lat = DEFAULT_LAT;
+      let lon = DEFAULT_LON;
+      
+      // 2. Lấy vị trí GPS nếu được phép
+      if (isLocationShared) {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          let userLoc = await Location.getCurrentPositionAsync({});
+          setCurrentLocation(userLoc);
+          lat = userLoc.coords.latitude;
+          lon = userLoc.coords.longitude;
+        } else {
+            // Nếu người dùng tắt quyền hệ thống, ta vẫn phải dùng mặc định
+            isLocationShared = false;
+        }
       }
+      
+      // 3. Cập nhật map region và fetch data
+      if (!params.initialLat && mapRef.current) {
+        mapRef.current.animateToRegion({ latitude: lat, longitude: lon, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+      }
 
-      fetchMapData(lat, lon, activeFilterType);
-      fetchAqiData(lat, lon);
-    })();
-  }, []);
+      fetchMapData(lat, lon, activeFilterType);
+      
+      // 4. Fetch AQI
+      if (isLocationShared) {
+        fetchAqiData(lat, lon); 
+      } else {
+        // AQI: Hiển thị placeholder nếu không được chia sẻ
+        setAqiData({ aqi: 'N/A', status: '(Riêng tư)' });
+      }
+    })();
+  }, []);
 
   // Re-fetch khi activeFilterType thay đổi (do bấm Chip)
-  useEffect(() => {
-    if (currentLocation) {
-        fetchMapData(currentLocation.coords.latitude, currentLocation.coords.longitude, activeFilterType);
-    }
-  }, [activeFilterType]); 
+  useEffect(() => {
+    // Nếu quyền chia sẻ vị trí bị tắt, không cần fetch lại với GPS thật
+    if (currentLocation && shareLocationEnabled) {
+        fetchMapData(currentLocation.coords.latitude, currentLocation.coords.longitude, activeFilterType);
+    }
+  }, [activeFilterType]);
 
 
   const handleMapPress = (e) => {
@@ -191,7 +222,10 @@ const MapScreen = () => {
     setActiveFilterType(type);
   };
 
-  const environmentIconColor = aqiData.aqi !== 'N/A' && aqiData.aqi !== '...' ? getAqiColor(aqiData.aqi) : '#E3F2FD';
+  // Màu icon môi trường phải dựa trên AQI chỉ khi nó được chia sẻ
+  const environmentIconColor = aqiData.aqi !== 'N/A' && aqiData.aqi !== '...' && shareLocationEnabled
+    ? getAqiColor(aqiData.aqi) 
+    : '#808080'; // Màu xám nếu tắt chia sẻ
 
   return (
     <View style={styles.container}>
@@ -200,7 +234,7 @@ const MapScreen = () => {
         style={styles.map}
         provider={PROVIDER_GOOGLE} 
         initialRegion={region}
-        showsUserLocation={true}
+        showsUserLocation={shareLocationEnabled}
         showsMyLocationButton={false} 
         onPress={handleMapPress} 
       >
@@ -353,7 +387,7 @@ const styles = StyleSheet.create({
   searchText: { color: '#666', fontSize: 16 },
   filterBtn: { borderLeftWidth: 1, borderLeftColor: '#EEE', paddingLeft: 10 },
   
-  chipsContainer: { flexDirection: 'row', marginTop: 12, paddingHorizontal: 20 },
+  chipsContainer: { flexDirection: 'row', marginTop: 12, paddingHorizontal: 10 },
   chip: { backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 10, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, borderWidth: 1, borderColor: '#DDD' },
   chipActive: { backgroundColor: '#00C853', borderColor: '#00C853' },
   chipText: { fontSize: 13, color: '#333', fontWeight: '500' },
