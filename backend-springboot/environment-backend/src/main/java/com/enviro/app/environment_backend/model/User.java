@@ -43,6 +43,9 @@ public class User {
     private LocalDate dateOfBirth;
 
     private String phoneNumber;
+    
+    @Column(name = "unread_notification_count", columnDefinition = "integer default 0")
+    private int unreadNotificationCount = 0; // Khởi tạo giá trị mặc định là 0
 
     @CreationTimestamp
     private OffsetDateTime createdAt;

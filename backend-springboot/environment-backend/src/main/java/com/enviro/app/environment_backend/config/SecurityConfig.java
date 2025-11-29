@@ -103,6 +103,9 @@ public class SecurityConfig {
 
                 // >>> 3. THÊM DÒNG NÀY: CHO PHÉP TRUY CẬP ẢNH UPLOAD <<<
                 .requestMatchers(mvc.pattern("/uploads/**")).permitAll()
+
+                .requestMatchers("/api/aqi/**").permitAll() 
+                .requestMatchers("/api/environmental-data/**").permitAll()
                 // ======================================================
                 
                 // 4. Cho phép trang lỗi

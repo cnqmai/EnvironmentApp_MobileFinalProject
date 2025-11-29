@@ -59,8 +59,10 @@ public class CollectionPointService {
      */
     public List<CollectionPointResponse> getNearbyCollectionPointsByType(
             double latitude, double longitude, double radiusKm, CollectionPointType type) {
+        
         List<WasteCollectionPoint> points = repository.findNearbyCollectionPointsByType(
-                latitude, longitude, radiusKm, type.name().toLowerCase());
+                latitude, longitude, radiusKm, type.name()); 
+                
         return points.stream()
                 .map(point -> mapToResponseWithDistance(point, latitude, longitude))
                 .collect(Collectors.toList());
