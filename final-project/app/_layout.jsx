@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
-import { Provider as PaperProvider, DefaultTheme } from "react-native-paper";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { DefaultTheme, Provider as PaperProvider } from "react-native-paper";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const theme = {
   ...DefaultTheme,
@@ -58,6 +58,34 @@ export default function RootLayout() {
           <Stack.Screen
             name="chat/chatbot-voice"
             options={{ headerShown: false, title: "Chatbot giọng nói" }}
+          />
+          <Stack.Screen
+            name="settings/history"
+            options={{ headerShown: false, title: "Lịch sử hoạt động" }}
+          />
+          <Stack.Screen
+            name="settings/notifications"
+            options={{ headerShown: false, title: "Thông báo" }}
+          />
+          <Stack.Screen
+            name="settings/policy"
+            options={{ headerShown: false, title: "Chính sách & Điều khoản" }}
+          />
+          <Stack.Screen
+            name="settings/privacy"
+            options={{ headerShown: false, title: "Quyền riêng tư" }}
+          />
+          <Stack.Screen
+            name="settings/help"
+            options={{ headerShown: false, title: "Trợ giúp" }}
+          />
+          <Stack.Screen
+            name="settings/delete-account"
+            options={{ headerShown: false, title: "Xóa tài khoản" }}
+          />
+          <Stack.Screen
+            name="settings/user-guide"
+            options={{ headerShown: false, title: "Hướng dẫn sử dụng" }}
           />
         </Stack>
       </PaperProvider>
