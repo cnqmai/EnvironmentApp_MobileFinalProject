@@ -40,6 +40,18 @@ export default function FeaturesLayout() {
         name="knowledge" 
         options={{ title: 'Thư viện kiến thức' }} 
       />
+      <Stack.Screen 
+        name="redeem-points" 
+        options={{ title: 'Đổi điểm lấy quà' }} 
+      />
+      <Stack.Screen 
+        name="reward-points" 
+        options={{ title: 'Điểm thưởng' }} 
+      />
+      <Stack.Screen 
+        name="badges" 
+        options={{ title: 'Huy hiệu' }} 
+      />
     </Stack>
   );
 }
