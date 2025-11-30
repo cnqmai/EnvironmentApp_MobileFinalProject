@@ -1,138 +1,121 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView, Alert } from 'react-native';
-import { getAllQuizzes, getQuizById, submitQuiz } from '../../src/services/quizService'; // Đảm bảo đường dẫn đúng
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const QuizScreen = () => {
-    const [quizzes, setQuizzes] = useState([]);
-    const [currentQuiz, setCurrentQuiz] = useState(null); // Quiz đang làm
-    const [answers, setAnswers] = useState({}); // Lưu câu trả lời { questionId: answerId }
-    const [modalVisible, setModalVisible] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
 
-    useEffect(() => {
-        loadQuizzes();
-    }, []);
+  const questionData = {
+    current: 1,
+    total: 2,
+    points: 10,
+    question: "Chai nhựa thuộc loại rác nào?",
+    options: [
+      { id: 'a', label: 'Rác hữu cơ' },
+      { id: 'b', label: 'Rác tái chế' }, // Đáp án đúng giả định
+      { id: 'c', label: 'Rác nguy hại' },
+      { id: 'd', label: 'Rác thải thông thường' },
+    ]
+  };
 
-    const loadQuizzes = async () => {
-        try {
-            const data = await getAllQuizzes();
-            setQuizzes(data);
-        } catch (error) {
-            console.error(error);
-        }
-    };
+  const handleNext = () => {
+    if (!selectedId) return;
+    Alert.alert("Kết quả", selectedId === 'b' ? "Chính xác! +10 điểm" : "Sai rồi, thử lại nhé!");
+  };
 
-    const startQuiz = async (quizId) => {
-        try {
-            const data = await getQuizById(quizId);
-            setCurrentQuiz(data);
-            setAnswers({});
-            setModalVisible(true);
-        } catch (error) {
-            Alert.alert("Lỗi", "Không thể tải bài quiz này.");
-        }
-    };
-
-    const handleSelectAnswer = (questionId, answerId) => {
-        setAnswers(prev => ({ ...prev, [questionId]: answerId }));
-    };
-
-    const handleSubmit = async () => {
-        try {
-            // Chuyển đổi format answers để gửi lên server
-            const answersArray = Object.keys(answers).map(qId => ({
-                questionId: qId,
-                answerId: answers[qId]
-            }));
-
-            const result = await submitQuiz(currentQuiz.id, answersArray);
-            
-            Alert.alert(
-                "Kết quả", 
-                `Bạn đạt ${result.score} điểm!`,
-                [{ text: "OK", onPress: () => setModalVisible(false) }]
-            );
-        } catch (error) {
-            Alert.alert("Lỗi", "Nộp bài thất bại.");
-        }
-    };
-
-    return (
-        <View style={styles.container}>
-            <Text style={styles.header}>Danh sách bài Quiz</Text>
-            <FlatList
-                data={quizzes}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.quizItem} onPress={() => startQuiz(item.id)}>
-                        <Text style={styles.quizTitle}>{item.title}</Text>
-                        <Text style={styles.quizDesc}>{item.description || 'Chạm để bắt đầu'}</Text>
-                    </TouchableOpacity>
-                )}
-            />
-
-            {/* Modal làm bài Quiz */}
-            <Modal visible={modalVisible} animationType="slide">
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>{currentQuiz?.title}</Text>
-                        <TouchableOpacity onPress={() => setModalVisible(false)}>
-                            <Text style={styles.closeBtn}>Đóng</Text>
-                        </TouchableOpacity>
-                    </View>
-                    
-                    <ScrollView contentContainerStyle={styles.questionsContainer}>
-                        {currentQuiz?.questions?.map((q, index) => (
-                            <View key={q.id} style={styles.questionBlock}>
-                                <Text style={styles.questionText}>Câu {index + 1}: {q.content}</Text>
-                                {q.answers?.map(ans => (
-                                    <TouchableOpacity 
-                                        key={ans.id} 
-                                        style={[
-                                            styles.answerBtn, 
-                                            answers[q.id] === ans.id && styles.answerBtnSelected
-                                        ]}
-                                        onPress={() => handleSelectAnswer(q.id, ans.id)}
-                                    >
-                                        <Text style={[
-                                            styles.answerText,
-                                            answers[q.id] === ans.id && styles.answerTextSelected
-                                        ]}>{ans.content}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        ))}
-                    </ScrollView>
-
-                    <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                        <Text style={styles.submitBtnText}>Nộp bài</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal>
+  return (
+    <View style={styles.container}>
+      
+      {/* Progress Section */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+           <Text style={styles.progressText}>Câu {questionData.current}/{questionData.total}</Text>
+           <View style={styles.pointsBadge}>
+              <Text style={styles.pointsText}>+{questionData.points} điểm</Text>
+           </View>
         </View>
-    );
+        {/* Progress Bar */}
+        <View style={styles.track}>
+           <View style={[styles.bar, { width: '50%' }]} />
+        </View>
+      </View>
+
+      {/* Question */}
+      <View style={styles.content}>
+        <Text style={styles.questionText}>{questionData.question}</Text>
+
+        <View style={styles.optionsList}>
+          {questionData.options.map((opt) => {
+            const isSelected = selectedId === opt.id;
+            return (
+              <TouchableOpacity 
+                key={opt.id}
+                style={[styles.optionCard, isSelected && styles.optionSelected]}
+                onPress={() => setSelectedId(opt.id)}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.radio, isSelected && styles.radioSelected]}>
+                    {isSelected && <View style={styles.radioDot} />}
+                </View>
+                <Text style={[styles.optionText, isSelected && styles.textSelected]}>
+                    {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Footer Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.nextBtn, !selectedId && styles.nextBtnDisabled]}
+          disabled={!selectedId}
+          onPress={handleNext}
+        >
+          <Text style={styles.nextBtnText}>Câu tiếp theo</Text>
+        </TouchableOpacity>
+      </View>
+
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-    header: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-    quizItem: { backgroundColor: '#f9f9f9', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
-    quizTitle: { fontSize: 16, fontWeight: 'bold' },
-    quizDesc: { color: '#666', marginTop: 4 },
-    
-    // Modal Styles
-    modalContainer: { flex: 1, backgroundColor: '#fff', paddingTop: 20 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#eee' },
-    modalTitle: { fontSize: 18, fontWeight: 'bold' },
-    closeBtn: { color: 'red', fontWeight: 'bold' },
-    questionsContainer: { padding: 16 },
-    questionBlock: { marginBottom: 24 },
-    questionText: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
-    answerBtn: { padding: 12, borderRadius: 6, borderWidth: 1, borderColor: '#ddd', marginBottom: 8 },
-    answerBtnSelected: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
-    answerText: { color: '#333' },
-    answerTextSelected: { color: '#2E7D32', fontWeight: 'bold' },
-    submitBtn: { margin: 16, backgroundColor: '#4CAF50', padding: 15, borderRadius: 8, alignItems: 'center' },
-    submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#FFF' },
+  
+  progressContainer: { padding: 24, paddingBottom: 0 },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  progressText: { fontSize: 16, color: '#666', fontWeight: '500' },
+  pointsBadge: { backgroundColor: '#4CAF50', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  pointsText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+  track: { height: 8, backgroundColor: '#F0F0F0', borderRadius: 4, width: '100%' },
+  bar: { height: 8, backgroundColor: '#111', borderRadius: 4 },
+
+  content: { flex: 1, padding: 24 },
+  questionText: { fontSize: 20, fontWeight: 'bold', color: '#111', marginBottom: 30, marginTop: 10 },
+  
+  optionsList: { gap: 16 },
+  optionCard: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 18, borderRadius: 16,
+    backgroundColor: '#FFF',
+    borderWidth: 1, borderColor: '#EEE',
+    elevation: 1, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2
+  },
+  optionSelected: { borderColor: '#4CAF50', backgroundColor: '#F1F8E9' },
+  
+  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#CCC', marginRight: 16, justifyContent: 'center', alignItems: 'center' },
+  radioSelected: { borderColor: '#4CAF50' },
+  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#4CAF50' },
+  
+  optionText: { fontSize: 16, color: '#333' },
+  textSelected: { fontWeight: '600', color: '#1B5E20' },
+
+  footer: { padding: 24, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  nextBtn: { backgroundColor: '#111', padding: 16, borderRadius: 14, alignItems: 'center' },
+  nextBtnDisabled: { backgroundColor: '#CCC' },
+  nextBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 });
 
 export default QuizScreen;

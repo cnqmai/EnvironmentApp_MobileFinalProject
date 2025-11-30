@@ -1,17 +1,35 @@
+
 import React, { useCallback, useState, useEffect } from "react";
-import { StyleSheet, FlatList, View, Text, RefreshControl, ActivityIndicator } from "react-native";
+import { StyleSheet, FlatList, View, Text, RefreshControl, ActivityIndicator, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons"; 
 import AQICard from "../../components/AQICard";
 import typography from "../../styles/typography";
 
 // Import Service lấy dữ liệu
 import { getAqiForSavedLocations } from "../../src/services/aqiService";
 
+
+// --- HÀM DUY NHẤT CẦN DÙNG (Dịch trạng thái) ---
+const getVietnameseAqiStatus = (aqiValue) => {
+    if (aqiValue === null || isNaN(aqiValue) || aqiValue < 0) return "Không rõ";
+    
+    if (aqiValue >= 301) return "Nguy hiểm";
+    if (aqiValue >= 201) return "Rất không tốt";
+    if (aqiValue >= 151) return "Không lành mạnh";
+    if (aqiValue >= 101) return "Không tốt cho nhóm nhạy cảm";
+    if (aqiValue >= 51) return "Trung bình";
+    if (aqiValue >= 0) return "Tốt";
+    
+    return "Không rõ";
+};
+// ----------------------------------------------------------------------------------
+
+
 const DashboardScreen = () => {
   const router = useRouter();
   
-  // States quản lý dữ liệu và trạng thái tải
   const [aqiList, setAqiList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,84 +37,104 @@ const DashboardScreen = () => {
   // Hàm lấy dữ liệu từ API
   const fetchData = async () => {
     try {
-      const data = await getAqiForSavedLocations();
-      
-      // Ánh xạ dữ liệu từ Backend (SavedLocationAqiResponse) sang format của UI
-      const formattedData = data.map((item, index) => ({
-        id: item.locationId ? item.locationId.toString() : `default-${index}`,
-        location: { 
-            // Ưu tiên lấy tên thành phố đã phân giải, nếu không có thì lấy tên đặt
-            name: item.locationName || "Vị trí chưa đặt tên", 
-            city: item.resolvedCityName || "" 
-        },
-        aqi: item.aqiValue,
-        status: translateStatus(item.status), // Chuyển đổi trạng thái sang tiếng Việt
-        description: item.healthAdvisory,
-        // Logic xác định nhóm nhạy cảm (Ví dụ: AQI > 100 là có hại cho nhóm nhạy cảm)
-        isSensitiveGroup: item.aqiValue > 100, 
-      }));
+      // Backend đã tính toán AQI 0-500 và gửi về
+      const data = await getAqiForSavedLocations(); 
+      const formattedData = data.map((item, index) => {
+        
+        // --- CHỈ LẤY GIÁ TRỊ VÀ DỊCH TRẠNG THÁI ---
+        const calculatedAqi = item.aqiValue; 
+
+        return ({
+          id: item.locationId ? item.locationId.toString() : `default-${index}`,
+          location: { 
+              name: item.locationName || "Vị trí chưa đặt tên", 
+              city: item.resolvedCityName || "" 
+          },
+          aqi: calculatedAqi,
+          status: getVietnameseAqiStatus(calculatedAqi), 
+          description: item.healthAdvisory,
+          isSensitiveGroup: calculatedAqi > 100, 
+        })
+      });
 
       setAqiList(formattedData);
     } catch (error) {
-      console.error("Lỗi tải dashboard:", error);
-      // Có thể thêm Toast hoặc Alert báo lỗi tại đây
+       // console.error("Lỗi tải dashboard:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Gọi dữ liệu khi mở màn hình
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Xử lý khi người dùng kéo xuống để làm mới
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
   }, []);
 
-  // Helper: Dịch trạng thái AQI sang tiếng Việt
-  const translateStatus = (status) => {
-      const map = {
-          "Good": "Tốt",
-          "Fair": "Khá",
-          "Moderate": "Trung bình",
-          "Poor": "Kém",
-          "Very Poor": "Rất kém",
-          "Unknown": "Không rõ"
-      };
-      return map[status] || status;
-  };
-
-  const renderAQICard = useCallback(
-    ({ item }) => (
+  const renderAQICard = useCallback(({ item }) => (
       <AQICard
         location={item.location}
         aqi={item.aqi}
         description={item.description}
         isSensitiveGroup={item.isSensitiveGroup}
-        // Khi bấm vào card, chuyển sang trang chi tiết kèm dữ liệu
-        onPress={() =>
-          router.push({
+        onPress={() => router.push({
             pathname: "/detail",
             params: {
               locationName: item.location.name,
               locationCity: item.location.city,
               aqi: item.aqi,
-              status: item.status,
+              status: item.status, 
               description: item.description,
-              isSensitiveGroup: item.isSensitiveGroup.toString(), // Params nên là string
+              isSensitiveGroup: item.isSensitiveGroup.toString(),
             },
           })
         }
       />
-    ),
-    [router]
+    ), [router]);
+
+  // --- PHẦN HEADER VÀ UI DƯỚI GIỮ NGUYÊN ---
+  const DashboardHeader = () => (
+    <View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Dashboard</Text>
+      </View>
+
+      <View style={styles.featuresContainer}>
+        <TouchableOpacity style={styles.tipCard} onPress={() => router.push('/features/daily-tip')} activeOpacity={0.9}>
+          <View style={styles.tipIconBox}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FFF" />
+          </View>
+          <View style={styles.tipContent}>
+              <Text style={styles.tipLabel}>Mẹo hôm nay</Text>
+              <Text style={styles.tipTitle}>Mang túi vải đi chợ</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#004D40" />
+        </TouchableOpacity>
+
+        <View style={styles.rowButtons}>
+            <TouchableOpacity style={[styles.featureBtn, { backgroundColor: '#E0F2F1' }]} onPress={() => router.push('/features/quiz')}>
+                <MaterialCommunityIcons name="gamepad-variant-outline" size={28} color="#00695C" />
+                <Text style={styles.featureBtnText}>Mini Quiz</Text>
+                <Text style={styles.featureBtnSub}>Kiếm điểm thưởng</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.featureBtn, { backgroundColor: '#E3F2FD' }]} onPress={() => router.push('/features/knowledge')}>
+                <MaterialCommunityIcons name="book-open-page-variant-outline" size={28} color="#0277BD" />
+                <Text style={styles.featureBtnText}>Thư viện</Text>
+                <Text style={styles.featureBtnSub}>Kiến thức xanh</Text>
+            </TouchableOpacity>
+        </View>
+
+      </View>
+
+      <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
+    </View>
   );
 
-  // Hiển thị màn hình loading khi đang tải lần đầu
   if (loading && !refreshing) {
       return (
           <SafeAreaView style={[styles.container, styles.centerContent]}>
@@ -108,29 +146,17 @@ const DashboardScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-      </View>
-
-      <Text style={styles.dashboardTitle}>AQI khu vực của tôi</Text>
-
       <FlatList
         data={aqiList}
         renderItem={renderAQICard}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={DashboardHeader} 
         contentContainerStyle={styles.listContent}
         style={styles.flatListStyle}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={30}
-        initialNumToRender={3}
-        keyboardShouldPersistTaps="handled"
-        // Thêm RefreshControl
         refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#007AFF" />
         }
-        // Hiển thị khi danh sách trống
         ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>Chưa có địa điểm nào được lưu.</Text>
@@ -146,62 +172,117 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
-    position: "relative",
   },
   centerContent: {
       justifyContent: 'center',
-      alignItems: 'center'
+      alignItems: 'center',
+      flex: 1, 
   },
   header: {
-    backgroundColor: "#F0EFED",
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomWidth: 0,
-    zIndex: 2,
+    paddingBottom: 10, 
   },
   headerTitle: {
-    ...typography.h2,
-    fontSize: 20,
+    fontSize: 24, 
     fontWeight: "700",
     color: "#0A0A0A",
     letterSpacing: -0.3,
   },
-  dashboardTitle: {
-    ...typography.h1,
-    fontSize: 36,
-    fontWeight: "900",
-    marginHorizontal: 24,
+  featuresContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  tipCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    elevation: 2, 
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  tipIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFB300', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  tipTitle: {
+    fontSize: 16,
+    color: '#0A0A0A',
+    fontWeight: 'bold',
+  },
+  rowButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  featureBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    elevation: 2, 
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  featureBtnText: {
     marginTop: 8,
-    marginBottom: 32,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0A0A0A',
+  },
+  featureBtnSub: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 2,
+  },
+  dashboardTitle: {
+    fontSize: 22, 
+    fontWeight: "800",
+    marginHorizontal: 24,
+    marginTop: 10,
+    marginBottom: 16,
     color: "#0A0A0A",
-    letterSpacing: -0.8,
-    lineHeight: 42,
-    zIndex: 1,
   },
   flatListStyle: {
     flex: 1,
-    zIndex: 0,
   },
   listContent: {
-    paddingBottom: 120,
-    paddingTop: 16,
-    paddingHorizontal: 4,
-    flexGrow: 1,
-    minHeight: 200,
+    paddingBottom: 40,
   },
   emptyContainer: {
       alignItems: 'center',
-      marginTop: 50,
+      marginTop: 30,
       paddingHorizontal: 20
   },
   emptyText: {
-      ...typography.h3,
+      fontSize: 18,
       color: '#333',
       marginBottom: 8
   },
   emptySubText: {
-      ...typography.body,
+      fontSize: 15,
       color: '#999',
       textAlign: 'center'
   }
