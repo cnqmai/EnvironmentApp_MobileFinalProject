@@ -11,9 +11,9 @@ const SettingsScreen = () => {
   const menuItems = [
     {
       id: "notifications",
-      label: "Thông báo",
+      label: "Cài đặt Thông báo",
       icon: "bell-outline",
-      route: "/(tabs)/notifications",
+      route: "/settings/notification-settings",
     },
     {
       id: "history",

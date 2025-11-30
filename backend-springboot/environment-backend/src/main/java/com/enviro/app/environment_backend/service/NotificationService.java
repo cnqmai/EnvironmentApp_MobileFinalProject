@@ -139,17 +139,20 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
+    /**
+     * Lấy hoặc tạo notification settings cho user (FIX DETACHED ENTITY)
+     */
     @Transactional
     public NotificationSettings getOrCreateSettings(User detachedUser) {
-        // 1. Cố gắng tìm settings hiện có
         return settingsRepository.findByUser(detachedUser)
                 .orElseGet(() -> {
+                    // FIX: Tìm lại User bằng ID để đảm bảo đối tượng là Managed
                     User managedUser = userRepository.findById(detachedUser.getId())
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Managed User not found during settings creation."));
 
-                    // 3. Tạo settings mới với đối tượng User đã được Managed
+                    // Cấu hình mặc định (Mọi thứ BẬT)
                     NotificationSettings defaultSettings = NotificationSettings.builder()
-                            .user(managedUser) // SỬ DỤNG MANAGED USER
+                            .user(managedUser) 
                             .aqiAlertEnabled(true)
                             .aqiThreshold(100)
                             .collectionReminderEnabled(true)
@@ -164,13 +167,20 @@ public class NotificationService {
     }
 
     /**
-     * Cập nhật notification settings (FR-2.2.2) (Giữ nguyên)
+     * Cập nhật notification settings (FR-2.2.2) 
+     * LOGIC MỚI: Chấp nhận mọi cờ boolean gửi lên.
      */
     @Transactional
-    public NotificationSettingsResponse updateSettings(User user, NotificationSettingsRequest request) {
-        NotificationSettings settings = getOrCreateSettings(user);
+    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { 
+        // Lấy User Managed Entity (Đảm bảo transaction)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        // Cập nhật các trường nếu có trong request
+        // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại và lấy ra settings cần update
+        NotificationSettings settings = getOrCreateSettings(user);
+        
+        // --- CHẤP NHẬN TẤT CẢ CÁC CỜ BOOLEAN TỪ REQUEST ---
+        
         if (request.getAqiAlertEnabled() != null) {
             settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
         }
@@ -192,13 +202,14 @@ public class NotificationService {
         if (request.getReportStatusNotificationsEnabled() != null) {
             settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
         }
-
-        NotificationSettings saved = settingsRepository.save(settings);
-        return mapToSettingsResponse(saved);
+        
+        NotificationSettings updatedSettings = settingsRepository.save(settings);
+        
+        return mapToSettingsResponse(updatedSettings);
     }
 
     /**
-     * Lấy notification settings của user (Giữ nguyên)
+     * Lấy notification settings của user
      */
     public NotificationSettingsResponse getSettings(User user) {
         NotificationSettings settings = getOrCreateSettings(user);
@@ -206,7 +217,7 @@ public class NotificationService {
     }
 
     /**
-     * Map Notification entity sang NotificationResponse DTO (Giữ nguyên)
+     * Map Notification entity sang NotificationResponse DTO
      */
     private NotificationResponse mapToNotificationResponse(Notification notification) {
         return NotificationResponse.builder()
@@ -221,7 +232,7 @@ public class NotificationService {
     }
 
     /**
-     * Map NotificationSettings entity sang NotificationSettingsResponse DTO (Giữ nguyên)
+     * Map NotificationSettings entity sang NotificationSettingsResponse DTO
      */
     private NotificationSettingsResponse mapToSettingsResponse(NotificationSettings settings) {
         return NotificationSettingsResponse.builder()
