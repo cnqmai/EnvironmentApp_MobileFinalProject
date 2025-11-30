@@ -1,18 +1,13 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-
-interface Gift {
-  name: string;
-  left: number;
-  point: number;
-}
+import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 
 export default function RedeemScreen() {
-  const gifts: Gift[] = [
-    { name: "Voucher Eco 50k", left: 45, point: 100 },
-    { name: "Túi vải TC", left: 23, point: 200 },
-    { name: "Bình nước inox", left: 12, point: 350 },
-    { name: "Voucher Coffee 30k", left: 67, point: 80 },
+  const gifts = [
+    { icon: <MaterialCommunityIcons name="ticket-percent" size={30} />, name: "Voucher Eco 50k", left: 45, point: 100 },
+    { icon: <Feather name="shopping-bag" size={30} />, name: "Túi vải TC", left: 23, point: 200 },
+    { icon: <Feather name="droplet" size={30} />, name: "Bình nước inox", left: 12, point: 350 },
+    { icon: <Feather name="coffee" size={30} />, name: "Voucher Coffee 30k", left: 67, point: 80 },
   ];
 
   return (
@@ -26,7 +21,9 @@ export default function RedeemScreen() {
 
       {gifts.map((g, i) => (
         <View key={i} style={styles.giftBox}>
+          {g.icon}
           <Text style={styles.giftName}>{g.name}</Text>
+
           <Text>Còn {g.left}</Text>
           <Text style={styles.price}>Giá: ⭐ {g.point}</Text>
 
@@ -44,7 +41,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
 
   pointCard: {
-    backgroundColor: "#cc2dd6",
+    backgroundColor: "#d84ce6",
     padding: 20,
     borderRadius: 15,
     marginBottom: 20,
@@ -59,7 +56,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  giftName: { fontSize: 16, fontWeight: "bold" },
+  giftName: { fontSize: 16, fontWeight: "bold", marginTop: 5 },
   price: { marginTop: 4, fontWeight: "600" },
 
   button: {
