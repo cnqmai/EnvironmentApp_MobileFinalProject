@@ -2,11 +2,9 @@ package com.enviro.app.environment_backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.boot.web.server.WebServerFactoryCustomizer;
-import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
+import org.springframework.context.annotation.Bean; // Import mới
+import org.springframework.web.client.RestTemplate; // Import mới
+import org.springframework.scheduling.annotation.EnableScheduling; 
 import io.github.cdimascio.dotenv.Dotenv;
 
 @SpringBootApplication
@@ -14,41 +12,20 @@ import io.github.cdimascio.dotenv.Dotenv;
 public class EnvironmentBackendApplication {
 
     public static void main(String[] args) {
-        Dotenv dotenv = Dotenv.load(); // Load file .env
-        if (dotenv.get("GOOGLE_CLIENT_ID") != null) {
-            System.setProperty("GOOGLE_CLIENT_ID", dotenv.get("GOOGLE_CLIENT_ID"));
-        }
-        if (dotenv.get("GOOGLE_CLIENT_SECRET") != null) {
-            System.setProperty("GOOGLE_CLIENT_SECRET", dotenv.get("GOOGLE_CLIENT_SECRET"));
-        }
-        if (dotenv.get("FACEBOOK_APP_ID") != null) {
-            System.setProperty("FACEBOOK_APP_ID", dotenv.get("FACEBOOK_APP_ID"));
-        }
-        if (dotenv.get("FACEBOOK_APP_SECRET") != null) {
-            System.setProperty("FACEBOOK_APP_SECRET", dotenv.get("FACEBOOK_APP_SECRET"));
-        }
-        if (dotenv.get("MAIL_USERNAME") != null) {
-            System.setProperty("MAIL_USERNAME", dotenv.get("MAIL_USERNAME"));
-        }
-        if (dotenv.get("MAIL_PASSWORD") != null) {
-            System.setProperty("MAIL_PASSWORD", dotenv.get("MAIL_PASSWORD"));
-        }
+        // Cấu hình Dotenv để không lỗi nếu thiếu file .env
+        Dotenv dotenv = Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
+
+        dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));
+
         SpringApplication.run(EnvironmentBackendApplication.class, args);
     }
 
-    /**
-     * Bean này cung cấp RestTemplate cho AqiService sử dụng
-     */
+    // --- BỔ SUNG ĐOẠN NÀY ĐỂ FIX LỖI ---
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
     }
-
-    /**
-     * Giữ lại cấu hình context-path rỗng để tránh lỗi 404 cũ
-     */
-    @Bean
-    public WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> webServerFactoryCustomizer() {
-        return factory -> factory.setContextPath("");
-    }
+    // -----------------------------------
 }

@@ -5,9 +5,11 @@ server:
 
 spring:
   datasource:
+    # URL đã thêm ?stringtype=unspecified để fix lỗi PostgreSQL
     url: jdbc:postgresql://localhost:5432/environment_db?stringtype=unspecified
     username: env_app_user
-    password: "2112" # KIEM TRA LAI PASSWORD NAY TREN MAY BAN
+    password: "2112" # Thay bằng mật khẩu DB của bạn
+
   jpa:
     show-sql: true
     hibernate:
@@ -15,6 +17,21 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # --- CẤU HÌNH GỬI EMAIL (FIX LỖI JavaMailSender) ---
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "EMAIL_CUA_BAN@gmail.com"  # <--- ĐIỀN EMAIL CỦA BẠN
+    password: "MAT_KHAU_UNG_DUNG_16_KY_TU" # <--- ĐIỀN APP PASSWORD (ko phải pass đăng nhập)
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  # ----------------------------------------------------
+
   security:
     oauth2:
       client:
@@ -25,18 +42,51 @@ spring:
             client-id: "YOUR_FACEBOOK_APP_ID"
             client-secret: "YOUR_FACEBOOK_APP_SECRET"
 
+# --- Cấu hình API Facebook ---
 facebook:
   api:
     user-info-uri: "https://graph.facebook.com/me?fields=id,name,email,picture.type(large)"
 
+# --- JWT Configuration ---
 jwt:
   secret:
     key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
   expiration:
     ms: 86400000
 
+# --- AQI API Configuration ---
 aqi:
   api:
     key: 5ad9ae819b67abf939f3e0d4604bd362
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
+
+# --- CẤU HÌNH ỨNG DỤNG RIÊNG (QUAN TRỌNG: PHẦN NÀY ĐANG BỊ THIẾU) ---
+# ... (các phần trên giữ nguyên) ...
+
+app:
+  # Cấu hình đường dẫn lưu file upload
+  upload:
+    dir: "uploads" 
+
+  security:
+    google:
+      # Danh sách Client ID (Android, iOS, Web)
+      client-ids: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+      
+      # Client Secret (để dummy nếu không dùng luồng Web Server)
+      client-secret: "YOUR_GOOGLE_CLIENT_SECRET_OR_DUMMY"
+      
+      # --- THÊM DÒNG NÀY ĐỂ FIX LỖI MỚI ---
+      # Redirect URI (Đây là đường dẫn Google sẽ gọi lại sau khi đăng nhập web)
+      # Bạn có thể để localhost nếu chỉ test hoặc không dùng tính năng này
+      redirect-uri: "http://localhost:8080/login/oauth2/code/google"
+
+# ... (các phần dưới giữ nguyên) ...
+
+# --- CẤU HÌNH RESET PASSWORD (Fix lỗi PasswordResetService) ---
+password:
+  frontend:
+    # Đường dẫn Frontend xử lý khi người dùng bấm link trong email
+    reset-password-url: "http://localhost:8081/reset-password"
+    token-expiration-minutes: 15

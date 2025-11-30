@@ -43,7 +43,7 @@ public class AqiService {
                 AqiDataPoint dataPoint = response.getList().get(0);
                 
                 int aqi = dataPoint.getMain().getAqi();
-                Map<String, Double> components = dataPoint.getComponents();
+                Map<String, Double> components = dataPoint.getComponents(); // Lấy components
                 long dt = dataPoint.getDt();
                 String city = getCityNameFromGps(lat, lon);
 
@@ -56,6 +56,7 @@ public class AqiService {
                         .city(city)
                         .timeObservation(convertUnixTime(dt))
                         .healthAdvisory(getHealthAdvisory(aqi))
+                        .components(components) // --- FIX LỖI: Map components vào DTO ---
                         .build();
             }
         } catch (Exception e) {
@@ -80,6 +81,11 @@ public class AqiService {
             }
         }
         return result;
+    }
+
+    // --- FIX LỖI: Hàm này phải là public để NotificationScheduler gọi được ---
+    public GeocodingResponse geocodeAddress(String address) {
+        return getCoordinatesFromAddress(address);
     }
 
     private GeocodingResponse callGeocodingApi(String address) {
