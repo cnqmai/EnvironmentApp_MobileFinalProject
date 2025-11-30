@@ -1,7 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CommunityCard from "../../components/community/CommunityCard";
@@ -11,7 +17,16 @@ import typography from "../../styles/typography";
 
 const CommunityScreen = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("events");
+  const [activeTab, setActiveTab] = useState("forum");
+  const [forumSubTab, setForumSubTab] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
 
   const tabs = [
     { id: "forum", label: "Diễn đàn", icon: "forum" },
@@ -108,6 +123,22 @@ const CommunityScreen = () => {
     },
   ];
 
+  const myPosts = [
+    {
+      id: 1,
+      author: "Bạn",
+      badge: "Thành viên mới",
+      community: "Sống xanh Sài Gòn",
+      content:
+        "Mình mới tham gia nhóm và rất vui được làm quen với mọi người! Hi vọng sẽ học hỏi được nhiều kiến thức về bảo vệ môi trường từ các bạn 🌱",
+      likes: 45,
+      comments: 8,
+      shares: 2,
+      date: "1 ngày trước",
+      image: false,
+    },
+  ];
+
   const communities = [
     {
       id: 1,
@@ -142,9 +173,6 @@ const CommunityScreen = () => {
     <View style={styles.contentContainer}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Sự kiện sắp diễn ra</Text>
-        <TouchableOpacity activeOpacity={0.7}>
-          <Text style={styles.seeAllText}>Xem tất cả</Text>
-        </TouchableOpacity>
       </View>
 
       {events.map((event) => (
@@ -187,26 +215,59 @@ const CommunityScreen = () => {
     </View>
   );
 
-  const renderForum = () => (
-    <View style={styles.contentContainer}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Bài viết mới nhất</Text>
-        <TouchableOpacity activeOpacity={0.7}>
-          <Text style={styles.seeAllText}>Xem tất cả</Text>
-        </TouchableOpacity>
-      </View>
+  const renderForum = () => {
+    const displayPosts = forumSubTab === "all" ? posts : myPosts;
 
-      <View style={styles.postsContainer}>
-        {posts.map((post) => (
-          <ForumPostCard
-            key={post.id}
-            post={post}
-            onPress={() => router.push(`/community/post/${post.id}`)}
-          />
-        ))}
+    return (
+      <View style={styles.contentContainer}>
+        <View style={styles.forumSubTabs}>
+          <TouchableOpacity
+            style={[
+              styles.forumSubTab,
+              forumSubTab === "all" && styles.forumSubTabActive,
+            ]}
+            onPress={() => setForumSubTab("all")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.forumSubTabText,
+                forumSubTab === "all" && styles.forumSubTabTextActive,
+              ]}
+            >
+              Tất cả bài viết
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.forumSubTab,
+              forumSubTab === "my" && styles.forumSubTabActive,
+            ]}
+            onPress={() => setForumSubTab("my")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.forumSubTabText,
+                forumSubTab === "my" && styles.forumSubTabTextActive,
+              ]}
+            >
+              Bài viết của tôi
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.postsContainer}>
+          {displayPosts.map((post) => (
+            <ForumPostCard
+              key={post.id}
+              post={post}
+              onPress={() => router.push(`/community/post/${post.id}`)}
+            />
+          ))}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderDiscover = () => (
     <View style={styles.contentContainer}>
@@ -283,6 +344,14 @@ const CommunityScreen = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#007AFF"]}
+            tintColor="#007AFF"
+          />
+        }
       >
         {activeTab === "events" && renderEvents()}
         {activeTab === "forum" && renderForum()}
@@ -348,10 +417,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 0,
     flexGrow: 0,
+    flexShrink: 0,
   },
   tabsContent: {
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingBottom: 10,
     gap: 10,
   },
   tab: {
@@ -388,8 +458,40 @@ const styles = StyleSheet.create({
   },
 
   contentContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
+    paddingHorizontal: 16,
+  },
+  forumSubTabs: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 12,
+    padding: 4,
+  },
+  forumSubTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  forumSubTabActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  forumSubTabText: {
+    ...typography.body,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  forumSubTabTextActive: {
+    fontWeight: "600",
+    color: "#0A0A0A",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -411,7 +513,7 @@ const styles = StyleSheet.create({
     color: "#007AFF",
   },
   postsContainer: {
-    gap: 12,
+    gap: 8,
   },
   createCommunityButton: {
     flexDirection: "row",
