@@ -136,6 +136,13 @@ public class AqiService {
         }
         return null;
     }
+
+    /**
+     * [MỚI] API Geocoding để tìm tọa độ từ địa chỉ (Khắc phục lỗi Scheduler)
+     */
+    public GeocodingResponse geocodeAddress(String address) {
+        return getCoordinatesFromAddress(address);
+    }
     
     /**
      * [NÂNG CẤP] Tìm tọa độ từ địa chỉ (Có cơ chế thử lại thông minh)

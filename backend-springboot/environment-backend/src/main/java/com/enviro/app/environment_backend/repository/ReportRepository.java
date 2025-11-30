@@ -40,4 +40,6 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
      * Đếm số lượng báo cáo của một user theo trạng thái
      */
     long countByUserAndStatus(User user, ReportStatus status);
+
+    void deleteByUser(User user);
 }

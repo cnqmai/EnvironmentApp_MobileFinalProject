@@ -1,27 +1,74 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Text, Alert, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, Text, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
 import typography from "../../styles/typography";
 import { Button } from "react-native-paper";
 import Slider from "@react-native-community/slider";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getNotificationSettings, updateNotificationSettings } from '../../src/services/userService'; // Import API
+
 
 const AQIThresholdSettingsScreen = () => {
   const router = useRouter();
   const [aqiThreshold, setAqiThreshold] = useState(100);
+  const [loading, setLoading] = useState(true);
   const [sliderWidth, setSliderWidth] = useState(0);
-  const SLIDER_MIN = 0;
-  const SLIDER_MAX = 300;
+  const SLIDER_MIN = 50; // Ngưỡng an toàn tối thiểu (Good)
+  const SLIDER_MAX = 300; // Ngưỡng nguy hiểm tối đa
   const THUMB_SIZE = 36;
 
-  const handleSaveSettings = () => {
-    console.log("Lưu cài đặt ngưỡng cảnh báo: " + aqiThreshold);
-    Alert.alert(
-      "Thành công",
-      "Ngưỡng cảnh báo AQI đã được lưu: " + aqiThreshold
-    );
+  // --- LOGIC TẢI CÀI ĐẶT HIỆN TẠI ---
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setLoading(true);
+        const settings = await getNotificationSettings(); 
+        // Đảm bảo threshold nằm trong phạm vi slider
+        const initialThreshold = Math.min(Math.max(settings.aqiThreshold, SLIDER_MIN), SLIDER_MAX);
+        setAqiThreshold(initialThreshold);
+      } catch (error) {
+        console.error("Lỗi tải cài đặt AQI ngưỡng:", error);
+        Alert.alert("Lỗi", "Không thể tải cài đặt ngưỡng cảnh báo.");
+        setAqiThreshold(100); // Mặc định về ngưỡng chung
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+
+  // --- LOGIC LƯU CÀI ĐẶT ---
+  const handleSaveSettings = async () => {
+    setLoading(true);
+    try {
+      // Gửi toàn bộ DTO cài đặt (chỉ cập nhật ngưỡng, giữ nguyên các boolean khác)
+      await updateNotificationSettings({
+        aqiThreshold: aqiThreshold
+        // Các trường boolean khác (nếu cần)
+      });
+      
+      Alert.alert(
+        "Thành công",
+        `Ngưỡng cảnh báo AQI đã được lưu: ${aqiThreshold}`
+      );
+    } catch (error) {
+      console.error("Lỗi lưu cài đặt ngưỡng:", error);
+      Alert.alert("Lỗi", "Lưu cài đặt thất bại. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) {
+      return (
+          <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator size="large" color="#2196F3" />
+              <Text style={{ marginTop: 10 }}>Đang tải cài đặt...</Text>
+          </SafeAreaView>
+      );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -50,11 +97,12 @@ const AQIThresholdSettingsScreen = () => {
               <View
                 style={{
                   position: "absolute",
+                  // Tính toán vị trí Thumb Value
                   left:
                     ((aqiThreshold - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) *
                     (sliderWidth - THUMB_SIZE),
                   top: -30,
-                  width: 40,
+                  width: THUMB_SIZE,
                   alignItems: "center",
                   zIndex: 2,
                 }}
@@ -88,6 +136,7 @@ const AQIThresholdSettingsScreen = () => {
           style={styles.saveButton}
           contentStyle={styles.saveButtonLabel}
           labelStyle={[typography.body, { color: "#fff", fontWeight: "bold" }]}
+          disabled={loading}
         >
           Lưu cài đặt
         </Button>

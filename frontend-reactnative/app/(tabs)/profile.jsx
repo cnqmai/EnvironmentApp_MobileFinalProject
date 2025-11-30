@@ -116,7 +116,7 @@ const ProfileScreen = () => {
             <Text style={styles.loginPromptTitle}>Đăng nhập để trải nghiệm đầy đủ</Text>
              <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => router.push("/login")}
+              onPress={handleLogout}
               activeOpacity={0.8}
             >
               <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>

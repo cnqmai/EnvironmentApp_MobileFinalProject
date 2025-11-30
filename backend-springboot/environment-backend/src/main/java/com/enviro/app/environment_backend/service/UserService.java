@@ -46,25 +46,28 @@ public class UserService {
     private final NotificationSettingsRepository notificationSettingsRepository;
     private final UserBadgeRepository userBadgeRepository; // *** Cần inject ***
     private final PasswordEncoder passwordEncoder;
-    
+    private final NotificationService notificationService;
+
     // Đường dẫn upload (được inject từ application.properties)
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
     // CẬP NHẬT: Hàm khởi tạo (Constructor)
     public UserService(UserRepository userRepository, 
-                      ReportRepository reportRepository,
-                      SavedLocationRepository savedLocationRepository,
-                      NotificationSettingsRepository notificationSettingsRepository,
-                      UserBadgeRepository userBadgeRepository, // *** THÊM ***
-                      PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.reportRepository = reportRepository;
-        this.savedLocationRepository = savedLocationRepository;
-        this.notificationSettingsRepository = notificationSettingsRepository;
-        this.userBadgeRepository = userBadgeRepository; // Gán
-        this.passwordEncoder = passwordEncoder;
-    }
+                  ReportRepository reportRepository,
+                  SavedLocationRepository savedLocationRepository,
+                  NotificationSettingsRepository notificationSettingsRepository,
+                  UserBadgeRepository userBadgeRepository, 
+                  PasswordEncoder passwordEncoder,
+                  NotificationService notificationService) { 
+    this.userRepository = userRepository;
+    this.reportRepository = reportRepository;
+    this.savedLocationRepository = savedLocationRepository;
+    this.notificationSettingsRepository = notificationSettingsRepository;
+    this.userBadgeRepository = userBadgeRepository;
+    this.passwordEncoder = passwordEncoder;
+    this.notificationService = notificationService;
+}
 
     public Optional<User> findById(UUID id) { // SỬA: Dùng UUID
         return userRepository.findById(id);
@@ -189,11 +192,17 @@ public class UserService {
                 .build();
     }
 
+    // ====================================================================
+    // FR-2.2.2: LẤY/CẬP NHẬT CÀI ĐẶT THÔNG BÁO (CHỈ CHỈNH NGƯỠNG)
+    // ====================================================================
+
     public NotificationSettingsResponse getNotificationSettings(UUID userId) {
-        NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại
+        NotificationSettings settings = notificationService.getOrCreateSettings(user);
         
-        // SỬA: Dùng tên trường mới (ví dụ: getAqiAlertEnabled)
         return NotificationSettingsResponse.builder()
             .aqiAlertEnabled(settings.getAqiAlertEnabled())
             .aqiThreshold(settings.getAqiThreshold())
@@ -206,32 +215,27 @@ public class UserService {
     }
 
     @Transactional
-    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { // SỬA: Dùng UUID
-        NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
+    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
-        // SỬA: Dùng tên trường mới (ví dụ: setAqiAlertEnabled)
-        if (request.getAqiAlertEnabled() != null) {
-            settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
-        }
+        // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại
+        NotificationSettings settings = notificationService.getOrCreateSettings(user);
+        
+        // --- LOGIC: CHỈ CẬP NHẬT NGƯỠNG VÀ BẮT BUỘC BẬT TẤT CẢ CỜ KHÁC ---
+        
+        // 1. Cập nhật Ngưỡng AQI (Chỉ khi gửi)
         if (request.getAqiThreshold() != null) {
             settings.setAqiThreshold(request.getAqiThreshold());
         }
-        if (request.getCollectionReminderEnabled() != null) {
-            settings.setCollectionReminderEnabled(request.getCollectionReminderEnabled());
-        }
-        if (request.getCampaignNotificationsEnabled() != null) {
-            settings.setCampaignNotificationsEnabled(request.getCampaignNotificationsEnabled());
-        }
-        if (request.getWeatherAlertEnabled() != null) {
-            settings.setWeatherAlertEnabled(request.getWeatherAlertEnabled());
-        }
-        if (request.getBadgeNotificationsEnabled() != null) {
-            settings.setBadgeNotificationsEnabled(request.getBadgeNotificationsEnabled());
-        }
-        if (request.getReportStatusNotificationsEnabled() != null) {
-            settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
-        }
+        
+        // 2. BẮT BUỘC BẬT TẤT CẢ CÁC CỜ DÙ FRONTEND KHÔNG CHO PHÉP TÙY CHỈNH
+        settings.setAqiAlertEnabled(true);
+        settings.setCollectionReminderEnabled(true);
+        settings.setCampaignNotificationsEnabled(true);
+        // Các cờ khác cũng giữ nguyên TRUE (vì getOrCreateSettings đã tạo là TRUE)
+        
+        // Bỏ qua mọi trường boolean khác từ request để chúng không bị ghi đè thành NULL
         
         NotificationSettings updatedSettings = notificationSettingsRepository.save(settings);
         

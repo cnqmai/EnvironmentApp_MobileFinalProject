@@ -36,8 +36,11 @@ const SettingsScreen = () => {
   ];
 
   const handleLogout = () => {
-    router.push("/(tabs)/profile?logout=true");
-  };
+    router.push({
+        pathname: "/(tabs)/profile",
+        params: { logout: "true" }
+    }); 
+};
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>

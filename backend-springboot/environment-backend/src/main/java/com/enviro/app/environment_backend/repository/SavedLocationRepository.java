@@ -13,4 +13,6 @@ public interface SavedLocationRepository extends JpaRepository<SavedLocation, UU
     
     // Đếm số vị trí đã lưu của một user
     long countByUserId(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }
