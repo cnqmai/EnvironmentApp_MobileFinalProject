@@ -1,5 +1,6 @@
 package com.enviro.app.environment_backend.dto;
 
+import java.util.Map; // Cần import Map
 import lombok.Builder;
 import lombok.Data;
 import java.util.Map;

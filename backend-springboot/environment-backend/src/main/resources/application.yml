@@ -13,6 +13,7 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     show-sql: true
@@ -34,6 +35,7 @@ spring:
           starttls:
             enable: true
             required: true
+        format_sql: true
   
   security:
     oauth2:
@@ -53,23 +55,25 @@ spring:
               - email
               - public_profile
 
-# --- Cấu hình API của Facebook ---
+# --- CẤU HÌNH CÁC BIẾN MÔI TRƯỜNG ---
+
+# Fix lỗi 1: Cho Service upload
+file:
+  upload:
+    dir: uploads
+
 facebook:
   api:
     user-info-uri: "https://graph.facebook.com/me?fields=id,name,email,picture.type(large)"
 
-# --- JWT Configuration ---
 jwt:
   secret:
-    # Key Base64
     key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
   expiration:
     ms: 86400000
 
-# --- AQI API Configuration (OpenWeatherMap) ---
 aqi:
   api:
-    # Thay thế bằng API Key thật của bạn
     key: 5ad9ae819b67abf939f3e0d4604bd362
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
@@ -103,3 +107,15 @@ password:
     # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
     # Trừ khi bạn cài ngrok cho cả Spring Boot
     backend-url: "http://192.168.100.190:8080"
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    com.enviro.app: DEBUG
+
+# --- Gemini Configuration ---
+gemini:
+  api-key: "AIzaSyAtXwVcMg-h08LOcE17sK8gDINtHBMxHmY" 
+  # Hãy thay thế "YOUR_GEMINI_API_KEY_HERE" bằng mã khóa thực tế của bạn

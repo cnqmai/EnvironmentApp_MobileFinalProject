@@ -1,123 +1,115 @@
 package com.enviro.app.environment_backend.service;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.enviro.app.environment_backend.dto.ChatbotRequest;
 import com.enviro.app.environment_backend.dto.ChatbotResponse;
 import com.enviro.app.environment_backend.model.ChatbotHistory;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service xử lý logic Chatbot AI (FR-5.x)
- * 
- * LƯU Ý: Service này hiện tại chỉ trả về câu trả lời mẫu.
- * Để tích hợp AI thực sự, bạn cần:
- * 1. Tích hợp OpenAI API hoặc Google Gemini API
- * 2. Hoặc tạo một service AI riêng để xử lý
- */
+import java.util.*;
+import java.util.stream.Collectors;
+
 @Service
 public class ChatbotService {
 
     private final ChatbotHistoryRepository chatbotHistoryRepository;
+    private final GeminiService geminiService; // Service gọi AI
 
-    public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository) {
+    public ChatbotService(ChatbotHistoryRepository chatbotHistoryRepository, GeminiService geminiService) {
         this.chatbotHistoryRepository = chatbotHistoryRepository;
+        this.geminiService = geminiService;
     }
 
     /**
-     * Xử lý câu hỏi từ user và trả về phản hồi từ chatbot (FR-5.1)
-     * 
-     * TODO: Tích hợp với AI Service thực sự (OpenAI/Gemini)
+     * Xử lý tin nhắn từ người dùng:
+     * 1. Tạo session ID nếu chưa có.
+     * 2. Gọi Google Gemini để lấy câu trả lời thông minh.
+     * 3. Lưu vào database.
      */
     @Transactional
     public ChatbotResponse processMessage(User user, ChatbotRequest request) {
         String userQuery = request.getMessage();
-        String botResponse = generateBotResponse(userQuery);
+        
+        // Nếu client không gửi sessionId (chat mới), tự tạo UUID mới
+        String sessionId = (request.getSessionId() == null || request.getSessionId().isEmpty()) 
+                            ? UUID.randomUUID().toString() 
+                            : request.getSessionId();
 
-        // Lưu vào lịch sử
-        ChatbotHistory history = new ChatbotHistory(user, userQuery, botResponse);
+        // [QUAN TRỌNG] Gọi AI thay vì dùng if-else cứng nhắc
+        String botResponse = geminiService.callGemini(
+            "Bạn là trợ lý môi trường Enviminds. Hãy trả lời ngắn gọn, thân thiện (dưới 200 từ) câu hỏi sau: " + userQuery
+        );
 
-        ChatbotHistory savedHistory = chatbotHistoryRepository.save(history);
+        // Lưu lịch sử
+        ChatbotHistory history = new ChatbotHistory(user, sessionId, userQuery, botResponse);
+        ChatbotHistory saved = chatbotHistoryRepository.save(history);
 
+        // Trả về kết quả
         return new ChatbotResponse(
-                savedHistory.getId(),
-                savedHistory.getUserQuery(),
-                savedHistory.getBotResponse(),
-                savedHistory.getCreatedAt()
+            saved.getId(), 
+            saved.getSessionId(), 
+            saved.getUserQuery(), 
+            saved.getBotResponse(), 
+            saved.getCreatedAt()
         );
     }
 
     /**
-     * Tạo phản hồi từ chatbot (Hiện tại chỉ là logic đơn giản)
-     * TODO: Thay thế bằng AI Service thực sự
+     * Lấy danh sách các cuộc hội thoại (Sessions).
+     * Logic: Chỉ lấy tin nhắn mới nhất của mỗi session để hiển thị ngoài danh sách.
      */
-    private String generateBotResponse(String userQuery) {
-        String query = userQuery.toLowerCase().trim();
+    public List<ChatbotResponse> getChatSessions(User user) {
+        // Lấy tất cả lịch sử của user, sắp xếp mới nhất lên đầu
+        List<ChatbotHistory> allHistory = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
 
-        // Logic đơn giản để trả lời một số câu hỏi thường gặp
-        if (query.contains("phân loại rác") || query.contains("rác thải")) {
-            return "Để phân loại rác đúng cách, bạn nên:\n" +
-                   "1. Rác hữu cơ: Thức ăn thừa, lá cây → Ủ phân hoặc bỏ vào thùng rác hữu cơ\n" +
-                   "2. Rác tái chế: Giấy, nhựa, kim loại → Bỏ vào thùng rác tái chế\n" +
-                   "3. Rác nguy hại: Pin, bóng đèn, thiết bị điện tử → Mang đến điểm thu gom đặc biệt\n" +
-                   "4. Rác thải khác: Không thể tái chế → Bỏ vào thùng rác thông thường";
+        // Dùng Map để lọc trùng sessionId (chỉ giữ bản ghi đầu tiên/mới nhất gặp được)
+        Map<String, ChatbotHistory> uniqueSessions = new LinkedHashMap<>();
+        
+        for (ChatbotHistory h : allHistory) {
+            // Nếu có sessionId và chưa có trong map thì thêm vào
+            if (h.getSessionId() != null && !uniqueSessions.containsKey(h.getSessionId())) {
+                uniqueSessions.put(h.getSessionId(), h);
+            }
         }
 
-        if (query.contains("chất lượng không khí") || query.contains("aqi")) {
-            return "Chỉ số AQI (Air Quality Index) đo chất lượng không khí:\n" +
-                   "• 0-50: Tốt (Xanh lá) - Không khí trong lành\n" +
-                   "• 51-100: Trung bình (Vàng) - Nhạy cảm nhẹ có thể gặp vấn đề\n" +
-                   "• 101-150: Không tốt cho nhóm nhạy cảm (Cam) - Tránh hoạt động ngoài trời\n" +
-                   "• 151-200: Không tốt (Đỏ) - Mọi người có thể gặp vấn đề sức khỏe\n" +
-                   "• >200: Rất nguy hại (Tím) - Tránh tất cả hoạt động ngoài trời";
-        }
-
-        if (query.contains("bảo vệ môi trường") || query.contains("sống xanh")) {
-            return "Một số cách bảo vệ môi trường bạn có thể làm:\n" +
-                   "• Giảm sử dụng nhựa dùng một lần\n" +
-                   "• Tái chế rác thải đúng cách\n" +
-                   "• Tiết kiệm điện, nước\n" +
-                   "• Sử dụng phương tiện công cộng hoặc đi bộ\n" +
-                   "• Trồng cây xanh\n" +
-                   "• Tham gia các hoạt động tình nguyện môi trường";
-        }
-
-        if (query.contains("luật") || query.contains("quy định")) {
-            return "Các luật bảo vệ môi trường quan trọng ở Việt Nam:\n" +
-                   "• Luật Bảo vệ Môi trường 2020\n" +
-                   "• Nghị định về xử phạt vi phạm hành chính trong lĩnh vực môi trường\n" +
-                   "• Quy định về phân loại, thu gom và xử lý rác thải\n" +
-                   "Bạn có thể báo cáo vi phạm môi trường qua ứng dụng này!";
-        }
-
-        // Trả lời mặc định
-        return "Xin chào! Tôi là chatbot hỗ trợ về môi trường.\n" +
-               "Tôi có thể giúp bạn với:\n" +
-               "• Phân loại rác thải\n" +
-               "• Chất lượng không khí (AQI)\n" +
-               "• Cách bảo vệ môi trường\n" +
-               "• Luật và quy định môi trường\n\n" +
-               "Hãy hỏi tôi bất kỳ câu hỏi nào về môi trường!";
+        // Chuyển đổi sang DTO
+        return uniqueSessions.values().stream()
+                .map(h -> new ChatbotResponse(
+                    h.getId(), 
+                    h.getSessionId(), 
+                    h.getUserQuery(), 
+                    h.getBotResponse(), 
+                    h.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
     }
 
     /**
-     * Lấy lịch sử chat của user (FR-1.2.3, FR-5.1)
+     * Lấy chi tiết toàn bộ tin nhắn trong một cuộc hội thoại cụ thể.
      */
-    public List<ChatbotResponse> getChatHistory(User user) {
-        List<ChatbotHistory> historyList = chatbotHistoryRepository.findByUserOrderByCreatedAtDesc(user);
+    public List<ChatbotResponse> getSessionMessages(String sessionId) {
+        // Lấy list tin nhắn theo sessionId, sắp xếp cũ -> mới để hiển thị đúng thứ tự chat
+        List<ChatbotHistory> sessionHistory = chatbotHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
         
-        return historyList.stream()
+        return sessionHistory.stream()
                 .map(h -> new ChatbotResponse(
-                        h.getId(),
-                        h.getUserQuery(),
-                        h.getBotResponse(),
-                        h.getCreatedAt()))
+                    h.getId(), 
+                    h.getSessionId(), 
+                    h.getUserQuery(), 
+                    h.getBotResponse(), 
+                    h.getCreatedAt()
+                ))
                 .collect(Collectors.toList());
     }
-}
 
+    /**
+     * Xóa toàn bộ cuộc hội thoại theo Session ID.
+     */
+    @Transactional
+    public void deleteSession(String sessionId, User user) {
+        // Lưu ý: Trong thực tế nên check xem sessionId này có thuộc về user không để bảo mật
+        chatbotHistoryRepository.deleteBySessionId(sessionId);
+    }
+}

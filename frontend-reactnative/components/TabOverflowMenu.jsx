@@ -50,6 +50,7 @@ const TabOverflowMenu = (props) => {
                 text="Cộng đồng"
                 onPress={() => navigateAndClose("/community")}
               />
+              {/* QUAN TRỌNG: Đường dẫn phải là /chat/chatbot */}
               <MenuItem
                 icon="chat"
                 text="Chatbot"
@@ -63,7 +64,6 @@ const TabOverflowMenu = (props) => {
             </>
           )}
 
-          {/* Nút "Cài đặt" luôn hiển thị */}
           <MenuItem
             icon="cog"
             text="Cài đặt"
@@ -84,7 +84,6 @@ const TabOverflowMenu = (props) => {
   );
 };
 
-// Component MenuItem và styles từ tệp gốc
 const MenuItem = ({ icon, text, onPress }) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <MaterialCommunityIcons name={icon} size={24} color="#333" />

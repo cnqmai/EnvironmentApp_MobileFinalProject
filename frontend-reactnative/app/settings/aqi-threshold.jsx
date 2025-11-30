@@ -73,7 +73,7 @@ const AQIThresholdSettingsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/*Nút quay lại*/}
+        {/* Nút quay lại */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -81,7 +81,7 @@ const AQIThresholdSettingsScreen = () => {
           <Ionicons name="chevron-back" size={24} color="#222" />
         </TouchableOpacity>
 
-        {/*Tiêu đề*/}
+        {/* Tiêu đề */}
         <Text style={[typography.h1, styles.screenTitle]}>
           Cài đặt ngưỡng cảnh báo AQI
         </Text>
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
-    fontFamily: "System",
   },
   content: {
     padding: 20,
@@ -194,25 +193,34 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 40,
   },
-  thresholdValue: {
-    marginTop: 10,
-    alignSelf: "center",
+  thresholdBubble: {
+    fontWeight: "bold",
+    color: "#555",
+    fontSize: 12
+  },
+  scaleLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: -5
+  },
+  scaleText: {
+    fontSize: 10,
+    color: '#999'
   },
   infoText: {
     color: "#666",
     marginBottom: 20,
     marginStart: 10,
     alignSelf: "flex-start",
+    lineHeight: 20
   },
   saveButton: {
     width: "100%",
     marginTop: 8,
     borderRadius: 20,
-    paddingVertical: 4,
-    backgroundColor: "#2196F3",
-  },
-  saveButtonLabel: {
-    // Đã dùng labelStyle cho Button
+    paddingVertical: 6,
+    elevation: 2
   },
 });
 

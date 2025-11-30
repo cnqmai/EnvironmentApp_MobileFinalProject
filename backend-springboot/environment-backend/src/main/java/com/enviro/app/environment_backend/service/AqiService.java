@@ -4,6 +4,10 @@ import com.enviro.app.environment_backend.dto.AqiDataPoint;
 import com.enviro.app.environment_backend.dto.AqiResponse;
 import com.enviro.app.environment_backend.dto.GeocodingResponse;
 import com.enviro.app.environment_backend.dto.OpenWeatherMapResponse;
+import com.enviro.app.environment_backend.model.NotificationSettings;
+import com.enviro.app.environment_backend.model.NotificationType;
+import com.enviro.app.environment_backend.model.User;
+import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -15,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AqiService {
@@ -42,8 +47,14 @@ public class AqiService {
         }
     );
 
-    public AqiService(RestTemplate restTemplate) {
+    public AqiService(RestTemplate restTemplate,
+                      NotificationService notificationService,
+                      NotificationSettingsRepository settingsRepository,
+                      UserService userService) {
         this.restTemplate = restTemplate;
+        this.notificationService = notificationService;
+        this.settingsRepository = settingsRepository;
+        this.userService = userService;
     }
 
     /**
@@ -170,7 +181,7 @@ public class AqiService {
                 }
             }
         }
-        return result;
+        return null;
     }
 
 
@@ -207,17 +218,13 @@ public class AqiService {
                     .queryParam("appid", apiKey)
                     .build()
                     .toUri();
-
-            ResponseEntity<GeocodingResponse[]> responseEntity = 
-                restTemplate.getForEntity(uri, GeocodingResponse[].class);
-            
+            ResponseEntity<GeocodingResponse[]> responseEntity = restTemplate.getForEntity(uri, GeocodingResponse[].class);
             GeocodingResponse[] responses = responseEntity.getBody();
-
             if (responses != null && responses.length > 0) {
                 return responses[0];
             }
         } catch (Exception e) {
-            System.err.println("Geocoding API error cho địa chỉ '" + address + "': " + e.getMessage());
+            // Bỏ qua lỗi để tiếp tục vòng lặp retry
         }
         return null;
     }
@@ -225,17 +232,10 @@ public class AqiService {
     private String getCityNameFromGps(double lat, double lon) {
         try {
             URI uri = UriComponentsBuilder.fromUriString(geocodingUrl)
-                .queryParam("lat", lat)
-                .queryParam("lon", lon)
-                .queryParam("limit", 1)
-                .queryParam("appid", apiKey)
-                .build()
-                .toUri();
-
+                .queryParam("lat", lat).queryParam("lon", lon).queryParam("limit", 1).queryParam("appid", apiKey)
+                .build().toUri();
             GeocodingResponse[] responses = restTemplate.getForObject(uri, GeocodingResponse[].class);
-            if (responses != null && responses.length > 0) {
-                return responses[0].getName();
-            }
+            if (responses != null && responses.length > 0) return responses[0].getName();
         } catch (Exception e) {
             e.printStackTrace();
         }

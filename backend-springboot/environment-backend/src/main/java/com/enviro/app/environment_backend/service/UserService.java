@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID; // Sử dụng UUID
+import java.util.UUID;
 import java.nio.file.Files; 
 import java.nio.file.Path; 
 import java.nio.file.Paths; 
@@ -12,6 +12,8 @@ import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.enviro.app.environment_backend.dto.DeleteAccountRequest;
-// Thêm các DTO và Model cần thiết
 import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
 import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
 import com.enviro.app.environment_backend.dto.PrivacySettingsRequest;
@@ -30,7 +31,6 @@ import com.enviro.app.environment_backend.model.NotificationSettings;
 import com.enviro.app.environment_backend.model.Report;
 import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
-// Thêm các Repository cần thiết
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
@@ -69,7 +69,7 @@ public class UserService {
     this.notificationService = notificationService;
 }
 
-    public Optional<User> findById(UUID id) { // SỬA: Dùng UUID
+    public Optional<User> findById(UUID id) {
         return userRepository.findById(id);
     }
 
@@ -77,7 +77,6 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
-    // Cần phương thức này cho AuthController
     public User save(User user) {
         return userRepository.save(user);
     }
@@ -122,7 +121,7 @@ public class UserService {
     }
 
     @Transactional
-    public User updateUserProfile(UUID userId, UpdateProfileRequest request) { // SỬA: Dùng UUID
+    public User updateUserProfile(UUID userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
@@ -153,14 +152,14 @@ public class UserService {
     }
     
     @Transactional
-    public void deleteUser(UUID userId) { // SỬA: Dùng UUID
+    public void deleteUser(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
         userRepository.delete(user);
     }
     
-    public UserStatisticsResponse getUserStatistics(UUID userId) { // SỬA: Dùng UUID
+    public UserStatisticsResponse getUserStatistics(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
@@ -179,7 +178,6 @@ public class UserService {
                 .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
                 .sum();
         
-        // SỬA: Dùng @Builder (vì DTO UserStatisticsResponse không có setters)
         return UserStatisticsResponse.builder()
                 .totalReports(totalReports)
                 .reportsReceived(reportsReceived)
@@ -320,5 +318,18 @@ public class UserService {
         
         // 4. Xóa bản ghi User cuối cùng
         userRepository.delete(user);
+    }
+
+    // --- PHƯƠNG THỨC MỚI ĐỂ SỬA LỖI ---
+    /**
+     * Lấy User hiện tại đang đăng nhập từ Security Context.
+     */
+    public User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return null;
+        }
+        String email = authentication.getName();
+        return userRepository.findByEmail(email).orElse(null);
     }
 }

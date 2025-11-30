@@ -1,20 +1,15 @@
+// File: .../dto/ChatbotRequest.java
 package com.enviro.app.environment_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/**
- * DTO cho yêu cầu gửi câu hỏi đến Chatbot (FR-5.1)
- */
-@Value
+@Data
+@NoArgsConstructor
 public class ChatbotRequest {
+    @NotBlank(message = "Tin nhắn không được để trống")
+    private String message;
     
-    @NotBlank(message = "Câu hỏi không được để trống")
-    String message; // Câu hỏi của user
-
-    // Explicit getter to avoid reliance on Lombok in IDE
-    public String getMessage() {
-        return message;
-    }
+    private String sessionId; // [MỚI] Gửi kèm ID hội thoại (nếu có)
 }
-

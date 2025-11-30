@@ -131,8 +131,47 @@ const Login = () => {
     if (!email || !password) { Alert.alert('Thông báo', 'Nhập email/pass'); return; }
     setLoading(true);
     try {
+      // 1. Gọi API đăng nhập
       const data = await login(email, password);
-      await finishLogin(data); 
+      
+      if (data.token) {
+        // --- SỬA LỖI 401: Dùng saveToken thay vì AsyncStorage.setItem thủ công ---
+        await saveToken(data.token); 
+        // -----------------------------------------------------------------------
+        
+        let userData = data.user;
+
+        // --- TÍNH NĂNG: Tự động cập nhật vị trí ---
+        try {
+          console.log("Đang lấy vị trí hiện tại...");
+          const currentAddress = await getCurrentDeviceAddress();
+          
+          if (currentAddress) {
+            console.log("Đã lấy được vị trí:", currentAddress);
+            
+            // Cập nhật lên server (Lúc này token đã được lưu đúng nên API này sẽ chạy OK)
+            await updateProfile({ defaultLocation: currentAddress });
+            
+            // Cập nhật vào biến cục bộ để lưu xuống máy
+            if (userData) {
+                userData = { ...userData, defaultLocation: currentAddress };
+            }
+          }
+        } catch (locError) {
+          console.warn("Không thể tự động cập nhật vị trí:", locError);
+          // Không chặn đăng nhập nếu lỗi vị trí
+        }
+        // ------------------------------------------
+
+        // Lưu thông tin user để hiển thị offline/profile
+        if (userData) {
+             await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        }
+      }
+
+      // Điều hướng vào trong App
+      router.replace('/(tabs)'); 
+
     } catch (error) {
       Alert.alert('Lỗi', "Sai thông tin đăng nhập");
       setLoading(false);
@@ -284,7 +323,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#ccc', 
+    borderColor: '#007bff',
+    width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 10,

@@ -106,6 +106,12 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/aqi/**").permitAll() 
                 .requestMatchers("/api/environmental-data/**").permitAll()
+                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll()
+                
+                // --- 3. THÊM MỚI: Cho phép API CATEGORIES (Public) ---
+                .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
+                .requestMatchers(mvc.pattern("/categories/**")).permitAll()
+                
                 // ======================================================
                 
                 // 4. Cho phép trang lỗi

@@ -16,13 +16,25 @@ public class WasteCategory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // ID danh mục
+    private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name; // Tên danh mục (ví dụ: "Rác thải nhựa")
+    private String name;
 
     @Column(columnDefinition = "TEXT")
-    private String description; // Mô tả chi tiết về danh mục
+    private String description;
 
-    // Bạn có thể thêm trường String iconUrl nếu muốn lưu trữ biểu tượng
+    // Hướng dẫn xử lý/vứt bỏ (Frontend hiển thị ở mục "Cách xử lý")
+    @Column(name = "disposal_guideline", columnDefinition = "TEXT")
+    private String disposalGuideline;
+
+    // Hướng dẫn tái chế (Frontend hiển thị ở mục "Khả năng tái chế")
+    @Column(name = "recycling_guideline", columnDefinition = "TEXT")
+    private String recyclingGuideline;
+
+    // Loại rác để Frontend map màu sắc/icon (ORGANIC, PLASTIC, METAL...)
+    @Column(name = "collection_point_type")
+    private String collectionPointType;
+
+    private String iconUrl;
 }
