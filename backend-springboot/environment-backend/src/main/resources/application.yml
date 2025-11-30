@@ -90,3 +90,6 @@ password:
     # Đường dẫn Frontend xử lý khi người dùng bấm link trong email
     reset-password-url: "http://localhost:8081/reset-password"
     token-expiration-minutes: 15
+
+gemini:
+  api-key: "AIzaSyAtXwVcMg-h08LOcE17sK8gDINtHBMxHmY"

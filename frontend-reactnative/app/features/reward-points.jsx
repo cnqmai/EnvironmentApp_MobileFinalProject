@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
-import EarnItem from "../components/EarnItem";
-import HistoryItem from "../components/HistoryItem";
+// Sửa dòng 3 và 4 thành:
+import EarnItem from "../../components/EarnItem";
+import HistoryItem from "../../components/HistoryItem";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const RewardsScreen = () => {
