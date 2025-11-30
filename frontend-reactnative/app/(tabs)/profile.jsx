@@ -229,17 +229,30 @@ const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* CARD THỐNG KÊ */}
+          {/* CARD THỐNG KÊ - Đã thêm điều hướng */}
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
+            {/* 1. Nút xem Báo Cáo */}
+            <TouchableOpacity 
+                style={styles.statCard}
+                activeOpacity={0.7}
+                onPress={() => router.push('/reports')}
+            >
               <MaterialCommunityIcons name="file-document-outline" size={32} color="#0A0A0A" />
               <Text style={styles.statText}>{stats.reportsCount} báo cáo đã gửi</Text>
-            </View>
+              {/* Thêm text nhỏ để gợi ý bấm được */}
+              <Text style={{fontSize: 10, color: '#4CAF50', marginTop: 4, fontWeight: 'bold'}}>Xem chi tiết &rarr;</Text>
+            </TouchableOpacity>
 
-            <View style={styles.statCard}>
+            {/* 2. Nút xem Chatbot */}
+            <TouchableOpacity 
+                style={styles.statCard}
+                activeOpacity={0.7}
+                onPress={() => router.push('/chat/chatbot')} // Chuyển đến trang app/chat/chatbot.jsx
+            >
               <MaterialCommunityIcons name="message-text-outline" size={32} color="#0A0A0A" />
               <Text style={styles.statText}>{stats.questionsCount} câu hỏi chatbot</Text>
-            </View>
+              <Text style={{fontSize: 10, color: '#4CAF50', marginTop: 4, fontWeight: 'bold'}}>Xem lịch sử &rarr;</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>

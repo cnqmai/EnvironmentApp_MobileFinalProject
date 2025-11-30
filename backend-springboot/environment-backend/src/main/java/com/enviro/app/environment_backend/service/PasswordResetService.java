@@ -32,8 +32,7 @@ public class PasswordResetService {
     @Value("${password.frontend.reset-password-url}")
     private String frontendResetUrl; 
 
-    // --- SỬA DUY NHẤT DÒNG NÀY ---
-    // Thay vì lấy IP LAN (chỉ chạy nội bộ), ta lấy link Ngrok để email gửi đi bấm được
+    // Link backend dùng ngrok để truy cập từ ngoài internet
     private String backendUrl = "https://eructative-prodeportation-nikola.ngrok-free.dev";
     
     @Value("${spring.mail.username}")
@@ -47,64 +46,108 @@ public class PasswordResetService {
         this.mailSender = mailSender;
     }
 
+    // --- GIỮ NGUYÊN HÀM RESET PASSWORD CŨ CỦA BẠN ---
     @Transactional
     public void createAndSendResetToken(User user) {
-        // 1. Xóa token cũ
+       // ... (Code cũ giữ nguyên)
+       // Copy lại y nguyên nội dung hàm createAndSendResetToken từ file bạn gửi
         PasswordResetToken existingToken = tokenRepository.findByUser(user);
         if (existingToken != null) {
             tokenRepository.delete(existingToken);
         }
 
-        // 2. Tạo token mới (GIỮ NGUYÊN CODE CỦA BẠN - DÙNG SETTER)
         String token = UUID.randomUUID().toString();
         OffsetDateTime expiryDate = OffsetDateTime.now().plusMinutes(expirationTimeMinutes);
 
         PasswordResetToken newToken = new PasswordResetToken();
         newToken.setToken(token);
         newToken.setUser(user);
-        newToken.setExpiryDate(expiryDate); // Dùng OffsetDateTime như cũ
+        newToken.setExpiryDate(expiryDate);
         tokenRepository.save(newToken);
 
-        // 3. Tạo Link chuyển hướng
         String deepLink = frontendResetUrl + "?token=" + token;
         String httpLink = "";
         
         try {
-            // Encode deepLink để truyền an toàn trên URL
             String encodedDeepLink = URLEncoder.encode(deepLink, StandardCharsets.UTF_8.toString());
-            // Tạo link HTTP trỏ về API open-app của Backend
             httpLink = backendUrl + "/api/auth/open-app?url=" + encodedDeepLink;
         } catch (Exception e) {
             e.printStackTrace();
-            httpLink = deepLink; // Fallback nếu lỗi
+            httpLink = deepLink;
         }
 
-        // 4. Gửi Email chứa HTTP Link
         try {
-            sendHtmlEmail(user.getEmail(), httpLink, user.getFullName());
-            System.out.println(">>> [EMAIL SENT] Đã gửi mail thành công tới: " + user.getEmail());
-            System.out.println(">>> [LINK] " + httpLink);
+            sendHtmlEmail(user.getEmail(), httpLink, user.getFullName(), "RESET");
+            System.out.println(">>> [RESET PASSWORD] Email sent to: " + user.getEmail());
         } catch (MessagingException e) {
-            System.err.println(">>> [EMAIL ERROR] Không thể gửi mail: " + e.getMessage());
+            System.err.println(">>> [EMAIL ERROR] " + e.getMessage());
         }
     }
 
-    // Hàm gửi email HTML
-    private void sendHtmlEmail(String toAddress, String link, String name) throws MessagingException {
+    // --- THÊM HÀM MỚI: GỬI MAIL XÁC THỰC TÀI KHOẢN ---
+    @Transactional
+    public void createAndSendVerificationToken(User user) {
+        // 1. Xóa token cũ nếu có (dọn dẹp rác)
+        PasswordResetToken existingToken = tokenRepository.findByUser(user);
+        if (existingToken != null) {
+            tokenRepository.delete(existingToken);
+        }
+
+        // 2. Tạo token mới
+        String token = UUID.randomUUID().toString();
+        // Thời gian hết hạn cho xác thực có thể lâu hơn (ví dụ 24h)
+        OffsetDateTime expiryDate = OffsetDateTime.now().plusHours(24); 
+
+        PasswordResetToken newToken = new PasswordResetToken();
+        newToken.setToken(token);
+        newToken.setUser(user);
+        newToken.setExpiryDate(expiryDate);
+        tokenRepository.save(newToken);
+
+        // 3. Tạo Link HTTP gọi thẳng API Backend
+        // Khác với Reset Pass (cần mở App), Verify Email chỉ cần gọi API server là xong
+        // Link dạng: https://.../api/auth/verify-email?token=...
+        String verifyLink = backendUrl + "/api/auth/verify-email?token=" + token;
+
+        // 4. Gửi Email
+        try {
+            sendHtmlEmail(user.getEmail(), verifyLink, user.getFullName(), "VERIFY");
+            System.out.println(">>> [VERIFY EMAIL] Email sent to: " + user.getEmail());
+        } catch (MessagingException e) {
+            System.err.println(">>> [EMAIL ERROR] " + e.getMessage());
+        }
+    }
+
+    // Hàm gửi email chung (đã sửa để hỗ trợ 2 loại mail)
+    private void sendHtmlEmail(String toAddress, String link, String name, String type) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
         
         helper.setFrom(fromEmail);
         helper.setTo(toAddress);
-        helper.setSubject("Yêu cầu đặt lại mật khẩu - Enviroment App");
         
-        // Nội dung email dạng HTML
+        String subject = "";
+        String title = "";
+        String body = "";
+        String buttonText = "";
+        
+        if ("RESET".equals(type)) {
+            subject = "Yêu cầu đặt lại mật khẩu - Enviroment App";
+            title = "Yêu cầu đặt lại mật khẩu";
+            body = "Bạn đã yêu cầu đặt lại mật khẩu. Nhấn nút dưới để mở ứng dụng:";
+            buttonText = "Đặt lại mật khẩu";
+        } else {
+            subject = "Xác thực tài khoản - Enviroment App";
+            title = "Chào mừng đến với Enviroment App!";
+            body = "Cảm ơn bạn đã đăng ký. Vui lòng xác thực email để kích hoạt tài khoản:";
+            buttonText = "Xác thực ngay";
+        }
+        
+        helper.setSubject(subject);
+        
         String content = "<div style=\"font-family: Arial, sans-serif; padding: 20px;\">"
                 + "<h2>Xin chào " + name + ",</h2>"
-                + "<p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản Enviroment App.</p>"
-                + "<p>Vui lòng nhấn vào nút bên dưới để mở ứng dụng:</p>"
-                
-                // --- PHẦN LINK HTTP (Click được) ---
+                + "<p>" + body + "</p>"
                 + "<div style=\"margin: 30px 0;\">"
                 + "  <a href=\"" + link + "\" style=\""
                 + "    display: inline-block;"
@@ -114,19 +157,13 @@ public class PasswordResetService {
                 + "    text-decoration: none;"
                 + "    border-radius: 6px;"
                 + "    font-weight: bold;"
-                + "  \">Đặt lại mật khẩu</a>"
+                + "  \">" + buttonText + "</a>"
                 + "</div>"
-                // ---------------------------
-                
-                + "<p style=\"font-size: 13px; color: #666;\">Nếu nút không hoạt động, hãy copy link dưới đây vào trình duyệt:</p>"
+                + "<p style=\"font-size: 13px; color: #666;\">Hoặc copy link này:</p>"
                 + "<p style=\"font-size: 13px; color: #0088FF;\">" + link + "</p>"
-                
-                + "<hr style=\"margin-top: 20px; border: 0; border-top: 1px solid #eee;\"/>"
-                + "<p>Link này sẽ hết hạn sau " + expirationTimeMinutes + " phút.</p>"
-                + "<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>"
                 + "</div>";
         
-        helper.setText(content, true); // true = html
+        helper.setText(content, true);
         mailSender.send(message);
     }
     

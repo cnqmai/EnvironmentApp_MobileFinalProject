@@ -12,6 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
+// Import services
 import { requestPasswordReset } from '../src/services/authService'; 
 import { FONT_FAMILY } from '../styles/typography';
 
@@ -20,26 +21,40 @@ const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // FR-1.1.3: Gửi yêu cầu đặt lại mật khẩu
+  // Validate Email Regex
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSendCode = async () => {
+    // 1. Validate Input rỗng
     if (!email) {
       Alert.alert('Lỗi', 'Vui lòng nhập email');
       return;
     }
 
+    // 2. Validate định dạng Email
+    if (!isValidEmail(email)) {
+        Alert.alert('Lỗi', 'Email không hợp lệ. Vui lòng kiểm tra lại.');
+        return;
+    }
+
     setLoading(true);
     try {
-      // Gọi API yêu cầu reset mật khẩu
+      // 3. Gọi API
+      // Nếu email không tồn tại, Backend trả về 404 -> authService ném Error -> Nhảy vào catch
       await requestPasswordReset(email);
       
-      // Phản hồi thành công và điều hướng về login
+      // 4. Thành công
       Alert.alert(
         'Thành công', 
         'Link đặt lại mật khẩu đã được gửi vào email của bạn. Vui lòng kiểm tra hộp thư.', 
-        [{ text: 'OK', onPress: () => router.replace('/login') }] // Dùng replace để đóng màn hình này
+        [{ text: 'OK', onPress: () => router.replace('/login') }] 
       );
     } catch (error) {
-      // Hiển thị message lỗi
+      // 5. Hiển thị lỗi từ Backend (VD: "Email này chưa được đăng ký...")
+      console.log("Forgot Password Error:", error);
       Alert.alert('Lỗi', error.message || 'Không thể gửi yêu cầu.');
     } finally {
       setLoading(false);
@@ -64,15 +79,17 @@ const ForgotPassword = () => {
 
             {/* Email Input */}
             <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+            <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập email"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+            </View>
             
             {/* Submit Button */}
             <TouchableOpacity 
@@ -87,8 +104,8 @@ const ForgotPassword = () => {
               )}
             </TouchableOpacity>
 
-            {/* View trống để đẩy nội dung lên trên, nếu nội dung ngắn */}
-            <View style={{ flex: 1, marginTop: 50 }} />
+            {/* View trống để đẩy nội dung lên trên */}
+            <View style={{ flex: 1, minHeight: 50 }} />
 
             {/* Quay lại đăng nhập */}
             <TouchableOpacity 
@@ -136,7 +153,6 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
   },
-  // --- LABEL VÀ INPUT (Đồng bộ hóa) ---
   label: {
     fontSize: 16,
     color: '#000000',
@@ -145,18 +161,24 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '600',
   },
-  input: {
+  // Sử dụng inputContainer giống Register/Login để đồng bộ
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#0088FF',
     borderRadius: 15,
-    paddingVertical: 12,
+    marginBottom: 40,
     paddingHorizontal: 15,
+    backgroundColor: '#fff',
+  },
+  inputField: {
+    flex: 1, 
+    paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-    marginBottom: 40, 
-    fontFamily: FONT_FAMILY, 
+    fontFamily: FONT_FAMILY,
   },
-  // --- SUBMIT BUTTON (Đồng bộ hóa) ---
   submitButton: {
     backgroundColor: '#007bff',
     paddingVertical: 15,
@@ -174,13 +196,12 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
   },
-  // --- QUAY LẠI ĐĂNG NHẬP (Footer/Button) ---
   backToLoginButton: {
     backgroundColor: '#F0EFED',
     paddingVertical: 15,
-    borderRadius: 15, // Dùng 15px để đồng bộ với Guest Button bên login.jsx
+    borderRadius: 15,
     alignItems: 'center',
-    marginTop: 60, // Đẩy lên 60px để có khoảng cách tốt
+    marginTop: 20,
   },
   backToLoginText: {
     color: '#000000',

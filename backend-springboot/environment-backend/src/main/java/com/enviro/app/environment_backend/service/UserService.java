@@ -31,6 +31,7 @@ import com.enviro.app.environment_backend.model.NotificationSettings;
 import com.enviro.app.environment_backend.model.Report;
 import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
+import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
@@ -44,7 +45,8 @@ public class UserService {
     private final ReportRepository reportRepository;
     private final SavedLocationRepository savedLocationRepository;
     private final NotificationSettingsRepository notificationSettingsRepository;
-    private final UserBadgeRepository userBadgeRepository; // *** Cần inject ***
+    private final UserBadgeRepository userBadgeRepository;
+    private final ChatbotHistoryRepository chatbotHistoryRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
 
@@ -58,6 +60,7 @@ public class UserService {
                   SavedLocationRepository savedLocationRepository,
                   NotificationSettingsRepository notificationSettingsRepository,
                   UserBadgeRepository userBadgeRepository, 
+                  ChatbotHistoryRepository chatbotHistoryRepository,
                   PasswordEncoder passwordEncoder,
                   NotificationService notificationService) { 
     this.userRepository = userRepository;
@@ -65,6 +68,7 @@ public class UserService {
     this.savedLocationRepository = savedLocationRepository;
     this.notificationSettingsRepository = notificationSettingsRepository;
     this.userBadgeRepository = userBadgeRepository;
+    this.chatbotHistoryRepository = chatbotHistoryRepository;
     this.passwordEncoder = passwordEncoder;
     this.notificationService = notificationService;
 }
@@ -178,6 +182,10 @@ public class UserService {
                 .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
                 .sum();
         
+        // --- ĐẾM SỐ TIN NHẮN CHATBOT ---
+        long totalChatMessages = chatbotHistoryRepository.countByUser(user);
+        // -------------------------------
+
         return UserStatisticsResponse.builder()
                 .totalReports(totalReports)
                 .reportsReceived(reportsReceived)
@@ -187,6 +195,7 @@ public class UserService {
                 .savedLocationsCount(savedLocationsCount)
                 .wasteClassificationsCount(wasteClassificationsCount)
                 .totalMediaUploaded(totalMediaUploaded)
+                .totalChatMessages(totalChatMessages)
                 .build();
     }
 
@@ -314,7 +323,8 @@ public class UserService {
         reportRepository.deleteByUser(user);
         savedLocationRepository.deleteByUserId(userId);
         notificationSettingsRepository.deleteByUser(user);
-        userBadgeRepository.deleteByUser(user); // Xóa Badge đã đạt được
+        userBadgeRepository.deleteByUser(user);
+        chatbotHistoryRepository.deleteByUser(user);
         
         // 4. Xóa bản ghi User cuối cùng
         userRepository.delete(user);

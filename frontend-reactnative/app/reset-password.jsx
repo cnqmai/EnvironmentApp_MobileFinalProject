@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router'; // ĐÃ SỬA: dùng useLocalSearchParams
+import { useRouter, useLocalSearchParams } from 'expo-router'; 
 import { FONT_FAMILY } from '../styles/typography';
 import { resetPassword } from '../src/services/authService'; 
 
@@ -20,15 +20,14 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Lấy token từ URL (ví dụ: /reset-password?token=XYZ)
-  const { token } = useLocalSearchParams(); // ĐÃ SỬA: dùng useLocalSearchParams
+  // Lấy token từ URL
+  const { token } = useLocalSearchParams(); 
   
   const router = useRouter();
 
   // Kiểm tra token khi màn hình được load
   useEffect(() => {
     if (!token) {
-      // Nếu không có token, chuyển hướng về Forgot Password
       Alert.alert(
         'Lỗi', 
         'Token đặt lại mật khẩu không hợp lệ. Vui lòng thử lại.', 
@@ -39,16 +38,25 @@ const ResetPassword = () => {
 
   // Xử lý việc đặt lại mật khẩu
   const handleResetPassword = async () => {
+    // 1. Validate Input rỗng
     if (!newPassword || !confirmPassword) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ Mật khẩu mới và Xác nhận.');
       return;
     }
+
+    // 2. Validate độ dài mật khẩu (> 6 ký tự) - MỚI THÊM
+    if (newPassword.length <= 6) {
+        Alert.alert('Lỗi', 'Mật khẩu mới phải có nhiều hơn 6 ký tự.');
+        return;
+    }
+
+    // 3. Validate Khớp mật khẩu
     if (newPassword !== confirmPassword) {
-      // Backend cũng kiểm tra điều này
       Alert.alert('Lỗi', 'Mật khẩu mới và Xác nhận mật khẩu không khớp.'); 
       return;
     }
     
+    // 4. Validate Token
     if (!token) {
         Alert.alert('Lỗi', 'Không tìm thấy token đặt lại mật khẩu.');
         return;
@@ -56,7 +64,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      // Gọi API reset mật khẩu, gửi token và mật khẩu
+      // Gọi API reset mật khẩu
       await resetPassword(token, newPassword, confirmPassword);
       
       // Phản hồi thành công
@@ -66,7 +74,6 @@ const ResetPassword = () => {
         [{ text: 'OK', onPress: () => router.replace('/login') }] 
       );
     } catch (error) {
-      // Hiển thị lỗi từ Backend (ví dụ: Token không hợp lệ hoặc đã hết hạn)
       Alert.alert('Lỗi', error.message || 'Không thể đặt lại mật khẩu.');
     } finally {
       setLoading(false);
@@ -93,7 +100,7 @@ const ResetPassword = () => {
             <Text style={styles.label}>Mật khẩu mới</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập mật khẩu mới"
+              placeholder="Nhập mật khẩu mới (> 6 ký tự)" // Cập nhật placeholder cho rõ ràng
               placeholderTextColor="#999"
               value={newPassword}
               onChangeText={setNewPassword}
@@ -138,7 +145,7 @@ const ResetPassword = () => {
   );
 };
 
-// Sử dụng styles đồng bộ với forgot-password.jsx
+// Styles giữ nguyên như cũ
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -45,13 +45,17 @@ public class User {
     private String phoneNumber;
     
     @Column(name = "unread_notification_count", columnDefinition = "integer default 0")
-    private int unreadNotificationCount = 0; // Khởi tạo giá trị mặc định là 0
+    private int unreadNotificationCount = 0; 
 
     @Column(name = "share_personal_data", columnDefinition = "boolean default false")
-    private boolean sharePersonalData = false; // Mặc định không chia sẻ
+    private boolean sharePersonalData = false; 
     
     @Column(name = "share_location", columnDefinition = "boolean default false")
-    private boolean shareLocation = false; // Mặc định không chia sẻ vị trí
+    private boolean shareLocation = false; 
+
+    @Column(name = "enabled", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean enabled = false; 
 
     @CreationTimestamp
     private OffsetDateTime createdAt;

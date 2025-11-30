@@ -3,49 +3,74 @@ import { View, StyleSheet } from "react-native";
 import { Card, Text, Button } from "react-native-paper";
 import typography, { FONT_FAMILY } from "../styles/typography";
 
-// CẬP NHẬT LOGIC HIỂN THỊ THEO YÊU CẦU
+// CẬP NHẬT LOGIC: Thêm trường 'recommendations' cho từng mức độ
 export const getAqiInfo = (aqi) => {
   if (aqi <= 50) {
     return {
       color: "#4CAF50", // Xanh lá
       status: "Tốt",
       description: "Không khí trong lành.",
+      recommendations: [
+        { icon: "🏃", text: "Thoải mái tham gia các hoạt động ngoài trời." },
+        { icon: "🏠", text: "Nên mở cửa sổ để không khí lưu thông." }
+      ]
     };
   } else if (aqi <= 100) {
     return {
       color: "#FFC107", // Vàng
       status: "Trung bình",
       description: "Chất lượng chấp nhận được.",
+      recommendations: [
+        { icon: "⚠️", text: "Nhóm nhạy cảm nên hạn chế vận động mạnh." },
+        { icon: "🏠", text: "Vẫn có thể mở cửa sổ, nhưng cần chú ý." }
+      ]
     };
   } else if (aqi <= 150) {
     return {
       color: "#FF9800", // Cam
       status: "Kém",
       description: "Nhóm nhạy cảm cần lưu ý.",
+      recommendations: [
+        { icon: "😷", text: "Người già, trẻ em nên đeo khẩu trang khi ra ngoài." },
+        { icon: "🏠", text: "Đóng cửa sổ, hạn chế không khí bên ngoài vào." }
+      ]
     };
   } else if (aqi <= 200) {
     return {
       color: "#F44336", // Đỏ
       status: "Xấu",
       description: "Có hại cho sức khỏe.",
+      recommendations: [
+        { icon: "😷", text: "Bắt buộc đeo khẩu trang chống bụi mịn (N95)." },
+        { icon: "🚫", text: "Hạn chế tối đa các hoạt động ngoài trời." }
+      ]
     };
-  } else if (aqi <= 300) { // Khoảng 201-300
+  } else if (aqi <= 300) {
     return {
       color: "#9C27B0", // Tím
       status: "Rất xấu",
       description: "Cảnh báo khẩn cấp.",
+      recommendations: [
+        { icon: "🏠", text: "Nên ở trong nhà, sử dụng máy lọc không khí." },
+        { icon: "🚫", text: "Tránh mọi hoạt động thể chất ngoài trời." }
+      ]
     };
   } else {
     return {
-      color: "#7E0023", // Nâu đỏ (Maroon)
-      status: "Nguy hiểm", // Đúng tên gọi yêu cầu
+      color: "#7E0023", // Nâu đỏ
+      status: "Nguy hiểm",
       description: "Báo động! Tránh ra ngoài.",
+      recommendations: [
+        { icon: "🆘", text: "Tuyệt đối không ra ngoài nếu không cần thiết." },
+        { icon: "🏥", text: "Theo dõi sức khỏe, đến bệnh viện nếu khó thở." }
+      ]
     };
   }
 };
 
 const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
-  const { color, status, description: defaultDesc } = getAqiInfo(aqi);
+  // Lấy thêm recommendations từ hàm getAqiInfo
+  const { color, status, description: defaultDesc, recommendations } = getAqiInfo(aqi);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleExpansion = () => {
@@ -89,27 +114,17 @@ const AQICard = ({ location, aqi, description, isSensitiveGroup, onPress }) => {
               Khuyến nghị hành động
             </Text>
 
-            <View style={styles.recommendationItem}>
-              <View style={[styles.iconContainer, { backgroundColor: color }]}>
-                <Text style={styles.iconText}>😷</Text>
+            {/* Render danh sách khuyến nghị động từ mảng recommendations */}
+            {recommendations.map((item, index) => (
+              <View key={index} style={styles.recommendationItem}>
+                <View style={[styles.iconContainer, { backgroundColor: color }]}>
+                  <Text style={styles.iconText}>{item.icon}</Text>
+                </View>
+                <Text style={styles.recommendationText}>
+                  {item.text}
+                </Text>
               </View>
-              <Text style={styles.recommendationText}>
-                {aqi > 100 
-                  ? "Nên đeo khẩu trang chống bụi mịn khi ra ngoài." 
-                  : "Không cần khẩu trang chuyên dụng."}
-              </Text>
-            </View>
-
-            <View style={styles.recommendationItem}>
-              <View style={[styles.iconContainer, { backgroundColor: color }]}>
-                <Text style={styles.iconText}>🏠</Text>
-              </View>
-              <Text style={styles.recommendationText}>
-                {aqi > 150 
-                  ? "Nên đóng kín cửa sổ và hạn chế ra ngoài." 
-                  : "Mở cửa sổ để không khí lưu thông."}
-              </Text>
-            </View>
+            ))}
 
             <Button
               mode="contained"

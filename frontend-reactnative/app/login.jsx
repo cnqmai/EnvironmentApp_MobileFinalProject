@@ -6,7 +6,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking'; // Import thêm Linking
+import * as Linking from 'expo-linking';
+import { Ionicons } from '@expo/vector-icons'; // Import Icon
 
 import { login, loginWithGoogle } from '../src/services/authService'; 
 import { saveToken } from '../src/utils/apiHelper'; 
@@ -20,6 +21,8 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleStatus, setGoogleStatus] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // State ẩn hiện mật khẩu
+
   const router = useRouter();
   
   // Lấy params từ Deep Link (Ngrok trả về token ở đây)
@@ -28,21 +31,18 @@ const Login = () => {
   // Cấu hình NGROK và Google
   const NGROK_URL = "https://eructative-prodeportation-nikola.ngrok-free.dev";
   const { google } = Constants.expoConfig?.extra || {};
-  const webClientId = google?.webClientId; // Chỉ cần Web Client ID
+  const webClientId = google?.webClientId; 
 
   // --- XỬ LÝ KHI APP ĐƯỢC MỞ LẠI TỪ NGROK ---
   useEffect(() => {
     const handleUrl = ({ url }) => {
       console.log(">>> Link nhận được:", url);
 
-      // 1. QUAN TRỌNG: Nếu là link Reset Password thì bỏ qua ngay
-      // Để cho Expo Router tự điều hướng sang trang ResetPassword
       if (url && url.includes('reset-password')) {
         console.log(">>> Đây là link Reset Password, Login component sẽ bỏ qua.");
         return; 
       }
 
-      // 2. Logic cũ: Chỉ xử lý nếu là Google Login
       if (url && url.includes('token=')) {
         try {
           const { queryParams } = Linking.parse(url);
@@ -71,24 +71,22 @@ const Login = () => {
     return () => sub.remove();
   }, []);
 
-  // --- HÀM BẮT ĐẦU ĐĂNG NHẬP ---
+  // --- HÀM BẮT ĐẦU ĐĂNG NHẬP GOOGLE ---
   const handleSignInGoogle = async () => {
     setLoading(true);
     try {
-      // Tự tạo URL đăng nhập Google thủ công
-      // Lý do: Để ép Google trả về link Ngrok của bạn
+      const returnUrl = Linking.createURL('/login'); 
+      console.log("📍 Return URL gửi đi:", returnUrl);
+      const stateParam = encodeURIComponent(returnUrl);
+
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth` +
         `?client_id=${webClientId}` +
         `&redirect_uri=${encodeURIComponent(`${NGROK_URL}/api/auth/callback/google`)}` +
-        `&response_type=code` + // Lấy code để Backend tự xử lý lấy Token
-        `&scope=email%20profile%20openid`;
+        `&response_type=code` +
+        `&scope=email%20profile%20openid` +
+        `&state=${stateParam}`;
 
-      console.log("🚀 Đang mở trình duyệt đến:", googleAuthUrl);
-
-      // --- SỬA CHỖ 2: Dùng openBrowserAsync ---
       await WebBrowser.openBrowserAsync(googleAuthUrl);
-      
-      // Loading vẫn quay để chờ App quay lại và useEffect bắt được Token
     } catch (error) {
       console.log('❌ Lỗi mở trình duyệt:', error);
       setLoading(false);
@@ -97,10 +95,7 @@ const Login = () => {
 
   const handleDeepLinkLogin = async (jwtToken, userEmail) => {
     try {
-      // Token này là do Backend (Spring Boot) đã xử lý và tạo ra
       await saveToken(jwtToken);
-      
-      // Nếu Backend trả về email thì lưu, không thì thôi
       const userData = userEmail ? { email: userEmail } : {};
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
@@ -114,66 +109,41 @@ const Login = () => {
     }
   };
 
-  // --- Các hàm Login khác giữ nguyên ---
-  const finishLogin = async (data) => {
-    if (data && data.token) {
-      await saveToken(data.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(data.user || {}));
-      setLoading(false);
-      router.replace('/(tabs)');
-    } else {
-        setLoading(false);
-        Alert.alert("Lỗi", "Server không trả về token.");
-    }
-  };
-
+  // --- LOGIN THƯỜNG ---
   const handleLogin = async () => { 
     if (!email || !password) { Alert.alert('Thông báo', 'Nhập email/pass'); return; }
     setLoading(true);
     try {
-      // 1. Gọi API đăng nhập
       const data = await login(email, password);
       
       if (data.token) {
-        // --- SỬA LỖI 401: Dùng saveToken thay vì AsyncStorage.setItem thủ công ---
         await saveToken(data.token); 
-        // -----------------------------------------------------------------------
-        
         let userData = data.user;
 
-        // --- TÍNH NĂNG: Tự động cập nhật vị trí ---
         try {
           console.log("Đang lấy vị trí hiện tại...");
           const currentAddress = await getCurrentDeviceAddress();
-          
           if (currentAddress) {
-            console.log("Đã lấy được vị trí:", currentAddress);
-            
-            // Cập nhật lên server (Lúc này token đã được lưu đúng nên API này sẽ chạy OK)
             await updateProfile({ defaultLocation: currentAddress });
-            
-            // Cập nhật vào biến cục bộ để lưu xuống máy
             if (userData) {
                 userData = { ...userData, defaultLocation: currentAddress };
             }
           }
         } catch (locError) {
           console.warn("Không thể tự động cập nhật vị trí:", locError);
-          // Không chặn đăng nhập nếu lỗi vị trí
         }
-        // ------------------------------------------
 
-        // Lưu thông tin user để hiển thị offline/profile
         if (userData) {
              await AsyncStorage.setItem('userData', JSON.stringify(userData));
         }
       }
 
-      // Điều hướng vào trong App
       router.replace('/(tabs)'); 
 
     } catch (error) {
-      Alert.alert('Lỗi', "Sai thông tin đăng nhập");
+      // Xử lý thông báo lỗi chi tiết hơn nếu backend trả về (ví dụ chưa kích hoạt)
+      const msg = error.response?.data?.message || "Sai thông tin đăng nhập hoặc tài khoản chưa kích hoạt.";
+      Alert.alert('Lỗi', msg);
       setLoading(false);
     }
   };
@@ -187,10 +157,26 @@ const Login = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Đăng nhập</Text>
         <View style={styles.form}>
+          {/* Email */}
           <Text style={styles.label}>Email</Text>
-          <TextInput style={styles.input} placeholder="Nhập email" value={email} onChangeText={setEmail} autoCapitalize="none"/>
+          <View style={styles.inputContainer}>
+            <TextInput style={styles.inputField} placeholder="Nhập email" value={email} onChangeText={setEmail} autoCapitalize="none"/>
+          </View>
+
+          {/* Mật khẩu */}
           <Text style={styles.label}>Mật khẩu</Text>
-          <TextInput style={styles.input} placeholder="Nhập mật khẩu" secureTextEntry={true} value={password} onChangeText={setPassword}/>
+          <View style={styles.inputContainer}>
+            <TextInput 
+                style={styles.inputField} 
+                placeholder="Nhập mật khẩu" 
+                secureTextEntry={!showPassword} 
+                value={password} 
+                onChangeText={setPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#999" />
+            </TouchableOpacity>
+          </View>
           
           <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.forgotContainer}>
             <Text style={styles.forgotText}>Quên mật khẩu?</Text>
@@ -257,16 +243,26 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: 'bold',
   },
-  input: {
+  // Style mới cho Input Container
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#0088FF',
     borderRadius: 15,
-    paddingVertical: 12,
+    marginBottom: 25,
     paddingHorizontal: 15,
+    backgroundColor: '#fff',
+  },
+  inputField: {
+    flex: 1,
+    paddingVertical: 12,
     fontSize: 16,
     color: '#333', 
-    marginBottom: 25,
     fontFamily: FONT_FAMILY, 
+  },
+  eyeIcon: {
+    padding: 5,
   },
   forgotContainer: {
     alignItems: 'center',
@@ -318,7 +314,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   socialButton: {
-    flexDirection: 'row', // Thêm dòng này để icon và text nằm ngang
+    flexDirection: 'row', 
     flex: 1, 
     paddingVertical: 15,
     borderRadius: 15,
@@ -334,9 +330,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     resizeMode: 'contain',
-    marginRight: 10, // Thêm khoảng cách giữa icon và text
+    marginRight: 10, 
   },
-  socialText: { // Thêm style cho text Google
+  socialText: { 
     fontSize: 16,
     color: '#000',
     fontFamily: FONT_FAMILY,

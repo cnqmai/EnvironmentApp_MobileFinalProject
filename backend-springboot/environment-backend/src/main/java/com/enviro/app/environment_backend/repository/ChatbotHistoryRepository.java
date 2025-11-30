@@ -19,4 +19,10 @@ public interface ChatbotHistoryRepository extends JpaRepository<ChatbotHistory, 
     
     // [MỚI] Xóa cả cuộc hội thoại
     void deleteBySessionId(String sessionId);
+    
+    // Đếm số tin nhắn
+    long countByUser(User user);
+
+    // --- [MỚI] XÓA TẤT CẢ LỊCH SỬ CỦA USER ---
+    void deleteByUser(User user);
 }

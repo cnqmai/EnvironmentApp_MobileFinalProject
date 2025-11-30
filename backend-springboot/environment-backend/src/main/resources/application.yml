@@ -102,7 +102,7 @@ password:
       
   frontend:
     # Link Deep Link mở App (thay link Tunnel của bạn vào đây)
-    reset-password-url: "exp://duqqiw0-cnqmai-8081.exp.direct/--/reset-password"
+    reset-password-url: "exp://ze8itke-cnqmai-8081.exp.direct/--/reset-password"
     
     # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
     # Trừ khi bạn cài ngrok cho cả Spring Boot

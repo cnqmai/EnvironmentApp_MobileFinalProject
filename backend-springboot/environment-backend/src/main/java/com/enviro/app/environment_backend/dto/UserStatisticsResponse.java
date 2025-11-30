@@ -29,5 +29,7 @@ public class UserStatisticsResponse {
     
     // Tổng số media (ảnh/video) đã upload
     long totalMediaUploaded;
+    
+    long totalChatMessages;
 }
 

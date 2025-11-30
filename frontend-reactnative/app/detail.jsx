@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LineChart } from "react-native-chart-kit";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AQIRecommendation from "../components/AQIRecommendation";
 import { getAqiInfo } from "../components/AQICard";
 import typography, { FONT_FAMILY } from "../styles/typography";

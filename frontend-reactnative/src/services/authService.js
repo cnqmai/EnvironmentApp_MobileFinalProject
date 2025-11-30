@@ -35,6 +35,8 @@ const handleApiError = async (response) => {
 
 /**
  * Đăng nhập người dùng (FR-1.1.1)
+ * Lưu ý: Nếu tài khoản chưa kích hoạt (enabled=false), API trả về 403.
+ * Hàm handleApiError sẽ bắt được message: "Tài khoản chưa được kích hoạt..."
  */
 export const login = async (email, password) => {
   try {
@@ -65,6 +67,7 @@ export const login = async (email, password) => {
 
 /**
  * Đăng ký người dùng mới
+ * Backend trả về String thông báo, nên dùng response.text() thay vì json()
  */
 export const register = async (fullName, email, password) => {
   try {
@@ -81,7 +84,8 @@ export const register = async (fullName, email, password) => {
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    // [SỬA QUAN TRỌNG]: Backend trả về text, không phải JSON
+    return response.text(); 
   } catch (error) {
     throw error;
   }
@@ -89,7 +93,6 @@ export const register = async (fullName, email, password) => {
 
 /**
  * Gửi yêu cầu quên mật khẩu (gửi email)
- * ĐÃ SỬA: Chuyển sang fetch và thêm /auth vào URL
  */
 export const requestPasswordReset = async (email) => {
   try {
@@ -106,7 +109,6 @@ export const requestPasswordReset = async (email) => {
       throw new Error(errorMessage);
     }
 
-    // Backend trả về chuỗi text thông báo, dùng text() thay vì json()
     return response.text();
   } catch (error) {
     throw error;
@@ -115,7 +117,6 @@ export const requestPasswordReset = async (email) => {
 
 /**
  * Đặt lại mật khẩu mới với token
- * ĐÃ SỬA: Chuyển sang fetch và thêm /auth vào URL
  */
 export const resetPassword = async (token, newPassword, confirmPassword) => {
   try {
@@ -144,7 +145,6 @@ export const resetPassword = async (token, newPassword, confirmPassword) => {
 
 /**
  * Đăng nhập bằng Google (FR-1.1.1)
- * Gửi ID token từ Google OAuth
  */
 export const loginWithGoogle = async (idToken) => {
   console.log('loginWithGoogle: sending ID token to', `${API_BASE_URL}/auth/google`);

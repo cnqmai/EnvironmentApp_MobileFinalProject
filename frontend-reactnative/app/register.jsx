@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 // Import service
 import { register } from '../src/services/authService';
-import { fetchAndSaveUserLocation } from '../src/services/locationService'; // Import mới
+import { fetchAndSaveUserLocation } from '../src/services/locationService'; 
 
 // Import FONT_FAMILY
 import { FONT_FAMILY } from '../styles/typography'; 
@@ -25,20 +25,38 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // State hiển thị
   const [loading, setLoading] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const router = useRouter();
 
+  // Hàm validate email
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleRegister = async () => {
-    // Validate cơ bản
-    if (!fullName || !email || !password || !confirmPassword) {
-        Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+    // 1. Validate Input
+    if (!email || !isValidEmail(email)) {
+        Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ email hợp lệ (có @ và tên miền).');
+        return;
+    }
+    if (password.length < 6) {
+        Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự.');
         return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp.');
       return;
+    }
+    if (!fullName) {
+        Alert.alert('Lỗi', 'Vui lòng nhập họ tên.');
+        return;
     }
     if (!isAgreed) {
         Alert.alert('Lỗi', 'Vui lòng đồng ý với Điều khoản & Chính sách');
@@ -47,18 +65,26 @@ const Register = () => {
 
     setLoading(true);
     try {
-      // Gọi hàm register
+      // 2. Gọi API Đăng ký
       await register(fullName, email, password);
       
-      // --- CẬP NHẬT MỚI: Xin quyền và lấy vị trí ngay lúc này ---
-      // Việc này giúp "làm nóng" quyền truy cập vị trí trước khi vào app
-      await fetchAndSaveUserLocation();
+      // 3. Xử lý lấy vị trí (Tách try-catch riêng)
+      try {
+        await fetchAndSaveUserLocation();
+      } catch (locError) {
+        console.log("Không lấy được vị trí ban đầu (không nghiêm trọng):", locError);
+      }
 
-      Alert.alert('Thành công', 'Đăng ký thành công! Vui lòng đăng nhập.', [
-        { text: 'OK', onPress: () => router.push('/login') }
-      ]);
+      // 4. Thông báo thành công và Chuyển hướng
+      Alert.alert(
+        'Đăng ký thành công', 
+        'Một email xác thực đã được gửi đến hòm thư của bạn. Vui lòng kiểm tra email (cả mục Spam) để kích hoạt tài khoản trước khi đăng nhập.', 
+        [{ text: 'Về trang đăng nhập', onPress: () => router.push('/login') }]
+      );
+
     } catch (error) {
-      Alert.alert('Lỗi đăng ký', error.message);
+      console.log("Lỗi đăng ký:", error);
+      Alert.alert('Lỗi đăng ký', error.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
@@ -77,49 +103,63 @@ const Register = () => {
         <View style={styles.form}>
             {/* Full Name Input */}
             <Text style={styles.label}>Họ và tên</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập họ và tên" 
-              placeholderTextColor="#999"
-              value={fullName}
-              onChangeText={setFullName}
-            />
+            <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập họ và tên" 
+                  placeholderTextColor="#999"
+                  value={fullName}
+                  onChangeText={setFullName}
+                />
+            </View>
 
             {/* Email Input */}
             <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+            <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập email"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+            </View>
 
             {/* Password Input */}
             <Text style={styles.label}>Mật khẩu</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập mật khẩu"
-              placeholderTextColor="#999"
-              secureTextEntry={true}
-              value={password}
-              onChangeText={setPassword}
-            />
+            <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập mật khẩu (>6 ký tự)"
+                  placeholderTextColor="#999"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#999" />
+                </TouchableOpacity>
+            </View>
             
             {/* Confirm Password Input */}
             <Text style={styles.label}>Xác nhận mật khẩu</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập lại mật khẩu"
-              placeholderTextColor="#999"
-              secureTextEntry={true}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
+            <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập lại mật khẩu"
+                  placeholderTextColor="#999"
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                    <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="#999" />
+                </TouchableOpacity>
+            </View>
             
-            {/* Terms Checkbox */}
+            {/* Terms Checkbox - ĐÃ CẬP NHẬT ĐIỀU HƯỚNG */}
             <View style={styles.termsContainer}>
                 <TouchableOpacity style={styles.checkbox} onPress={() => setIsAgreed(!isAgreed)}>
                     <Ionicons 
@@ -130,7 +170,12 @@ const Register = () => {
                 </TouchableOpacity>
                 <Text style={styles.termsText}>
                     Tôi đồng ý với{' '}
-                    <Text style={styles.termsLink}>Điều khoản & Chính sách</Text>
+                    <Text 
+                        style={styles.termsLink}
+                        onPress={() => router.push('/settings/policy')} 
+                    >
+                        Điều khoản & Chính sách
+                    </Text>
                 </Text>
             </View>
 
@@ -193,16 +238,25 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, 
     fontWeight: 'bold',
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#0088FF',
     borderRadius: 15,
-    paddingVertical: 12,
+    marginBottom: 20,
     paddingHorizontal: 15,
+    backgroundColor: '#fff',
+  },
+  inputField: {
+    flex: 1, 
+    paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-    marginBottom: 20, 
-    fontFamily: FONT_FAMILY, 
+    fontFamily: FONT_FAMILY,
+  },
+  eyeIcon: {
+    padding: 5,
   },
   // --- TERMS AND CHECKBOX ---
   termsContainer: {
@@ -224,6 +278,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontFamily: FONT_FAMILY, 
     fontWeight: '700',
+    // Bạn có thể thêm màu để làm nổi bật link
+    color: '#007bff', 
   },
   // --- REGISTER BUTTON ---
   registerButton: {
