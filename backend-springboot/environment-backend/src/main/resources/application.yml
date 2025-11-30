@@ -1,17 +1,14 @@
 server:
   port: 8080
-  # QUAN TRỌNG: Đặt context-path là / để không bị nhân đôi thành /api/api
   servlet:
     context-path: /
 
 spring:
   datasource:
-    # --- SỬA DÒNG NÀY ---
-    # Thêm ?stringtype=unspecified vào cuối URL
     url: jdbc:postgresql://localhost:5432/environment_db?stringtype=unspecified
-    # ---------------------
     username: env_app_user
     password: "2112"
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     show-sql: true
@@ -20,6 +17,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
   
   security:
     oauth2:
@@ -27,29 +25,53 @@ spring:
         registration:
           google:
             client-id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-          
-          # --- Cấu hình cho Facebook ---
+            client-secret: "YOUR_GOOGLE_SECRET"
+            scope:
+              - email
+              - profile
           facebook:
             client-id: "YOUR_FACEBOOK_APP_ID"
             client-secret: "YOUR_FACEBOOK_APP_SECRET"
+            scope:
+              - email
+              - public_profile
 
-# --- Cấu hình API của Facebook ---
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# --- CẤU HÌNH CÁC BIẾN MÔI TRƯỜNG ---
+
+# Fix lỗi 1: Cho Service upload
+file:
+  upload:
+    dir: uploads
+
+# Fix lỗi 2: Cho WebConfig
+app:
+  upload:
+    dir: uploads
+
 facebook:
   api:
     user-info-uri: "https://graph.facebook.com/me?fields=id,name,email,picture.type(large)"
 
-# --- JWT Configuration ---
 jwt:
   secret:
-    # Key Base64
     key: MjAxNS0xMDExY2h1eWVuZGVtb2JpbGUxMGRpZW0xMjM0NQ== 
   expiration:
     ms: 86400000
 
-# --- AQI API Configuration (OpenWeatherMap) ---
 aqi:
   api:
-    # Thay thế bằng API Key thật của bạn
     key: 5ad9ae819b67abf939f3e0d4604bd362
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    com.enviro.app: DEBUG
