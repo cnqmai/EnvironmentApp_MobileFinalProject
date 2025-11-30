@@ -1,8 +1,7 @@
-// styles/typography.js
-// Thư viện style typography dùng chung cho dự án
-import { StyleSheet } from "react-native";
+import { StyleSheet, Platform } from "react-native";
 
-export const FONT_FAMILY = "SF Pro Display";
+// ĐÃ SỬA: Sử dụng font hệ thống thay vì SF Pro Display
+export const FONT_FAMILY = Platform.OS === 'ios' ? "System" : "Roboto";
 
 const typography = StyleSheet.create({
   h1: {

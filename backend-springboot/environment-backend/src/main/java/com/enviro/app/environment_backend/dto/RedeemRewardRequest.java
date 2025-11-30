@@ -1,11 +1,26 @@
 package com.enviro.app.environment_backend.dto;
 
-import lombok.Value;
-
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-@Value
 public class RedeemRewardRequest {
-    UUID rewardId;
-}
+    @NotNull(message = "Reward ID cannot be null")
+    private UUID rewardId;
 
+    // Default constructor
+    public RedeemRewardRequest() {}
+
+    // Constructor with fields
+    public RedeemRewardRequest(UUID rewardId) {
+        this.rewardId = rewardId;
+    }
+
+    // Getters and Setters
+    public UUID getRewardId() {
+        return rewardId;
+    }
+
+    public void setRewardId(UUID rewardId) {
+        this.rewardId = rewardId;
+    }
+}
