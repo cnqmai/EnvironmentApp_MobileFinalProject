@@ -192,12 +192,12 @@ const CommunityScreen = () => {
     <View style={styles.contentContainer}>
       <TouchableOpacity
         style={styles.createCommunityButton}
-        onPress={() => router.push("/community/create")}
+        onPress={() => router.push("/community/create-community")}
         activeOpacity={0.8}
       >
         <MaterialCommunityIcons
           name="account-multiple-plus"
-          size={20}
+          size={18}
           color="#FFFFFF"
         />
         <Text style={styles.createCommunityButtonText}>Tạo cộng đồng mới</Text>
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...typography.h2,
     fontSize: 28,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#0A0A0A",
     letterSpacing: -0.5,
   },
@@ -520,11 +520,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#007AFF",
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginBottom: 20,
-    gap: 8,
+    gap: 6,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -533,8 +533,8 @@ const styles = StyleSheet.create({
   },
   createCommunityButtonText: {
     ...typography.body,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "600",
     color: "#FFFFFF",
   },
 });

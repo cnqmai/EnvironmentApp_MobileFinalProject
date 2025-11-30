@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.h2,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     color: "#0A0A0A",
     letterSpacing: -0.3,

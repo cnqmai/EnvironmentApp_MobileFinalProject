@@ -111,6 +111,14 @@ export default function RootLayout() {
             name="community/[id]/events/[eventId]"
             options={{ headerShown: false, title: "Chi tiết sự kiện" }}
           />
+          <Stack.Screen
+            name="community/create-community"
+            options={{ headerShown: false, title: "Tạo cộng đồng" }}
+          />
+          <Stack.Screen
+            name="community/create-event"
+            options={{ headerShown: false, title: "Tạo sự kiện" }}
+          />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>
