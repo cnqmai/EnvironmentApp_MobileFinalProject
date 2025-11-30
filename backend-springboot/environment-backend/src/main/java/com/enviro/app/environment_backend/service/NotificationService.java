@@ -10,6 +10,8 @@ import com.enviro.app.environment_backend.model.NotificationType;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.NotificationRepository;
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
+import com.enviro.app.environment_backend.repository.UserRepository;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +29,17 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSettingsRepository settingsRepository;
-    // BỔ SUNG: Dịch vụ quản lý Badge (để cập nhật số lượng badge)
     private final BadgeService badgeService; 
+    private final UserRepository userRepository;
 
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationSettingsRepository settingsRepository,
-                               BadgeService badgeService) { // THÊM BADGE SERVICE VÀO CONSTRUCTOR
+                               BadgeService badgeService,
+                                UserRepository userRepository) {
         this.notificationRepository = notificationRepository;
         this.settingsRepository = settingsRepository;
         this.badgeService = badgeService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -135,14 +139,17 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
-    /**
-     * Lấy hoặc tạo notification settings cho user (Giữ nguyên)
-     */
-    public NotificationSettings getOrCreateSettings(User user) {
-        return settingsRepository.findByUser(user)
+    @Transactional
+    public NotificationSettings getOrCreateSettings(User detachedUser) {
+        // 1. Cố gắng tìm settings hiện có
+        return settingsRepository.findByUser(detachedUser)
                 .orElseGet(() -> {
+                    User managedUser = userRepository.findById(detachedUser.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Managed User not found during settings creation."));
+
+                    // 3. Tạo settings mới với đối tượng User đã được Managed
                     NotificationSettings defaultSettings = NotificationSettings.builder()
-                            .user(user)
+                            .user(managedUser) // SỬ DỤNG MANAGED USER
                             .aqiAlertEnabled(true)
                             .aqiThreshold(100)
                             .collectionReminderEnabled(true)
@@ -151,6 +158,7 @@ public class NotificationService {
                             .badgeNotificationsEnabled(true)
                             .reportStatusNotificationsEnabled(true)
                             .build();
+                    
                     return settingsRepository.save(defaultSettings);
                 });
     }

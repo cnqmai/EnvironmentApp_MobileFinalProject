@@ -4,10 +4,6 @@ import com.enviro.app.environment_backend.dto.AqiDataPoint;
 import com.enviro.app.environment_backend.dto.AqiResponse;
 import com.enviro.app.environment_backend.dto.GeocodingResponse;
 import com.enviro.app.environment_backend.dto.OpenWeatherMapResponse;
-import com.enviro.app.environment_backend.model.NotificationSettings;
-import com.enviro.app.environment_backend.model.NotificationType;
-import com.enviro.app.environment_backend.model.User;
-import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -19,7 +15,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class AqiService {
@@ -47,14 +42,9 @@ public class AqiService {
         }
     );
 
-    public AqiService(RestTemplate restTemplate,
-                      NotificationService notificationService,
-                      NotificationSettingsRepository settingsRepository,
-                      UserService userService) {
+    // *** CONSTRUCTOR KHÔI PHỤC VỀ CHỈ CÓ RESTTEMPLATE ***
+    public AqiService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
-        this.notificationService = notificationService;
-        this.settingsRepository = settingsRepository;
-        this.userService = userService;
     }
 
     /**
@@ -62,24 +52,20 @@ public class AqiService {
      */
     private int calculateUsaAqi(Map<String, Double> components) {
         int maxAqi = 0;
-
-        // Tính IAQI (Individual AQI) cho PM2.5
+        // ... (logic tính toán giữ nguyên)
         Double pm25 = components.get("pm2_5");
         if (pm25 != null) {
             maxAqi = Math.max(maxAqi, calculateIAQI(pm25, (Object[][]) AQI_BREAKPOINTS.get("PM2.5")));
         }
-
-        // Tính IAQI cho PM10
         Double pm10 = components.get("pm10");
         if (pm10 != null) {
             maxAqi = Math.max(maxAqi, calculateIAQI(pm10, (Object[][]) AQI_BREAKPOINTS.get("PM10")));
         }
-        
         return maxAqi;
     }
 
     /**
-     * Áp dụng công thức OWM cho một chất ô nhiễm (Công thức OAUTH2 đã cung cấp)
+     * Áp dụng công thức OWM cho một chất ô nhiễm
      */
     private int calculateIAQI(double C, Object[][] breakpoints) {
         for (Object[] bp : breakpoints) {
@@ -107,39 +93,34 @@ public class AqiService {
     public AqiResponse getCurrentAqiByGps(double lat, double lon) {
         String url = String.format("%s?lat=%s&lon=%s&appid=%s", baseUrl, lat, lon, apiKey);
         try {
-            // Sửa DTO hứng response: Hứng toàn bộ list
             ResponseEntity<OpenWeatherMapResponse> responseEntity = restTemplate.getForEntity(url, OpenWeatherMapResponse.class);
             OpenWeatherMapResponse response = responseEntity.getBody();
 
             if (response != null && response.getList() != null && !response.getList().isEmpty()) {
                 AqiDataPoint dataPoint = response.getList().get(0);
                 
-                // 1. Lấy dữ liệu thô
                 Map<String, Double> components = dataPoint.getComponents();
-                // --- THÊM DÒNG DEBUG NÀY ---
                 System.out.println(">>> [AQI DEBUG] Nồng độ PM2.5: " + components.get("pm2_5"));
                 System.out.println(">>> [AQI DEBUG] Nồng độ PM10: " + components.get("pm10"));
-                // ----------------------------
+                
                 int owmAqi = dataPoint.getMain().getAqi(); // Thang 1-5
                 long dt = dataPoint.getDt();
 
-                // 2. Tính toán AQI chuẩn (0-500)
                 int calculatedAqi = calculateUsaAqi(components);
                 
                 String city = getCityNameFromGps(lat, lon);
 
-                // 3. Trả về DTO mới
                 return AqiResponse.builder()
-                        .calculatedAqiValue(calculatedAqi) // GIÁ TRỊ 0-500
-                        .owmAqiValue(owmAqi) // GIÁ TRỊ GỐC 1-5
-                        .status(mapAqiToStatus(calculatedAqi)) // Map trạng thái dựa trên 0-500
+                        .calculatedAqiValue(calculatedAqi) 
+                        .owmAqiValue(owmAqi) 
+                        .status(mapAqiToStatus(calculatedAqi)) 
                         .dominantPollutant(findDominantPollutant(components))
                         .latitude(lat)
                         .longitude(lon)
                         .city(city)
                         .timeObservation(convertUnixTime(dt))
                         .healthAdvisory(getHealthAdvisory(calculatedAqi))
-                        .components(components) // TRẢ VỀ CẢ COMPONENTS ĐỂ FRONTEND KIỂM TRA
+                        .components(components) 
                         .build();
             }
         } catch (Exception e) {
@@ -181,12 +162,11 @@ public class AqiService {
                 }
             }
         }
-        return null;
+        return result;
     }
 
-
     // =======================================================
-    // --- CÁC HÀM PRIVATE HELPER (ĐÃ XÓA DUPLICATE) ---
+    // --- CÁC HÀM PRIVATE HELPER ---
     // =======================================================
 
     private String mapAqiToStatus(int aqi) {
@@ -218,8 +198,10 @@ public class AqiService {
                     .queryParam("appid", apiKey)
                     .build()
                     .toUri();
+            
             ResponseEntity<GeocodingResponse[]> responseEntity = restTemplate.getForEntity(uri, GeocodingResponse[].class);
             GeocodingResponse[] responses = responseEntity.getBody();
+
             if (responses != null && responses.length > 0) {
                 return responses[0];
             }

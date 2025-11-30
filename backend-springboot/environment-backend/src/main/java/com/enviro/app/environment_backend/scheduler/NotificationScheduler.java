@@ -80,7 +80,6 @@ public class NotificationScheduler {
         for (User user : users) {
             NotificationSettings settings = getOrCreateSettings(user); 
             
-            // KIỂM TRA CỜ BẬT/TẮT: Collection Reminder (Luôn mặc định là TRUE)
             if (settings.getCollectionReminderEnabled()) {
                 notificationService.createNotification(
                     user,
@@ -105,7 +104,6 @@ public class NotificationScheduler {
         for (User user : users) {
             NotificationSettings settings = getOrCreateSettings(user);
             
-            // KIỂM TRA CỜ BẬT/TẮT: Campaign Notification (Luôn mặc định là TRUE)
             if (settings.getCampaignNotificationsEnabled()) {
                 
                 notificationService.createNotification(
