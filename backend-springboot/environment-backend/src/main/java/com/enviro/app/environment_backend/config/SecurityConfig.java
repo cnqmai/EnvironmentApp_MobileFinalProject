@@ -18,11 +18,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher; 
+import org.springframework.security.web.servlet.util.matcher.MvcRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.web.servlet.handler.HandlerMappingIntrospector; 
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 
 import com.enviro.app.environment_backend.security.JwtAuthenticationFilter;
 import com.enviro.app.environment_backend.security.JwtService;
@@ -77,47 +77,26 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, HandlerMappingIntrospector introspector) throws Exception {
         MvcRequestMatcher.Builder mvc = new MvcRequestMatcher.Builder(introspector);
-
         JwtAuthenticationFilter jwtAuthFilter = new JwtAuthenticationFilter(jwtService, customUserDetailsService);
 
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request, response, authException) -> {
                     System.out.println(">>> [SECURITY BLOCK] Access Denied: " + authException.getMessage());
-                    System.out.println(">>> Blocked URI: " + request.getRequestURI());
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: " + authException.getMessage());
                 })
             )
-
             .authorizeHttpRequests(auth -> auth
-                // 1. Cho phép API AUTH
                 .requestMatchers(mvc.pattern("/api/auth/**")).permitAll()
                 .requestMatchers(mvc.pattern("/auth/**")).permitAll()
-                
-                // 2. Cho phép API AQI (nhưng chặn saved-locations trong AqiController bằng logic riêng nếu cần, 
-                //    tuy nhiên AqiController hiện tại đang dùng SecurityContextHolder nên cần login cho các API con khác
-                //    -> Tốt nhất chỉ public những cái cần thiết)
-                .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/aqi")).permitAll() // Chỉ public GET AQI theo GPS
-                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll() // Public check alert
-                
-                // --- 3. THÊM MỚI: Cho phép API CATEGORIES (Public) ---
-                .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
-                .requestMatchers(mvc.pattern("/categories/**")).permitAll()
-                // -----------------------------------------------------
-                
-                // 4. Cho phép trang lỗi
+                .requestMatchers(mvc.pattern("/api/aqi/**")).permitAll()
+                .requestMatchers(mvc.pattern("/aqi/**")).permitAll()
                 .requestMatchers(mvc.pattern("/error")).permitAll()
-                
-                // 5. Cho phép OPTIONS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                
-                // 6. Các request còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
-            
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

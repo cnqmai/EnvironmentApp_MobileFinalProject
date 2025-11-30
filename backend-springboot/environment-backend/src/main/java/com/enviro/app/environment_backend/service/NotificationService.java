@@ -27,15 +27,19 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSettingsRepository settingsRepository;
+    // BỔ SUNG: Dịch vụ quản lý Badge (để cập nhật số lượng badge)
+    private final BadgeService badgeService; 
 
     public NotificationService(NotificationRepository notificationRepository,
-                              NotificationSettingsRepository settingsRepository) {
+                               NotificationSettingsRepository settingsRepository,
+                               BadgeService badgeService) { // THÊM BADGE SERVICE VÀO CONSTRUCTOR
         this.notificationRepository = notificationRepository;
         this.settingsRepository = settingsRepository;
+        this.badgeService = badgeService;
     }
 
     /**
-     * Lấy tất cả notifications của user (FR-6.1, FR-6.2, FR-6.3)
+     * Lấy tất cả notifications của user (Giữ nguyên)
      */
     public List<NotificationResponse> getUserNotifications(User user) {
         List<Notification> notifications = notificationRepository.findByUserOrderByCreatedAtDesc(user);
@@ -45,7 +49,7 @@ public class NotificationService {
     }
 
     /**
-     * Lấy notifications chưa đọc của user
+     * Lấy notifications chưa đọc của user (Giữ nguyên)
      */
     public List<NotificationResponse> getUnreadNotifications(User user) {
         List<Notification> notifications = notificationRepository.findByUserAndStatusOrderByCreatedAtDesc(
@@ -56,14 +60,14 @@ public class NotificationService {
     }
 
     /**
-     * Đếm số notifications chưa đọc
+     * Đếm số notifications chưa đọc (Giữ nguyên)
      */
     public long getUnreadCount(User user) {
         return notificationRepository.countByUserAndStatus(user, NotificationStatus.UNREAD);
     }
 
     /**
-     * Đánh dấu notification là đã đọc
+     * Đánh dấu 1 notification là đã đọc (FIX BADGE UPDATE)
      */
     @Transactional
     public NotificationResponse markAsRead(UUID notificationId, User user) {
@@ -73,7 +77,6 @@ public class NotificationService {
                     "Không tìm thấy thông báo với ID: " + notificationId
                 ));
 
-        // Kiểm tra xem notification có thuộc về user không
         if (!notification.getUser().getId().equals(user.getId())) {
             throw new ResponseStatusException(
                 HttpStatus.FORBIDDEN,
@@ -83,23 +86,36 @@ public class NotificationService {
 
         notification.setStatus(NotificationStatus.READ);
         Notification saved = notificationRepository.save(notification);
+        
+        // --- QUAN TRỌNG: CẬP NHẬT BADGE COUNT TỔNG ---
+        // Giảm số lượng chưa đọc đi 1 đơn vị
+        badgeService.decrementNotificationCount(user, 1); 
+        
         return mapToNotificationResponse(saved);
     }
 
     /**
-     * Đánh dấu tất cả notifications của user là đã đọc
+     * Đánh dấu tất cả notifications của user là đã đọc (FIX BADGE UPDATE)
      */
     @Transactional
     public void markAllAsRead(User user) {
         List<Notification> unreadNotifications = notificationRepository.findByUserAndStatusOrderByCreatedAtDesc(
                 user, NotificationStatus.UNREAD);
         
+        long countToDecrement = unreadNotifications.size(); // Số lượng sẽ giảm
+
         unreadNotifications.forEach(n -> n.setStatus(NotificationStatus.READ));
         notificationRepository.saveAll(unreadNotifications);
+
+        // --- QUAN TRỌNG: CẬP NHẬT BADGE COUNT TỔNG ---
+        if (countToDecrement > 0) {
+            // Giảm tổng số badge đi số lượng thông báo vừa đọc
+            badgeService.decrementNotificationCount(user, (int) countToDecrement); 
+        }
     }
 
     /**
-     * Tạo notification mới (dùng cho internal services)
+     * Tạo notification mới (dùng cho internal services) (Giữ nguyên)
      */
     @Transactional
     public Notification createNotification(User user, String title, String message, 
@@ -113,11 +129,14 @@ public class NotificationService {
                 .relatedId(relatedId)
                 .build();
 
+        // Thêm logic cập nhật badge khi có thông báo mới (tăng thêm 1)
+        badgeService.incrementNotificationCount(user, 1);
+        
         return notificationRepository.save(notification);
     }
 
     /**
-     * Lấy hoặc tạo notification settings cho user
+     * Lấy hoặc tạo notification settings cho user (Giữ nguyên)
      */
     public NotificationSettings getOrCreateSettings(User user) {
         return settingsRepository.findByUser(user)
@@ -137,7 +156,7 @@ public class NotificationService {
     }
 
     /**
-     * Cập nhật notification settings (FR-2.2.2)
+     * Cập nhật notification settings (FR-2.2.2) (Giữ nguyên)
      */
     @Transactional
     public NotificationSettingsResponse updateSettings(User user, NotificationSettingsRequest request) {
@@ -171,7 +190,7 @@ public class NotificationService {
     }
 
     /**
-     * Lấy notification settings của user
+     * Lấy notification settings của user (Giữ nguyên)
      */
     public NotificationSettingsResponse getSettings(User user) {
         NotificationSettings settings = getOrCreateSettings(user);
@@ -179,7 +198,7 @@ public class NotificationService {
     }
 
     /**
-     * Map Notification entity sang NotificationResponse DTO
+     * Map Notification entity sang NotificationResponse DTO (Giữ nguyên)
      */
     private NotificationResponse mapToNotificationResponse(Notification notification) {
         return NotificationResponse.builder()
@@ -194,7 +213,7 @@ public class NotificationService {
     }
 
     /**
-     * Map NotificationSettings entity sang NotificationSettingsResponse DTO
+     * Map NotificationSettings entity sang NotificationSettingsResponse DTO (Giữ nguyên)
      */
     private NotificationSettingsResponse mapToSettingsResponse(NotificationSettings settings) {
         return NotificationSettingsResponse.builder()
@@ -210,4 +229,3 @@ public class NotificationService {
                 .build();
     }
 }
-

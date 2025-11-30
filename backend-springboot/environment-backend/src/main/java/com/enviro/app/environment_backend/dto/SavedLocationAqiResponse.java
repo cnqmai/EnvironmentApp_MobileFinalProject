@@ -1,5 +1,6 @@
 package com.enviro.app.environment_backend.dto;
 
+import java.util.Map;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -27,4 +28,6 @@ public class SavedLocationAqiResponse {
     String healthAdvisory;
     String timeObservation;
     String resolvedCityName; // Tên thành phố được Geocoding giải quyết
+
+    Map<String, Double> components;
 }

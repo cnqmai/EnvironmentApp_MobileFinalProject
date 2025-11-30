@@ -10,13 +10,9 @@ const TabOverflowMenu = (props) => {
   const router = useRouter();
   const segments = useSegments(); 
 
-  const inAuthScreen =
-    segments[0] === "(tabs)" &&
-    (segments[1] === "login" || segments[1] === "register");
+  const inAuthScreen = segments[0] === "(tabs)" && (segments[1] === "login" || segments[1] === "register");
 
-  const toggleModal = () => {
-    setModalVisible(!isModalVisible);
-  };
+  const toggleModal = () => setModalVisible(!isModalVisible);
 
   const navigateAndClose = (path) => {
     toggleModal();
@@ -48,37 +44,14 @@ const TabOverflowMenu = (props) => {
         <View style={styles.modalContent}>
           {!inAuthScreen && (
             <>
-              <MenuItem
-                icon="account-group"
-                text="Cộng đồng"
-                onPress={() => navigateAndClose("/community")}
-              />
-              {/* QUAN TRỌNG: Đường dẫn phải là /chat/chatbot */}
-              <MenuItem
-                icon="chat"
-                text="Chatbot"
-                onPress={() => navigateAndClose("/chat/chatbot")}
-              />
-              <MenuItem
-                icon="flag"
-                text="Báo cáo vi phạm"
-                onPress={() => navigateAndClose("/report")}
-              />
+              <MenuItem icon="account-group" text="Cộng đồng" onPress={() => navigateAndClose("/community")} />
+              <MenuItem icon="chat" text="Chatbot" onPress={() => navigateAndClose("/chat/chatbot")} />
+              <MenuItem icon="flag" text="Báo cáo vi phạm" onPress={() => navigateAndClose("/report")} />
             </>
           )}
-
-          <MenuItem
-            icon="cog"
-            text="Cài đặt"
-            onPress={() => navigateAndClose("/settings")}
-          />
-
+          <MenuItem icon="cog" text="Cài đặt" onPress={() => navigateAndClose("/settings")} />
           {!inAuthScreen && (
-            <MenuItem
-              icon="logout"
-              text="Đăng xuất"
-              onPress={handleLogout}
-            />
+            <MenuItem icon="logout" text="Đăng xuất" onPress={handleLogout} />
           )}
         </View>
       </Modal>

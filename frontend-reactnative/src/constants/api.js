@@ -28,7 +28,12 @@ if (Platform.OS === 'android') {
     
 } else {
   // iOS hoặc Web
-  API_BASE_URL = `http://${localhost}:8080/api`;
+  if (Constants.isDevice || localhost.includes('exp.direct')) {
+    API_BASE_URL = `http://${PC_LAN_IP}:8080/api`;
+  } else {
+    // Dùng localhost cho iOS Simulator hoặc Web
+    API_BASE_URL = `http://${localhost}:8080/api`;
+  }
 }
 
 // In ra để kiểm tra IP có đúng không

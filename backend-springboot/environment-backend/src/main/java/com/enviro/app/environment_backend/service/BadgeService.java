@@ -6,6 +6,8 @@ import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.model.UserBadge;
 import com.enviro.app.environment_backend.repository.BadgeRepository;
 import com.enviro.app.environment_backend.repository.UserBadgeRepository;
+// *** Cần import UserRepository để lưu User ***
+import com.enviro.app.environment_backend.repository.UserRepository; 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,15 @@ public class BadgeService {
 
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
+    // *** THÊM UserRepository ***
+    private final UserRepository userRepository; 
 
-    public BadgeService(BadgeRepository badgeRepository, UserBadgeRepository userBadgeRepository) {
+    public BadgeService(BadgeRepository badgeRepository, 
+                        UserBadgeRepository userBadgeRepository, 
+                        UserRepository userRepository) {
         this.badgeRepository = badgeRepository;
         this.userBadgeRepository = userBadgeRepository;
+        this.userRepository = userRepository; // Inject
     }
 
     /**
@@ -90,6 +97,38 @@ public class BadgeService {
             }
         }
     }
+    
+    // ==========================================================
+    // *** PHƯƠNG THỨC MỚI KHẮC PHỤC LỖI BIÊN DỊCH ***
+    // ==========================================================
+    
+    /**
+     * Giảm số lượng thông báo chưa đọc (unreadNotificationCount) cho người dùng.
+     * Được gọi từ NotificationService khi thông báo được đánh dấu là đã đọc.
+     */
+    @Transactional
+    public void decrementNotificationCount(User user, int count) {
+        int currentCount = user.getUnreadNotificationCount();
+        int newCount = Math.max(0, currentCount - count);
+        
+        if (newCount != currentCount) {
+            user.setUnreadNotificationCount(newCount);
+            userRepository.save(user);
+        }
+    }
+
+    /**
+     * Tăng số lượng thông báo chưa đọc (unreadNotificationCount) cho người dùng.
+     * Được gọi từ NotificationService khi thông báo mới được tạo.
+     */
+    @Transactional
+    public void incrementNotificationCount(User user, int count) {
+        // Không cần Math.max vì chỉ tăng
+        user.setUnreadNotificationCount(user.getUnreadNotificationCount() + count);
+        userRepository.save(user);
+    }
+    
+    // ==========================================================
 
     /**
      * Map Badge entity sang BadgeResponse DTO
@@ -106,4 +145,3 @@ public class BadgeService {
                 .build();
     }
 }
-

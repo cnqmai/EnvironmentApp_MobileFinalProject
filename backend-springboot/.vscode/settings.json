@@ -1,3 +1,5 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.runtimes": [],
+    "java.jdt.ls.vmargs": "-javaagent:C:/Users/cnqma/.m2/repository/org/projectlombok/lombok/1.18.30/lombok-1.18.30.jar"
 }

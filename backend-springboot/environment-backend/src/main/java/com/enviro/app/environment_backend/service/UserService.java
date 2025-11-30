@@ -7,10 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-// --- [QUAN TRỌNG] THÊM 2 IMPORT NÀY ---
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-// ---------------------------------------
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -63,29 +59,18 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        if (request.getFullName() != null) {
-            user.setFullName(request.getFullName());
-        }
-        if (request.getAvatarUrl() != null) {
-            user.setAvatarUrl(request.getAvatarUrl());
-        }
-        if (request.getDefaultLocation() != null) {
-            user.setDefaultLocation(request.getDefaultLocation());
-        }
-        if (request.getGender() != null) {
-            user.setGender(request.getGender());
-        }
-        if (request.getPhoneNumber() != null) {
-            user.setPhoneNumber(request.getPhoneNumber());
-        }
+        if (request.getFullName() != null) user.setFullName(request.getFullName());
+        if (request.getAvatarUrl() != null) user.setAvatarUrl(request.getAvatarUrl());
+        if (request.getDefaultLocation() != null) user.setDefaultLocation(request.getDefaultLocation());
+        if (request.getGender() != null) user.setGender(request.getGender());
+        if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
         if (request.getDateOfBirth() != null) {
             try {
                 user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
             } catch (DateTimeParseException e) {
-                System.err.println("Invalid date format for dateOfBirth: " + request.getDateOfBirth());
+                System.err.println("Invalid date format: " + request.getDateOfBirth());
             }
         }
-
         return userRepository.save(user);
     }
     
@@ -93,7 +78,6 @@ public class UserService {
     public void deleteUser(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
-        
         userRepository.delete(user);
     }
     
@@ -108,13 +92,8 @@ public class UserService {
         long savedLocationsCount = savedLocationRepository.countByUserId(userId);
         
         List<Report> userReports = reportRepository.findByUserOrderByCreatedAtDesc(user);
-        long wasteClassificationsCount = userReports.stream()
-                .filter(r -> r.getWasteCategory() != null)
-                .count();
-        
-        long totalMediaUploaded = userReports.stream()
-                .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
-                .sum();
+        long wasteClassificationsCount = userReports.stream().filter(r -> r.getWasteCategory() != null).count();
+        long totalMediaUploaded = userReports.stream().mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0).sum();
         
         return UserStatisticsResponse.builder()
                 .totalReports(totalReports)
@@ -148,27 +127,13 @@ public class UserService {
         NotificationSettings settings = notificationSettingsRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy cài đặt"));
         
-        if (request.getAqiAlertEnabled() != null) {
-            settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
-        }
-        if (request.getAqiThreshold() != null) {
-            settings.setAqiThreshold(request.getAqiThreshold());
-        }
-        if (request.getCollectionReminderEnabled() != null) {
-            settings.setCollectionReminderEnabled(request.getCollectionReminderEnabled());
-        }
-        if (request.getCampaignNotificationsEnabled() != null) {
-            settings.setCampaignNotificationsEnabled(request.getCampaignNotificationsEnabled());
-        }
-        if (request.getWeatherAlertEnabled() != null) {
-            settings.setWeatherAlertEnabled(request.getWeatherAlertEnabled());
-        }
-        if (request.getBadgeNotificationsEnabled() != null) {
-            settings.setBadgeNotificationsEnabled(request.getBadgeNotificationsEnabled());
-        }
-        if (request.getReportStatusNotificationsEnabled() != null) {
-            settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
-        }
+        if (request.getAqiAlertEnabled() != null) settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
+        if (request.getAqiThreshold() != null) settings.setAqiThreshold(request.getAqiThreshold());
+        if (request.getCollectionReminderEnabled() != null) settings.setCollectionReminderEnabled(request.getCollectionReminderEnabled());
+        if (request.getCampaignNotificationsEnabled() != null) settings.setCampaignNotificationsEnabled(request.getCampaignNotificationsEnabled());
+        if (request.getWeatherAlertEnabled() != null) settings.setWeatherAlertEnabled(request.getWeatherAlertEnabled());
+        if (request.getBadgeNotificationsEnabled() != null) settings.setBadgeNotificationsEnabled(request.getBadgeNotificationsEnabled());
+        if (request.getReportStatusNotificationsEnabled() != null) settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
         
         NotificationSettings updatedSettings = notificationSettingsRepository.save(settings);
         
@@ -181,18 +146,5 @@ public class UserService {
             .badgeNotificationsEnabled(updatedSettings.getBadgeNotificationsEnabled())
             .reportStatusNotificationsEnabled(updatedSettings.getReportStatusNotificationsEnabled())
             .build();
-    }
-
-    // --- PHƯƠNG THỨC MỚI ĐỂ SỬA LỖI ---
-    /**
-     * Lấy User hiện tại đang đăng nhập từ Security Context.
-     */
-    public User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            return null;
-        }
-        String email = authentication.getName();
-        return userRepository.findByEmail(email).orElse(null);
     }
 }

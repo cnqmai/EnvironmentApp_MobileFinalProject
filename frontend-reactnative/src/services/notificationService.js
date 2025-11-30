@@ -20,11 +20,11 @@ export const getMyNotifications = async () => {
 
 /**
  * Đánh dấu thông báo đã đọc
- * PATCH /api/notifications/{id}/read
+ * PUT /api/notifications/{id}/read
  */
 export const markNotificationAsRead = async (notificationId) => {
     const response = await fetchWithAuth(`${API_BASE_URL}/notifications/${notificationId}/read`, {
-        method: 'PATCH',
+        method: 'PUT',
     });
 
     if (!response.ok) {
@@ -37,11 +37,11 @@ export const markNotificationAsRead = async (notificationId) => {
 
 /**
  * Đánh dấu tất cả thông báo đã đọc
- * PATCH /api/notifications/read-all
+ * PUT /api/notifications/read-all
  */
 export const markAllNotificationsAsRead = async () => {
     const response = await fetchWithAuth(`${API_BASE_URL}/notifications/read-all`, {
-        method: 'PATCH',
+        method: 'PUT',
     });
 
     if (!response.ok) {
@@ -90,3 +90,21 @@ export const updateNotificationSettings = async (settings) => {
     return response.json();
 };
 
+/**
+ * Đếm số thông báo chưa đọc
+ * GET /api/notifications/unread/count
+ */
+export const getUnreadCount = async () => {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/notifications/unread/count`, {
+            method: 'GET',
+        });
+        
+        if (!response.ok) return 0;
+        
+        const data = await response.json();
+        return data.count || 0;
+    } catch (error) {
+        return 0;
+    }
+};

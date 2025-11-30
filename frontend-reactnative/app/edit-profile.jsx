@@ -7,20 +7,26 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image, // Import Image
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as Location from "expo-location"; // Import thư viện Location
+import * as Location from "expo-location"; 
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import typography from "../styles/typography";
+import { API_BASE_URL } from '../src/constants/api';
 import { getMyProfile, updateProfile } from "../src/services/userService";
+import { getToken } from '../src/utils/apiHelper';
 
 const EditProfileScreen = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [locating, setLocating] = useState(false); // State loading cho nút lấy vị trí
+  const [locating, setLocating] = useState(false); 
+  const [uploading, setUploading] = useState(false); // State loading cho upload ảnh
 
   // State cho các trường thông tin
   const [fullName, setFullName] = useState("");
@@ -29,6 +35,8 @@ const EditProfileScreen = () => {
   const [location, setLocation] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [avatarUri, setAvatarUri] = useState(null); // THÊM: State quản lý URI ảnh đã chọn/URL ảnh cũ
+  const [newAvatarSelected, setNewAvatarSelected] = useState(false); // THÊM: Cờ đánh dấu ảnh mới đã được chọn
 
   // Load dữ liệu khi mở màn hình
   useEffect(() => {
@@ -44,6 +52,7 @@ const EditProfileScreen = () => {
       setLocation(user.defaultLocation || "");
       setEmail(user.email || "");
       setPhone(user.phoneNumber || "");
+      setAvatarUri(user.avatarUrl || null); 
     } catch (error) {
       Alert.alert("Lỗi", "Không thể tải thông tin người dùng.");
       console.log(error);
@@ -51,12 +60,82 @@ const EditProfileScreen = () => {
       setLoading(false);
     }
   };
+  
+  // --- HÀM MỚI: CHỌN ẢNH TỪ THƯ VIỆN ---
+  const handlePickImage = async () => {
+    // 1. Xin quyền
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Quyền bị từ chối', 'Cần quyền truy cập thư viện ảnh để chọn ảnh đại diện.');
+      return;
+    }
 
-  // --- HÀM MỚI: LẤY VỊ TRÍ HIỆN TẠI ---
+    // 2. Mở thư viện ảnh
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'Images', 
+      
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setAvatarUri(result.assets[0].uri);
+      setNewAvatarSelected(true);
+    }
+  };
+
+  // --- HÀM UPLOAD ẢNH THỰC TẾ ---
+  const uploadImage = async (uri) => {
+    const uriParts = uri.split('.');
+    const fileExtension = uriParts[uriParts.length - 1];
+    const fileName = `avatar_${Date.now()}.${fileExtension}`;
+    const token = await getToken();
+
+    // Tạo FormData
+    const formData = new FormData();
+    formData.append('file', { 
+      uri: uri,
+      name: fileName,
+      type: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+    });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`, 
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Upload Response Error:", errorText);
+        throw new Error("Lỗi khi tải ảnh lên máy chủ.");
+      }
+
+      const result = await response.json();
+      
+      // Xử lý kết quả trả về từ server
+      let uploadedUrl = result.avatarUrl;
+      // Nếu server trả về đường dẫn tương đối, ghép với domain
+      if (uploadedUrl && uploadedUrl.startsWith("/")) {
+          const baseUrl = API_BASE_URL.replace("/api", "");
+          uploadedUrl = `${baseUrl}${uploadedUrl}`;
+      }
+      
+      return uploadedUrl; 
+    } catch (error) {
+      console.error("Error during actual upload:", error);
+      throw new Error(error.message || "Lỗi kết nối khi upload ảnh.");
+    }
+  };
+
   const handleGetCurrentLocation = async () => {
     setLocating(true);
     try {
-      // 1. Xin quyền truy cập vị trí
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
@@ -67,12 +146,10 @@ const EditProfileScreen = () => {
         return;
       }
 
-      // 2. Lấy tọa độ hiện tại
       let currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
 
-      // 3. Chuyển tọa độ thành địa chỉ (Reverse Geocoding)
       let addressResponse = await Location.reverseGeocodeAsync({
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
@@ -80,14 +157,13 @@ const EditProfileScreen = () => {
 
       if (addressResponse.length > 0) {
         const addr = addressResponse[0];
-        // Tạo chuỗi địa chỉ từ các thành phần trả về
         const formattedAddress = [
           addr.street,
-          addr.subregion, // Quận/Huyện
-          addr.city,      // Thành phố/Tỉnh
-          addr.country    // Quốc gia (có thể bỏ nếu không cần)
+          addr.subregion,
+          addr.city,
+          addr.country
         ]
-          .filter((item) => item) // Lọc bỏ các giá trị null/undefined
+          .filter((item) => item) 
           .join(", ");
 
         setLocation(formattedAddress);
@@ -99,27 +175,40 @@ const EditProfileScreen = () => {
       setLocating(false);
     }
   };
-  // -------------------------------------
 
   const handleSave = async () => {
     setSaving(true);
+    setUploading(true);
+    let finalAvatarUrl = avatarUri;
+
     try {
+      // 1. UPLOAD ẢNH NẾU CÓ ẢNH MỚI ĐƯỢC CHỌN
+      if (newAvatarSelected && avatarUri) {
+        finalAvatarUrl = await uploadImage(avatarUri); 
+        setNewAvatarSelected(false);
+      }
+      setUploading(false);
+
+      // 2. CẬP NHẬT PROFILE
       const updateData = {
         fullName,
         gender,
         dateOfBirth: birthDate,
         defaultLocation: location,
         phoneNumber: phone,
+        avatarUrl: finalAvatarUrl, // Gửi URL mới (hoặc URL cũ nếu không chọn ảnh mới)
       };
 
       await updateProfile(updateData);
       Alert.alert("Thành công", "Cập nhật hồ sơ thành công!", [
         { text: "OK", onPress: () => router.back() },
       ]);
+
     } catch (error) {
       Alert.alert("Lỗi", error.message || "Không thể cập nhật hồ sơ.");
     } finally {
       setSaving(false);
+      setUploading(false);
     }
   };
 
@@ -153,15 +242,41 @@ const EditProfileScreen = () => {
           <View style={styles.placeholder} />
         </View>
 
+        {/* KHU VỰC AVATAR (FR-1.2.2) */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <MaterialCommunityIcons
-              name="account-circle"
-              size={80}
-              color="#CCCCCC"
-            />
-          </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={handlePickImage}
+            disabled={saving}
+          >
+            {avatarUri ? (
+              <Image 
+                source={{ uri: avatarUri }} 
+                style={styles.avatarImage} 
+              />
+            ) : (
+              <MaterialCommunityIcons
+                name="account-circle"
+                size={80}
+                color="#CCCCCC"
+              />
+            )}
+            
+            {/* NÚT CHỈNH SỬA NHỎ */}
+            <View style={styles.editIconContainer}>
+               <MaterialCommunityIcons 
+                 name="camera-outline" 
+                 size={20} 
+                 color="#FFFFFF" 
+               />
+            </View>
+          </TouchableOpacity>
+          {uploading && (
+             <ActivityIndicator style={styles.uploadingIndicator} size="small" color="#007AFF" />
+          )}
         </View>
+        {/* KẾT THÚC KHU VỰC AVATAR */}
+
 
         <View style={styles.formSection}>
           <View style={styles.inputGroup}>
@@ -197,7 +312,7 @@ const EditProfileScreen = () => {
             />
           </View>
 
-          {/* --- CẬP NHẬT UI PHẦN KHU VỰC --- */}
+          {/* KHU VỰC SINH SỐNG MẶC ĐỊNH (FR-1.2.1) */}
           <View style={[styles.inputGroup, { marginBottom: 0 }]}>
             <Text style={styles.label}>Khu vực</Text>
             <View style={styles.inputWithIcon}>
@@ -211,13 +326,13 @@ const EditProfileScreen = () => {
               <TouchableOpacity 
                 style={styles.inputIconBtn} 
                 onPress={handleGetCurrentLocation}
-                disabled={locating}
+                disabled={locating || saving}
               >
                 {locating ? (
                   <ActivityIndicator size="small" color="#007AFF" />
                 ) : (
                   <MaterialCommunityIcons
-                    name="crosshairs-gps" // Icon định vị
+                    name="crosshairs-gps" 
                     size={24}
                     color="#007AFF"
                   />
@@ -225,14 +340,13 @@ const EditProfileScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
-          {/* -------------------------------- */}
 
           <View style={styles.divider} />
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: "#F5F5F5", color: "#888" }]}
+              style={[styles.input, { backgroundColor: "#F5F5F5", color: "#888", borderColor: '#E0E0E0' }]}
               value={email}
               editable={false}
             />
@@ -252,12 +366,12 @@ const EditProfileScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.saveButton, saving && { opacity: 0.7 }]}
+          style={[styles.saveButton, (saving || uploading) && { opacity: 0.7 }]}
           onPress={handleSave}
           activeOpacity={0.8}
-          disabled={saving}
+          disabled={saving || uploading}
         >
-          {saving ? (
+          {(saving || uploading) ? (
             <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={styles.saveButtonText}>Lưu thông tin</Text>
@@ -313,6 +427,7 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
+  // --- AVATAR SECTION STYLES ---
   avatarSection: {
     alignItems: "center",
     paddingVertical: 32,
@@ -331,7 +446,30 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
+    position: 'relative',
   },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 70,
+  },
+  editIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 5,
+    backgroundColor: '#007AFF',
+    borderRadius: 18,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  uploadingIndicator: {
+    marginTop: 8,
+  },
+  // --- END AVATAR SECTION STYLES ---
   formSection: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 24,
@@ -373,14 +511,14 @@ const styles = StyleSheet.create({
   },
   inputWithIcon: {
     position: "relative",
-    justifyContent: 'center', // Căn giữa icon theo chiều dọc
+    justifyContent: 'center', 
   },
   inputWithIconPadding: {
-    paddingRight: 50, // Tăng padding để không bị icon che chữ
+    paddingRight: 50, 
   },
   inputIconBtn: {
     position: "absolute",
-    right: 10, // Đặt sát bên phải
+    right: 10, 
     padding: 5,
     zIndex: 1,
   },

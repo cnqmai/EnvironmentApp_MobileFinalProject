@@ -1,21 +1,18 @@
 package com.enviro.app.environment_backend.dto;
 
-import java.util.Map;
-
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-/**
- * DTO đại diện cho một điểm dữ liệu AQI cụ thể trong mảng 'list'.
- */
+import java.util.Map;
+
 @Data
 public class AqiDataPoint {
-    
-    // Dữ liệu lồng chứa chỉ số AQI
-    private Main main; 
-    
-    // Dữ liệu lồng chứa nồng độ các chất ô nhiễm (PM2.5, O3, NO2,...)
-    private Map<String, Double> components; 
-    
-    // Thời gian quan sát (timestamp)
     private long dt;
+    private Main main; // Chứa AQI 1-5
+    private Map<String, Double> components; // Chứa nồng độ PM2.5, CO, O3, v.v.
+
+    @Data
+    public static class Main {
+        private int aqi;
+    }
 }

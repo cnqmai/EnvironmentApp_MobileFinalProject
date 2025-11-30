@@ -1,5 +1,5 @@
-import React from "react";
-import { Tabs } from "expo-router";
+import React, { useState, useCallback } from "react";
+import { Tabs, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Platform, View } from "react-native";
 import {
   MaterialIcons,
@@ -8,8 +8,23 @@ import {
 } from "@expo/vector-icons";
 
 import TabOverflowMenu from "../../components/TabOverflowMenu";
+import { getUnreadCount } from "../../src/services/notificationService";
 
 const TabsLayout = () => {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const params = useLocalSearchParams();
+
+  const fetchUnreadCount = async () => {
+    const count = await getUnreadCount();
+    setUnreadCount(count);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+    }, [params.refreshStamp])
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -48,7 +63,7 @@ const TabsLayout = () => {
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="notifications" size={28} color={color} />
           ),
-          tabBarBadge: 3,
+          tabBarBadge: unreadCount > 0 ? unreadCount : null,
           tabBarBadgeStyle: styles.badge,
         }}
       />
@@ -68,12 +83,12 @@ const TabsLayout = () => {
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons
               name="dots-horizontal-circle"
-              size={28}
+              size={30}
               color={color}
             />
           ),
           tabBarButton: (props) => (
-            <TabOverflowMenu {...props} /> // Component tùy chỉnh của bạn
+            <TabOverflowMenu {...props} /> 
           ),
         }}
       />
@@ -85,7 +100,8 @@ const TabsLayout = () => {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    bottom: 25,
+    paddingTop: 10,
+    bottom: -10,
     left: 20,
     right: 20,
     borderRadius: 15,
@@ -101,7 +117,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5.46,
   },
   badge: {
-    backgroundColor: "#FF6347", // Màu đỏ
+    backgroundColor: "#FF6347",
     color: "#fff",
     fontSize: 11,
     lineHeight: 14,
@@ -111,8 +127,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     overflow: "hidden",
     position: "absolute",
-    top: 10,
-    right: 18,
+    top: -4, 
+    right: -4,
   },
 });
 

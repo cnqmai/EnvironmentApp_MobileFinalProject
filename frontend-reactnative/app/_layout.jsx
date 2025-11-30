@@ -4,9 +4,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ActivityIndicator, View, Text } from "react-native";
 import * as Font from 'expo-font'; // Import Font loader
 import * as SplashScreen from 'expo-splash-screen'; // Thường được dùng để kiểm soát splash screen
+import * as WebBrowser from 'expo-web-browser'; // OAuth redirect handling
 
 // Đường dẫn import đúng từ app/_layout.jsx là '../src/...'
 import { getToken } from "../src/utils/apiHelper";
+
+// Xử lý OAuth redirect
+WebBrowser.maybeCompleteAuthSession();
 
 // Tùy chọn: Giữ splash screen hiển thị cho đến khi tài nguyên được tải
 // SplashScreen.preventAutoHideAsync(); 

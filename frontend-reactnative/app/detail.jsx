@@ -101,13 +101,8 @@ const AQIDetailScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.backText}>‹ Quay lại</Text>
+         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color="#000" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuButton}
@@ -256,12 +251,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E8E9EA",
   },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+  backBtn: { 
+    width: 40, 
+    height: 40, 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    elevation: 2 
   },
   backText: {
     ...typography.h3,

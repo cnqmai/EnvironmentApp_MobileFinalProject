@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -14,7 +14,7 @@ const ProfileScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, points: 0 });
+  const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, currentPoints: 0 }); 
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
@@ -49,7 +49,7 @@ const ProfileScreen = () => {
         setStats({
           reportsCount: statistics.totalReports || 0,
           questionsCount: statistics.totalChatMessages || 0,
-          points: statistics.currentPoints || 0
+          currentPoints: statistics.currentPoints || 0 // Đã sửa tên biến
         });
       }
 
@@ -101,6 +101,7 @@ const ProfileScreen = () => {
     );
   }
 
+  // --- UI CHẾ ĐỘ CHƯA ĐĂNG NHẬP (GIỮ NGUYÊN) ---
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -111,13 +112,11 @@ const ProfileScreen = () => {
             </View>
             <Text style={styles.guestTitle}>Chưa đăng nhập</Text>
           </View>
-
           <View style={styles.loginPromptCard}>
             <Text style={styles.loginPromptTitle}>Đăng nhập để trải nghiệm đầy đủ</Text>
-            {/* ... Giữ nguyên phần UI giới thiệu tính năng ... */}
              <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => router.push("/login")}
+              onPress={handleLogout}
               activeOpacity={0.8}
             >
               <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
@@ -127,6 +126,12 @@ const ProfileScreen = () => {
       </SafeAreaView>
     );
   }
+
+  // --- UI CHẾ ĐỘ ĐÃ ĐĂNG NHẬP (CẬP NHẬT) ---
+  const MAX_XP_FOR_LEVEL = 300; 
+  const progressPercentage = (stats.currentPoints / MAX_XP_FOR_LEVEL) * 100;
+  const progressBarWidth = `${Math.min(progressPercentage, 100)}%`;
+
 
   return (
     <>
@@ -149,43 +154,82 @@ const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.userCard}>
+          {/* KHỐI CHÍNH: AVATAR & TÊN (Nằm độc lập) */}
+          <View style={styles.avatarBlock}>
             <View style={styles.avatarContainer}>
               {userData?.avatarUrl ? (
-                  // Nếu có ảnh avatar từ API thì dùng Image, tạm thời dùng icon
-                  <MaterialCommunityIcons name="account" size={56} color="#0a0a0aff" />
+                  // Dùng Image nếu có avatar URL
+                  <Image source={{ uri: userData.avatarUrl }} style={styles.avatarImage} /> 
               ) : (
-                  <MaterialCommunityIcons name="emoticon-happy-outline" size={56} color="#0a0a0aff" />
+                  // Dùng icon tạm thời giống ảnh mẫu
+                  <Text style={styles.defaultAvatarText}>:-)</Text>
               )}
             </View>
             <Text style={styles.userName}>{userData?.fullName || "Người dùng"}</Text>
-
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="email-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>{userData?.email}</Text>
-            </View>
-             {/* Các field khác nếu có trong API */}
           </View>
 
-          <View style={styles.greenWarriorCard}>
-            <View style={styles.greenWarriorHeader}>
-              <MaterialCommunityIcons name="leaf" size={24} color="#4CAF50" />
-              <Text style={styles.greenWarriorTitle}>THÀNH TÍCH XANH</Text>
-            </View>
-
-            <View style={styles.pointsRow}>
-              <Text style={styles.pointsLabel}>Điểm hiện tại</Text>
-              <Text style={styles.pointsValue}>{stats.points} điểm</Text>
-            </View>
+          {/* CARD THÔNG TIN LIÊN HỆ (Bố cục mới) */}
+          <View style={styles.infoCard}>
             
-            {/* Thanh tiến độ có thể tính toán dựa trên level nếu API trả về */}
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: "50%" }]} /> 
+            {/* HÀNG 1: Email và Phone Number */}
+            <View style={styles.infoRow}>
+              {/* Email (Áp dụng style mới: emailItem) */}
+              <View style={[styles.infoItem, styles.emailItem]}>
+                <MaterialCommunityIcons name="email-outline" size={18} color="#666" />
+                <Text style={styles.infoText}>{userData?.email}</Text>
+              </View>
+              {/* Phone Number (Áp dụng style mới: phoneItem) */}
+              <View style={[styles.infoItem, styles.phoneItem]}>
+                <MaterialCommunityIcons name="phone-outline" size={18} color="#666" />
+                <Text style={styles.infoText}>{userData?.phoneNumber || "0123456789"}</Text>
               </View>
             </View>
+            
+            {/* HÀNG 2: Location (Giữ nguyên) */}
+            <View style={styles.locationRow}>
+              <MaterialCommunityIcons name="map-marker-outline" size={18} color="#666" />
+              <Text style={styles.infoText}>{userData?.defaultLocation || "Thành phố Hồ Chí Minh"}</Text>
+            </View>
+
           </View>
 
+          {/* CARD CHIẾN BINH XANH (ĐÃ SỬA BỐ CỤC) */}
+          <View style={styles.greenWarriorCard}>
+            
+            {/* TIÊU ĐỀ KHÔNG CÓ ICON */}
+            <Text style={styles.greenWarriorTitleOnly}>CHIẾN BINH XANH</Text>
+            
+            {/* KHỐI ĐIỂM VÀ THANH TIẾN ĐỘ */}
+            <View style={styles.xpBlockContainer}>
+                
+                {/* 1. Icon Hoa Tulip bên trái */}
+                <MaterialCommunityIcons name="flower-tulip-outline" size={32} color="#4CAF50" style={styles.tulipIcon} />
+
+                {/* 2. Cụm Điểm và Thanh Tiến độ */}
+                <View style={styles.progressDetailBlock}>
+                    {/* Dòng 1: Label Điểm xanh và XP Value */}
+                    <View style={styles.pointsLabelRow}>
+                        <Text style={styles.pointsLabel}>Điểm xanh</Text>
+                        <Text style={styles.pointsValue}>{stats.currentPoints} / {MAX_XP_FOR_LEVEL}xp</Text>
+                    </View>
+                    
+                    {/* Dòng 2: Thanh tiến độ */}
+                    <View style={styles.progressBarContainer}>
+                        <View style={styles.progressBarBackground}>
+                            <View style={[styles.progressBarFill, { width: progressBarWidth }]} /> 
+                        </View>
+                    </View>
+                </View>
+            </View>
+
+             <TouchableOpacity style={styles.learnMoreButton}>
+               <Text style={styles.learnMoreText}>Tìm hiểu thêm về </Text>
+               <Text style={styles.learnMoreBold}>Huy hiệu xanh</Text>
+               <MaterialCommunityIcons name="chevron-right" size={16} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
+
+          {/* CARD THỐNG KÊ */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <MaterialCommunityIcons name="file-document-outline" size={32} color="#0A0A0A" />
@@ -200,6 +244,7 @@ const ProfileScreen = () => {
         </ScrollView>
       </SafeAreaView>
 
+      {/* DROPDOWN MENU */}
       {menuVisible && (
         <>
           <TouchableOpacity
@@ -230,9 +275,7 @@ const ProfileScreen = () => {
   );
 };
 
-// Giữ nguyên styles...
 const styles = StyleSheet.create({
-  // ... copy styles cũ vào đây
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
@@ -245,7 +288,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0EFED",
     paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 16,
     alignItems: "flex-end",
     position: "relative",
     zIndex: 1000,
@@ -306,53 +348,92 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
     marginHorizontal: 12,
   },
-  userCard: {
+  // --- 1. KHỐI AVATAR VÀ TÊN ---
+  avatarBlock: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatarContainer: {
+    width: 150, 
+    height: 150,
+    borderRadius: 100,
+    backgroundColor: "#FFFFFF", // Nền trắng
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20, 
+    elevation: 5, // Độ nổi
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  defaultAvatarText: { // Style cho ":-)"
+    fontSize: 32,
+    color: "#666",
+    fontWeight: 'bold',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 100,
+  },
+  userName: {
+    ...typography.h2,
+    fontSize: 24, 
+    fontWeight: "800",
+    color: "#0A0A0A",
+    marginBottom: 0, 
+    letterSpacing: -0.5,
+  },
+
+  // --- 2. CARD THÔNG TIN LIÊN HỆ ---
+  infoCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 20, 
     borderRadius: 24,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    alignItems: "center",
+    paddingVertical: 16, 
+    paddingHorizontal: 6, 
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
-  avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: "#F0EFED",
-  },
-  userName: {
-    ...typography.h2,
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#0A0A0A",
-    marginBottom: 16,
-    letterSpacing: -0.5,
-  },
   infoRow: {
     flexDirection: "row",
+    width: '100%',
+    paddingVertical: 2, 
+    marginBottom: 2, // Khoảng cách với dòng Location
+  },
+  infoItem: {
+    flexDirection: "row",
     alignItems: "center",
-    marginVertical: 6,
-    width: "100%",
-    paddingHorizontal: 8,
+    paddingHorizontal: 15, 
   },
-  infoText: {
+  emailItem: {
+    flex: 0.4,
+    minWidth: 150,
+  },
+  phoneItem: {
+    flex: 0.6,
+  },
+  infoText: { 
     ...typography.body,
-    fontSize: 14,
-    color: "#666",
+    fontSize: 12,
+    color: "#000000",
     fontWeight: "500",
-    marginLeft: 8,
+    marginLeft: 6,
+    flexShrink: 1, 
   },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start", 
+    paddingVertical: 4,
+    paddingHorizontal: 15,
+  },
+  // --- 3. CARD CHIẾN BINH XANH ---
   greenWarriorCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
@@ -366,39 +447,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
-  greenWarriorHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  greenWarriorTitle: {
+  greenWarriorTitleOnly: { // MỚI: Tiêu đề không có icon
     ...typography.h3,
-    fontSize: 16,
+    fontSize: 18, 
     fontWeight: "800",
     color: "#0A0A0A",
-    marginLeft: 8,
+    marginBottom: 16, 
     letterSpacing: -0.3,
   },
-  pointsRow: {
+  // KHỐI CHÍNH: ICON + ĐIỂM/TIẾN ĐỘ
+  xpBlockContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  tulipIcon: { // Icon hoa tulip
+    marginRight: 10,
+    marginTop: 2, 
+  },
+  progressDetailBlock: { // KHỐI CHI TIẾT (Điểm + Tiến độ)
+    flex: 1, 
+  },
+  pointsLabelRow: { // Dòng 1: Label Điểm xanh và XP Value
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    alignItems: "flex-end", 
+    marginBottom: 4,
   },
   pointsLabel: {
     ...typography.body,
     fontSize: 14,
     fontWeight: "600",
-    color: "#0A0A0A",
+    color: "#000000",
   },
   pointsValue: {
-    ...typography.body,
+    ...typography.italic,
     fontSize: 14,
-    fontWeight: "700",
-    color: "#0A0A0A",
+    fontWeight: "500", 
+    color: "#000000", 
   },
   progressBarContainer: {
-    marginBottom: 12,
+    marginBottom: 4, 
   },
   progressBarBackground: {
     height: 8,
@@ -415,19 +504,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
+    marginTop: 8, 
   },
   learnMoreText: {
     ...typography.small,
     fontSize: 12,
-    color: "#666",
+    color: "#000000",
     fontWeight: "500",
   },
   learnMoreBold: {
     ...typography.small,
     fontSize: 12,
     color: "#4CAF50",
-    fontWeight: "700",
+    fontWeight: "800",
   },
+  // --- 4. CARD THỐNG KÊ ---
   statsRow: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -457,6 +548,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: -0.2,
   },
+  // --- GUEST MODE (Giữ nguyên) ---
   guestHeader: {
     alignItems: "center",
     paddingVertical: 40,
@@ -481,31 +573,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     letterSpacing: -0.3,
   },
-  locationCard: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  locationText: {
-    ...typography.body,
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#666",
-    marginLeft: 8,
-  },
   loginPromptCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
@@ -526,22 +593,6 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     marginBottom: 20,
     letterSpacing: -0.3,
-  },
-  featureList: {
-    marginBottom: 24,
-  },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  featureText: {
-    ...typography.body,
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#0A0A0A",
-    marginLeft: 12,
-    letterSpacing: -0.1,
   },
   loginButton: {
     backgroundColor: "#007AFF",
