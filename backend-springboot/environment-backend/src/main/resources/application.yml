@@ -75,3 +75,10 @@ logging:
     org.springframework.web: DEBUG
     org.springframework.security: DEBUG
     com.enviro.app: DEBUG
+
+# ... (các cấu hình khác)
+
+# --- Gemini Configuration ---
+gemini:
+  api-key: "AIzaSyAtXwVcMg-h08LOcE17sK8gDINtHBMxHmY" 
+  # Hãy thay thế "YOUR_GEMINI_API_KEY_HERE" bằng mã khóa thực tế của bạn
