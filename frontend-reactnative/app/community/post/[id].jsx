@@ -1,114 +1,196 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Image,
+  Share,
+  RefreshControl,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import typography from "../../../styles/typography";
+import { Video } from 'expo-av';
+
+// Import service mới
+import {
+  fetchPostDetails,
+  toggleLikePost,
+  addCommentToPost,
+  fetchPostComments,
+  trackPostShare,
+  fetchCurrentUser,
+} from '../../../src/services/communityService';
+
+// Helper để lấy chữ cái đầu
+const getInitials = (fullName) => {
+  if (!fullName || typeof fullName !== 'string' || fullName.trim().length === 0) {
+    return '?';
+  }
+  const parts = fullName.split(' ');
+  if (parts.length >= 2) {
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+  return fullName.substring(0, 2).toUpperCase();
+};
+
 
 const PostDetailScreen = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const [liked, setLiked] = useState(false);
+
+  const [post, setPost] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [commentLikes, setCommentLikes] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
 
-  // Mock data
-  const post = {
-    id: id,
-    author: {
-      name: "Nguyễn Minh Anh",
-      initials: "NMA",
-      badge: "Chiến binh môi trường",
-    },
-    community: "Sống xanh Sài Gòn",
-    content: `Hôm nay mình đã tham gia dọn dẹp công viên cùng nhóm. Thu được gần 50kg rác! Cảm thấy rất vui và ý nghĩa 🌿 Cảm ơn tất cả mọi người đã tham gia! Hẹn gặp lại ở hoạt động tiếp theo!`,
-    date: "2 giờ trước",
-    likes: 124,
-    comments: 18,
-    shares: 5,
+  const [currentUser, setCurrentUser] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+
+  // --- LOGIC TẢI DỮ LIỆU CHÍNH (Tách ra để dùng cho Refresh) ---
+  const fetchPostData = useCallback(async () => {
+    if (!id) return;
+    try {
+      const postData = await fetchPostDetails(id);
+      setPost(postData);
+      const commentsData = await fetchPostComments(id);
+      setComments(commentsData.map(c => ({ ...c, isLikedByCurrentUser: false })));
+    } catch (e) {
+      console.error("Lỗi tải chi tiết bài viết:", e.response?.data || e.message);
+      Alert.alert("Lỗi", "Không thể tải chi tiết bài viết.");
+      setPost(null);
+      setComments([]);
+    }
+  }, [id]);
+
+
+  // Hàm tải dữ liệu khi focus hoặc pull-to-refresh
+  const loadInitialData = useCallback(async () => {
+    if (!refreshing) {
+      setLoading(true);
+    }
+
+    try {
+      await fetchPostData();
+
+      if (!currentUser) {
+        const user = await fetchCurrentUser();
+        setCurrentUser(user);
+      }
+    } catch (e) {
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [fetchPostData, refreshing, currentUser]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialData();
+
+    }, [loadInitialData])
+  );
+
+  // --- HÀM XỬ LÝ PULL-TO-REFRESH ---
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadInitialData();
+  }, [loadInitialData]);
+  // ------------------------------------
+
+
+  // --- HÀM THẢ TIM BÀI VIẾT (FR-8.1.2) ---
+  const handleLike = async () => {
+    if (commentLoading || !post) return;
+
+    try {
+      const updatedPostResponse = await toggleLikePost(post.id);
+      setPost(updatedPostResponse);
+    } catch (e) {
+      console.error("Lỗi thả tim:", e);
+      Alert.alert("Lỗi", "Thao tác thả tim thất bại.");
+    }
   };
 
-  const comments = [
-    {
-      id: 1,
-      author: "Phạm Thị Lan",
-      initials: "PTL",
-      content: "Cảm ơn bạn đã chia sẻ! Mình cũng đang áp dụng những mẹo này",
-      time: "2 giờ trước",
-      likes: 5,
-      replies: [
-        {
-          id: 101,
-          author: "Nguyễn Minh Anh",
-          initials: "NMA",
-          content: "Cảm ơn bạn! Hy vọng sẽ hữu ích cho bạn nhé 😊",
-          time: "1 giờ trước",
-          likes: 2,
-        },
-        {
-          id: 102,
-          author: "Trần Văn Nam",
-          initials: "TVN",
-          content: "Mình cũng đang thử nghiệm, hiệu quả lắm",
-          time: "30 phút trước",
-          likes: 1,
-        },
-      ],
-    },
-    {
-      id: 2,
-      author: "Lê Văn Cường",
-      initials: "LVC",
-      content: "Rất hữu ích! Mình sẽ thử áp dụng từ ngày mai",
-      time: "1 giờ trước",
-      likes: 3,
-      replies: [],
-    },
-  ];
+  // --- HÀM ĐĂNG BÌNH LUẬN (FR-8.1.2) ---
+  const handleComment = async () => {
+    if (!commentText.trim() || commentLoading || !post || !currentUser) return;
 
-  const handleLike = () => {
-    setLiked(!liked);
-  };
+    setCommentLoading(true);
+    Keyboard.dismiss();
 
-  const handleCommentLike = (commentId) => {
-    setCommentLikes((prev) => ({
-      ...prev,
-      [commentId]: !prev[commentId],
-    }));
+    try {
+      const content = commentText.trim();
+      await addCommentToPost(post.id, content);
+
+      await fetchPostData();
+
+      setCommentText("");
+      setReplyingTo(null);
+
+    } catch (e) {
+      console.error("Lỗi đăng bình luận:", e.response?.data || e.message);
+      Alert.alert("Lỗi", "Không thể đăng bình luận.");
+    } finally {
+      setCommentLoading(false);
+    }
   };
 
   const handleReply = (commentId, authorName) => {
     setReplyingTo({ id: commentId, author: authorName });
-    setCommentText(`@${authorName} `);
   };
 
-  const handleComment = () => {
-    if (commentText.trim()) {
-      if (replyingTo) {
-        console.log(`Replying to ${replyingTo.author}:`, commentText);
-      } else {
-        console.log("Adding comment:", commentText);
+  // --- HÀM CHIA SẺ (FR-8.1.2) ---
+  const handleShare = async () => {
+    const ngrokBaseUrl = "https://eructative-prodeportation-nikola.ngrok-free.dev";
+    const internalPath = `/community/post/${post.id}`;
+    const postUrl = `${ngrokBaseUrl}${internalPath}`;
+    const message = `Hãy cùng xem mẹo sống xanh này: "${post.content.substring(0, 50)}..."`;
+
+    try {
+      const result = await Share.share({
+        message: message,
+        url: postUrl,
+        title: 'Chia sẻ Mẹo Sống Xanh',
+      });
+
+      if (result.action === Share.sharedAction) {
+        await trackPostShare(post.id);
+        await fetchPostData();
       }
-      setCommentText("");
-      setReplyingTo(null);
+    } catch (error) {
+      console.error('Lỗi khi chia sẻ:', error.message);
+      Alert.alert('Lỗi', 'Không thể mở khung chia sẻ.');
     }
   };
 
-  const handleShare = () => {
-    console.log("Sharing post");
-  };
+  const totalComments = comments.length;
 
-  const totalComments = comments.reduce((total, comment) => {
-    return total + 1 + (comment.replies ? comment.replies.length : 0);
-  }, 0);
+  // --- KIỂM TRA LOADING/NULL POST ---
+  if (loading || post === null) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={["top"]}>
+        {loading ? (
+          <>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={{ marginTop: 10, color: '#666' }}>Đang tải chi tiết bài viết...</Text>
+          </>
+        ) : (
+          <Text style={{ marginTop: 10, color: '#E63946', fontSize: 16 }}>Không tìm thấy bài viết này.</Text>
+        )}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -138,54 +220,91 @@ const PostDetailScreen = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#007AFF"]}
+            tintColor="#007AFF"
+          />
+        }
       >
+        {/* POST CONTENT */}
         <View style={styles.postCard}>
           <View style={styles.postHeader}>
             <View style={styles.authorAvatar}>
-              <Text style={styles.avatarText}>{post.author.initials}</Text>
+              <Text style={styles.avatarText}>{getInitials(post.userFullName)}</Text>
             </View>
             <View style={styles.authorInfo}>
               <View style={styles.authorRow}>
-                <Text style={styles.authorName}>{post.author.name}</Text>
-                {post.author.badge && (
-                  <View style={styles.badge}>
-                    <MaterialCommunityIcons
-                      name="star"
-                      size={11}
-                      color="#FFB800"
-                    />
-                    <Text style={styles.badgeText} numberOfLines={1}>
-                      {post.author.badge}
-                    </Text>
-                  </View>
-                )}
+                <Text style={styles.authorName}>{post.userFullName}</Text>
               </View>
               <Text style={styles.postMeta} numberOfLines={1}>
-                {post.date} • Nhóm: {post.community}
+                {new Date(post.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • Nhóm: {post.groupName || 'Chung'}
               </Text>
             </View>
           </View>
 
           <Text style={styles.postContent}>{post.content}</Text>
 
-          <View style={styles.postImage} />
+          {/* POST MEDIA (Đã sửa lỗi không xem được video bằng Component Video) */}
+          {post.mediaUrls && post.mediaUrls.length > 0 && (
+            <View style={styles.postMediaContainer}>
+              {post.mediaUrls.map((url, index) => {
+                // Kiểm tra đuôi file để phân biệt Video
+                const isVideo = url.toLowerCase().match(/\.(mp4|mov|avi|wmv|flv|webm)$/);
+
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.postImage,
+                      post.mediaUrls.length > 1 && { height: 180, marginBottom: 8 }
+                    ]}
+                  >
+                    {isVideo ? (
+                      // Video Component (sử dụng expo-av/Video)
+                      <Video
+                        source={{ uri: url }}
+                        rate={1.0}
+                        volume={1.0}
+                        isMuted={false}
+                        resizeMode="cover"
+                        shouldPlay={false}
+                        useNativeControls
+                        style={styles.imagePlaceholder}
+                      />
+                    ) : (
+                      // Image Render
+                      <Image
+                        source={{ uri: url }}
+                        style={[styles.imagePlaceholder]}
+                        resizeMode='cover'
+                      />
+                    )}
+                  </View>
+                )}
+              )}
+            </View>
+          )}
 
           <View style={styles.postFooter}>
             <View style={styles.postStats}>
               <TouchableOpacity
                 style={styles.statItem}
                 onPress={handleLike}
+                disabled={commentLoading}
                 activeOpacity={0.7}
               >
                 <MaterialCommunityIcons
-                  name={liked ? "heart" : "heart-outline"}
+                  name={post.isLikedByCurrentUser ? "heart" : "heart-outline"}
                   size={18}
-                  color={liked ? "#E63946" : "#666"}
+                  color={post.isLikedByCurrentUser ? "#E63946" : "#666"}
                 />
                 <Text
-                  style={[styles.statsText, liked && styles.statsTextActive]}
+                  style={[styles.statsText, post.isLikedByCurrentUser && styles.statsTextActive]}
                 >
-                  {post.likes + (liked ? 1 : 0)}
+                  {post.likesCount}
                 </Text>
               </TouchableOpacity>
 
@@ -195,7 +314,7 @@ const PostDetailScreen = () => {
                   size={18}
                   color="#666"
                 />
-                <Text style={styles.statsText}>{post.comments}</Text>
+                <Text style={styles.statsText}>{post.commentsCount}</Text>
               </View>
 
               <TouchableOpacity
@@ -208,146 +327,85 @@ const PostDetailScreen = () => {
                   size={18}
                   color="#666"
                 />
-                <Text style={styles.statsText}>{post.shares}</Text>
+                <Text style={styles.statsText}>{post.sharesCount || 0}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
+        {/* COMMENTS SECTION */}
         <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>Bình luận ({totalComments})</Text>
+          <Text style={styles.commentsTitle}>Bình luận ({post.commentsCount})</Text>
 
-          {comments.map((comment) => {
-            const isLiked = commentLikes[comment.id];
-            const likeCount = comment.likes + (isLiked ? 1 : 0);
+          {comments.length === 0 && !loading ? (
+            <Text style={styles.noCommentsText}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
+          ) : (
+            comments.map((comment) => {
+              const isLiked = comment.isLikedByCurrentUser;
+              const likeCount = 0;
+              const commentInitials = getInitials(comment.userFullName);
 
-            return (
-              <View key={comment.id}>
-                <View style={styles.commentCard}>
-                  <View style={styles.commentAvatar}>
-                    <Text style={styles.commentAvatarText}>
-                      {comment.initials}
-                    </Text>
-                  </View>
-                  <View style={styles.commentContent}>
-                    <View style={styles.commentBubble}>
-                      <Text style={styles.commentAuthor}>{comment.author}</Text>
-                      <Text style={styles.commentText}>{comment.content}</Text>
+              return (
+                <View key={comment.id}>
+                  <View style={styles.commentCard}>
+                    <View style={styles.commentAvatar}>
+                      {/* Nếu Backend trả về URL avatar, dùng <Image> */}
+                      <Text style={styles.commentAvatarText}>
+                        {commentInitials}
+                      </Text>
                     </View>
-                    <View style={styles.commentActions}>
-                      <Text style={styles.commentTime}>{comment.time}</Text>
-                      <TouchableOpacity
-                        style={styles.commentAction}
-                        onPress={() => handleCommentLike(comment.id)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.commentActionWithIcon}>
-                          <MaterialCommunityIcons
-                            name={isLiked ? "heart" : "heart-outline"}
-                            size={14}
-                            color={isLiked ? "#E63946" : "#666"}
-                          />
-                          {likeCount > 0 && (
-                            <Text
-                              style={[
-                                styles.commentActionText,
-                                isLiked && styles.commentActionTextActive,
-                              ]}
-                            >
-                              {likeCount}
-                            </Text>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.commentAction}
-                        onPress={() => handleReply(comment.id, comment.author)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.commentActionText}>Trả lời</Text>
-                      </TouchableOpacity>
+                    <View style={styles.commentContent}>
+                      <View style={styles.commentBubble}>
+                        <Text style={styles.commentAuthor}>{comment.userFullName}</Text>
+                        <Text style={styles.commentText}>{comment.content}</Text>
+                      </View>
+                      <View style={styles.commentActions}>
+                        <Text style={styles.commentTime}>
+                          {new Date(comment.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.commentAction}
+                          onPress={() => handleCommentLike(comment.id)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.commentActionWithIcon}>
+                            <MaterialCommunityIcons
+                              name={isLiked ? "heart" : "heart-outline"}
+                              size={14}
+                              color={isLiked ? "#E63946" : "#666"}
+                            />
+                            {/* Chỉ hiển thị số lượng nếu > 0 */}
+                            {likeCount > 0 && (
+                              <Text
+                                style={[
+                                  styles.commentActionText,
+                                  isLiked && styles.commentActionTextActive,
+                                ]}
+                              >
+                                {likeCount}
+                              </Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.commentAction}
+                          // Tạm thời ẩn trả lời vì logic trả lời bình luận (replies) chưa có trong Comment Model
+                          // onPress={() => handleReply(comment.id, comment.userFullName)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.commentActionText}>Trả lời</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 </View>
-
-                {/* Render replies */}
-                {comment.replies && comment.replies.length > 0 && (
-                  <View style={styles.repliesContainer}>
-                    {comment.replies.map((reply) => {
-                      const isReplyLiked = commentLikes[reply.id];
-                      const replyLikeCount =
-                        reply.likes + (isReplyLiked ? 1 : 0);
-
-                      return (
-                        <View key={reply.id} style={styles.replyCard}>
-                          <View style={styles.commentAvatar}>
-                            <Text style={styles.commentAvatarText}>
-                              {reply.initials}
-                            </Text>
-                          </View>
-                          <View style={styles.commentContent}>
-                            <View style={styles.commentBubble}>
-                              <Text style={styles.commentAuthor}>
-                                {reply.author}
-                              </Text>
-                              <Text style={styles.commentText}>
-                                {reply.content}
-                              </Text>
-                            </View>
-                            <View style={styles.commentActions}>
-                              <Text style={styles.commentTime}>
-                                {reply.time}
-                              </Text>
-                              <TouchableOpacity
-                                style={styles.commentAction}
-                                onPress={() => handleCommentLike(reply.id)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={styles.commentActionWithIcon}>
-                                  <MaterialCommunityIcons
-                                    name={
-                                      isReplyLiked ? "heart" : "heart-outline"
-                                    }
-                                    size={14}
-                                    color={isReplyLiked ? "#E63946" : "#666"}
-                                  />
-                                  {replyLikeCount > 0 && (
-                                    <Text
-                                      style={[
-                                        styles.commentActionText,
-                                        isReplyLiked &&
-                                          styles.commentActionTextActive,
-                                      ]}
-                                    >
-                                      {replyLikeCount}
-                                    </Text>
-                                  )}
-                                </View>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={styles.commentAction}
-                                onPress={() =>
-                                  handleReply(comment.id, reply.author)
-                                }
-                                activeOpacity={0.7}
-                              >
-                                <Text style={styles.commentActionText}>
-                                  Trả lời
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </View>
       </ScrollView>
 
+      {/* COMMENT INPUT FOOTER */}
       <View style={styles.commentInputContainer}>
         {replyingTo && (
           <View style={styles.replyingBanner}>
@@ -367,29 +425,32 @@ const PostDetailScreen = () => {
         )}
         <View style={styles.inputRow}>
           <View style={styles.commentInputAvatar}>
-            <Text style={styles.inputAvatarText}>BAN</Text>
+            <Text style={styles.inputAvatarText}>{currentUser ? getInitials(currentUser.fullName) : '...'}</Text>
           </View>
           <TextInput
             style={styles.commentInput}
             placeholder={
-              replyingTo
-                ? `Trả lời ${replyingTo.author}...`
-                : "Viết bình luận..."
+              commentLoading ? "Đang gửi..." : (replyingTo ? `Trả lời ${replyingTo.author}...` : "Viết bình luận...")
             }
             placeholderTextColor="#999"
             value={commentText}
             onChangeText={setCommentText}
+            editable={!commentLoading}
           />
           <TouchableOpacity
             onPress={handleComment}
-            disabled={!commentText.trim()}
+            disabled={!commentText.trim() || commentLoading}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons
-              name="arrow-up-circle"
-              size={36}
-              color={commentText.trim() ? "#007AFF" : "#D0D0D0"}
-            />
+            {commentLoading ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <MaterialCommunityIcons
+                name="arrow-up-circle"
+                size={36}
+                color={commentText.trim() ? "#007AFF" : "#D0D0D0"}
+              />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -398,6 +459,7 @@ const PostDetailScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // ... (Styles giữ nguyên)
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
@@ -516,12 +578,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
+  postMediaContainer: {
+    marginBottom: 12,
+  },
   postImage: {
     width: "100%",
-    height: 240,
+    height: 240, // Default height
     borderRadius: 12,
     backgroundColor: "#E8E8E8",
-    marginBottom: 12,
+    marginBottom: 8,
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: { // Dùng cho cả ảnh và video
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E8E8E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
   },
   postFooter: {
     paddingTop: 8,
@@ -571,6 +645,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0A0A0A",
     marginBottom: 12,
+  },
+  noCommentsText: {
+    ...typography.body,
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   commentCard: {
     flexDirection: "row",

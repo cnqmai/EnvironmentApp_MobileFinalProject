@@ -15,11 +15,15 @@ public class CommentResponse {
     
     UUID id;
     String content;
+    UUID postId;
     
     // Thông tin user tạo comment
     UUID userId;
     String userFullName;
     String userAvatarUrl;
+
+    long likesCount;
+    boolean isLikedByCurrentUser;
     
     OffsetDateTime createdAt;
     OffsetDateTime updatedAt;

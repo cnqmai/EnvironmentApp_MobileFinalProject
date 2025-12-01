@@ -1,40 +1,89 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useCallback, useState } from "react";
+import { 
+  ScrollView, 
+  StyleSheet, 
+  TouchableOpacity, 
+  View, 
+  ActivityIndicator, 
+  Alert,
+  Image, // Import Image
+} from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
+import { fetchCommunityDetails, toggleJoinCommunity } from '../../src/services/communityService';
+import { useFocusEffect } from "expo-router";
 
 const CommunityDetailScreen = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const [isJoined, setIsJoined] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(true);
+  const { id } = useLocalSearchParams(); // Group ID (UUID string)
+  
+  const [community, setCommunity] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  // Mock data - trong thực tế sẽ fetch từ API dựa vào id
-  const community = {
-    id: id,
-    name: "Cộng đồng bảo vệ môi trường Cấp 2",
-    members: 325,
-    campaigns: 12,
-    recycledWeight: 5420,
-    reports: 320,
-    participants: 2345,
-  };
+  // --- LOGIC LẤY DỮ LIỆU ---
+  const loadCommunityDetails = useCallback(async () => {
+      if (!id) return;
 
-  const handleJoinToggle = () => {
-    setIsJoined(!isJoined);
-    if (!isJoined) {
-      setIsFollowing(true); // Auto follow when joining
+      setLoading(true);
+      try {
+          // Dữ liệu trả về giờ bao gồm: areaName, totalReports, recycledWasteKg, imageUrl
+          const data = await fetchCommunityDetails(id); 
+          setCommunity(data);
+      } catch (e) {
+          console.error("Lỗi tải chi tiết nhóm:", e.response?.data || e.message);
+          Alert.alert("Lỗi", "Không thể tải thông tin cộng đồng.");
+          setCommunity(null);
+      } finally {
+          setLoading(false);
+      }
+  }, [id]);
+
+  useFocusEffect(loadCommunityDetails);
+
+  // --- LOGIC THAM GIA/RỜI NHÓM ---
+  const handleJoinToggle = async () => {
+    if (actionLoading) return;
+
+    setActionLoading(true);
+    try {
+        const updatedCommunity = await toggleJoinCommunity(id);
+        setCommunity(updatedCommunity);
+        Alert.alert("Thành công", updatedCommunity.isMember ? "Bạn đã tham gia nhóm!" : "Bạn đã rời khỏi nhóm.");
+    } catch (e) {
+        console.error("Lỗi tham gia/rời nhóm:", e.response?.data || e.message);
+        Alert.alert("Lỗi", "Thao tác không thành công.");
+    } finally {
+        setActionLoading(false);
     }
   };
 
-  const handleFollowToggle = () => {
-    if (isJoined) {
-      setIsFollowing(!isFollowing);
-    }
-  };
+  if (loading || community === null) {
+      return (
+          <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={["top"]}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={{ marginTop: 10, color: '#666' }}>Đang tải chi tiết cộng đồng...</Text>
+          </SafeAreaView>
+      );
+  }
+  
+  const isJoined = community.isMember;
+  const isFollowing = isJoined; 
+  
+  // Lấy dữ liệu động mới từ API response
+  const { 
+    areaName, 
+    totalReports, 
+    recycledWasteKg, 
+    imageUrl 
+  } = community;
+
+  // Định dạng số (làm tròn kg và thêm dấu phẩy)
+  const formattedRecycledWaste = recycledWasteKg ? Math.round(recycledWasteKg).toLocaleString('vi-VN') : '0';
+  const formattedTotalReports = totalReports ? totalReports.toLocaleString('vi-VN') : '0';
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -59,24 +108,43 @@ const CommunityDetailScreen = () => {
         </View>
 
         <View style={styles.communityInfo}>
-          <View style={styles.communityIconContainer}>
-            <MaterialCommunityIcons
-              name="shield-check"
-              size={56}
-              color="#FFFFFF"
+          {/* LOGIC HIỂN THỊ ẢNH ĐẠI DIỆN */}
+          {imageUrl ? (
+            <Image 
+                source={{ uri: imageUrl }} 
+                style={styles.communityAvatar} // Style mới
             />
-          </View>
+          ) : (
+            <View style={styles.communityIconContainer}>
+              <MaterialCommunityIcons
+                name="shield-check"
+                size={56}
+                color="#FFFFFF"
+              />
+            </View>
+          )}
+          {/* KẾT THÚC LOGIC ẢNH */}
+
           <View style={styles.communityTextInfo}>
             <Text style={styles.communityName}>{community.name}</Text>
+            
+            {/* HIỂN THỊ KHU VỰC HOẠT ĐỘNG */}
+            {areaName && (
+              <Text style={styles.communityLocationText}>
+                <MaterialCommunityIcons name="map-marker" size={14} color="#666" /> 
+                {' '}Khu vực: {areaName}
+              </Text>
+            )}
+
             <Text style={styles.communityMembers}>
-              {community.members} thành viên
+              {community.memberCount} thành viên
             </Text>
           </View>
         </View>
 
         <View style={styles.communityDescription}>
           <Text style={styles.descriptionText}>
-            Cộng đồng hoạt động vì môi trường xanh, sạch, bền vững
+            {"Giới thiệu về nhóm: \n" + community.description || "Cộng đồng hoạt động vì môi trường xanh, sạch, bền vững"}
           </Text>
         </View>
 
@@ -87,21 +155,28 @@ const CommunityDetailScreen = () => {
               isJoined && styles.primaryButtonActive,
             ]}
             onPress={handleJoinToggle}
+            disabled={actionLoading}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons
-              name={isJoined ? "account-check" : "account-plus"}
-              size={20}
-              color={isJoined ? "#007AFF" : "#FFFFFF"}
-            />
-            <Text
-              style={[
-                styles.primaryButtonText,
-                isJoined && styles.primaryButtonTextActive,
-              ]}
-            >
-              {isJoined ? "Đã tham gia" : "Tham gia"}
-            </Text>
+            {actionLoading ? (
+                <ActivityIndicator size="small" color={isJoined ? "#007AFF" : "#FFFFFF"} />
+            ) : (
+                <>
+                    <MaterialCommunityIcons
+                        name={isJoined ? "account-check" : "account-plus"}
+                        size={20}
+                        color={isJoined ? "#007AFF" : "#FFFFFF"}
+                    />
+                    <Text
+                        style={[
+                            styles.primaryButtonText,
+                            isJoined && styles.primaryButtonTextActive,
+                        ]}
+                    >
+                        {isJoined ? "Đã tham gia" : "Tham gia"}
+                    </Text>
+                </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -109,7 +184,8 @@ const CommunityDetailScreen = () => {
               styles.secondaryButton,
               isFollowing && styles.secondaryButtonActive,
             ]}
-            onPress={handleFollowToggle}
+            onPress={() => { Alert.alert("Tính năng chưa có", "Tính năng theo dõi sẽ sớm được cập nhật."); }} // Mock: Giữ nguyên logic UI
+            disabled={!isJoined || actionLoading}
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons
@@ -127,7 +203,8 @@ const CommunityDetailScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-
+        
+        {/* Phần thống kê (Giữ nguyên Mock data, thay memberCount) */}
         <View style={styles.secondRowButtons}>
           <TouchableOpacity
             style={styles.eventButton}
@@ -149,16 +226,18 @@ const CommunityDetailScreen = () => {
           <View style={styles.mainStatsCard}>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{community.members}</Text>
+                <Text style={styles.statValue}>{community.memberCount}</Text>
                 <Text style={styles.statLabel}>Thành viên</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{community.campaigns}</Text>
+                {/* Dùng Mock data vì API chưa có */}
+                <Text style={styles.statValue}>12</Text>
                 <Text style={styles.statLabel}>Chiến dịch</Text>
               </View>
               <View style={styles.statItem}>
+                {/* [CẬP NHẬT] Dùng dữ liệu động từ API */}
                 <Text style={styles.statValue}>
-                  {community.recycledWeight}kg
+                  {formattedRecycledWaste}kg
                 </Text>
                 <Text style={styles.statLabel}>Lượng rác{"\n"}tái chế</Text>
               </View>
@@ -172,8 +251,9 @@ const CommunityDetailScreen = () => {
                 size={28}
                 color="#0A0A0A"
               />
+              {/* [CẬP NHẬT] Dùng dữ liệu động từ API */}
               <Text style={styles.smallCardValue}>
-                {community.reports} báo cáo{"\n"}đã gửi
+                {formattedTotalReports} báo cáo{"\n"}đã gửi
               </Text>
             </View>
 
@@ -183,12 +263,14 @@ const CommunityDetailScreen = () => {
                 size={28}
                 color="#0A0A0A"
               />
+              {/* Dùng Mock data */}
               <Text style={styles.smallCardValue}>
-                {community.participants} người{"\n"}tham gia
+                2345 người{"\n"}tham gia
               </Text>
             </View>
           </View>
-
+          
+          {/* ... (Phần Chart và Badge giữ nguyên Mock UI) ... */}
           <View style={styles.chartSection}>
             <View style={styles.chartHeader}>
               <Text style={styles.chartTitle}>Hoạt động cộng đồng</Text>
@@ -290,14 +372,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 10,
   },
   backButton: {
     width: 44,
@@ -322,18 +403,36 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
-
   communityInfo: {
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 10,
     backgroundColor: "#F0EFED",
   },
+  
+  // [CẬP NHẬT] Style mới cho Image
+  communityAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    backgroundColor: '#E5E5E5',
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    resizeMode: 'cover',
+  },
+  // [GIỮ NGUYÊN] Style cũ cho icon (dùng khi không có ảnh)
   communityIconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: "#007AFF",
     alignItems: "center",
     justifyContent: "center",
@@ -356,10 +455,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: -0.5,
   },
+  // [MỚI] Style cho khu vực hoạt động
+  communityLocationText: {
+    ...typography.body,
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 8,
+  },
   communityMembers: {
     ...typography.body,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "#666",
     textAlign: "center",
   },
@@ -371,7 +479,7 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 16,
     lineHeight: 20,
     color: "#666",
     textAlign: "center",

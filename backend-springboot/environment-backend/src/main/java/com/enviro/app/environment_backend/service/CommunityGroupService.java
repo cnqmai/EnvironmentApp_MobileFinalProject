@@ -53,6 +53,7 @@ public class CommunityGroupService {
                 .creator(creator)
                 .isPublic(request.getIsPublic() != null ? request.getIsPublic() : true)
                 .memberCount(1)
+                .imageUrl(request.getImageUrl()) // [CẬP NHẬT] Lấy imageUrl từ request và lưu
                 .build();
 
         CommunityGroup saved = groupRepository.save(group);
@@ -112,6 +113,12 @@ public class CommunityGroupService {
             Optional<GroupMember> member = memberRepository.findByUserAndGroup(currentUser, group);
             role = member.map(GroupMember::getRole).orElse(null);
         }
+        
+        // --- LOGIC MOCK/TÍNH TOÁN CHO DASHBOARD (FR-12.1.2) ---
+        Integer mockTotalReports = group.getMemberCount() * 3;
+        Double mockRecycledWaste = group.getMemberCount() * 50.5;
+        // --------------------------------------------------------
+
 
         return CommunityGroupResponse.builder()
                 .id(group.getId())
@@ -126,7 +133,10 @@ public class CommunityGroupService {
                 .isMember(isMember)
                 .role(role)
                 .createdAt(group.getCreatedAt())
+                // Ánh xạ dữ liệu Dashboard
+                .totalReports(mockTotalReports)
+                .recycledWasteKg(mockRecycledWaste)
+                .imageUrl(group.getImageUrl()) // [CẬP NHẬT] Ánh xạ imageUrl
                 .build();
     }
 }
-

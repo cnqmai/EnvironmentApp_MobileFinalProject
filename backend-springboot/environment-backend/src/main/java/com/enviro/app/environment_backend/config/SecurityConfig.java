@@ -110,12 +110,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/environmental-data/**").permitAll() 
                 
                 .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll()
+
+                .requestMatchers("/api/posts/{id}").permitAll() // Thêm đường dẫn API
+                .requestMatchers("/community/post/**").permitAll() // Thêm đường dẫn Deep Link
                 
-                // --- 4. Cho phép API CATEGORIES (Public) ---
                 .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
                 .requestMatchers(mvc.pattern("/categories/**")).permitAll()
                 
-                // 5. Cho phép trang lỗi
                 .requestMatchers(mvc.pattern("/error")).permitAll()
                 
                 // 6. Cho phép OPTIONS (CORS)

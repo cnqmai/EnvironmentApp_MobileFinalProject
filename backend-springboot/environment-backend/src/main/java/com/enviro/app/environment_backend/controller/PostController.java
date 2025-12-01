@@ -37,6 +37,9 @@ public class PostController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
     }
 
+    /**
+     * FR-8.1.1: Tạo bài viết mới
+     */
     @PostMapping
     public ResponseEntity<PostResponse> createPost(@Valid @RequestBody PostRequest request) {
         User user = getCurrentUser();
@@ -44,10 +47,20 @@ public class PostController {
         return new ResponseEntity<>(post, HttpStatus.CREATED);
     }
 
+    /**
+     * FR-8.1.2: Lấy Feed chung (Hỗ trợ tab "Diễn đàn" trên Frontend)
+     */
     @GetMapping
-    public ResponseEntity<List<PostResponse>> getAllPosts() {
+    public ResponseEntity<List<PostResponse>> getCommunityFeed(
+            @RequestParam(defaultValue = "all") String tab, // 'all', 'following', 'my'
+            @RequestParam(required = false) UUID groupId) { // Lấy bài viết theo nhóm cụ thể
+        
         User currentUser = getCurrentUser();
-        List<PostResponse> posts = postService.getAllPosts(currentUser);
+        
+        // [CẬP NHẬT] Truyền tab vào service
+        // LƯU Ý: logic lọc theo groupId CHƯA được hiện thực trong PostService
+        List<PostResponse> posts = postService.getAllPosts(currentUser, tab); 
+        
         return ResponseEntity.ok(posts);
     }
 
@@ -58,6 +71,9 @@ public class PostController {
         return ResponseEntity.ok(post);
     }
 
+    /**
+     * FR-8.1.2: Thả tim/Bỏ thả tim
+     */
     @PostMapping("/{id}/like")
     public ResponseEntity<PostResponse> toggleLike(@PathVariable UUID id) {
         User user = getCurrentUser();
@@ -65,6 +81,9 @@ public class PostController {
         return ResponseEntity.ok(post);
     }
 
+    /**
+     * FR-8.1.2: Thêm bình luận
+     */
     @PostMapping("/{id}/comments")
     public ResponseEntity<CommentResponse> addComment(
             @PathVariable UUID id,
@@ -74,9 +93,23 @@ public class PostController {
         return new ResponseEntity<>(comment, HttpStatus.CREATED);
     }
 
+    /**
+     * FR-8.1.2: Lấy danh sách bình luận
+     */
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<CommentResponse>> getPostComments(@PathVariable UUID id) {
         List<CommentResponse> comments = postService.getPostComments(id);
         return ResponseEntity.ok(comments);
+    }
+
+    /**
+     * [BỔ SUNG] Tăng số lượng chia sẻ (shares count)
+     * POST /api/posts/{id}/share
+     */
+    @PostMapping("/{id}/share")
+    public ResponseEntity<Void> trackShare(@PathVariable UUID id) {
+        // Không cần getCurrentUser() vì đây là hành động đếm công khai
+        postService.trackShare(id);
+        return ResponseEntity.ok().build();
     }
 }

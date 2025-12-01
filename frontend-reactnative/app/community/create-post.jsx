@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   Alert,
   ScrollView,
@@ -8,63 +8,180 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image, // Import Image
+  ActivityIndicator, // Import ActivityIndicator
 } from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
+import * as ImagePicker from 'expo-image-picker'; // Import ImagePicker
+import { fetchDiscoverCommunities, createPost, fetchCurrentUser } from '../../src/services/communityService';
+// Import HÀM UPLOAD THỰC TẾ
+import { uploadFile } from '../../src/services/fileService'; 
+
 
 const CreatePostScreen = () => {
   const router = useRouter();
   const [content, setContent] = useState("");
-  const [selectedCommunity, setSelectedCommunity] = useState("");
+  // Dùng null/UUID cho ID nhóm
+  const [selectedCommunityId, setSelectedCommunityId] = useState(null); 
   const [selectedImages, setSelectedImages] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  
+  // State User hiện tại
+  const [currentUser, setCurrentUser] = useState(null); 
+  
+  // State load danh sách nhóm
+  const [communities, setCommunities] = useState([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(true);
 
-  const communities = [
-    { id: 0, name: "Cộng đồng chung", icon: "earth" },
-    { id: 1, name: "Sống xanh sài gòn", icon: "account-group" },
-    { id: 2, name: "Tái chế sáng tạo", icon: "recycle" },
-    { id: 3, name: "Sống tối giản", icon: "leaf" },
-    { id: 4, name: "Không rác thải nhựa", icon: "bottle-soda-outline" },
-    { id: 5, name: "Tiết kiệm năng lượng", icon: "lightning-bolt" },
-  ];
+  // Helper để lấy chữ cái đầu
+  const getInitials = (fullName) => {
+    // [CẬP NHẬT QUAN TRỌNG] Kiểm tra nếu fullName là null, undefined, hoặc rỗng
+    if (!fullName || typeof fullName !== 'string' || fullName.trim().length === 0) {
+        return '?'; // Trả về ký tự placeholder nếu tên không hợp lệ
+    }
+    
+    // Logic còn lại giữ nguyên
+    const parts = fullName.split(' ');
+    
+    // Lấy chữ cái đầu của từ đầu tiên và từ cuối cùng
+    if (parts.length >= 2) {
+        // Lấy chữ cái đầu của từ đầu tiên và từ cuối cùng
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    
+    // Nếu chỉ có 1 từ hoặc không có, lấy 2 ký tự đầu
+    return fullName.substring(0, 2).toUpperCase();
+};
+
+  // --- LOGIC 1: LẤY THÔNG TIN USER (TỪ TOKEN) ---
+  const loadCurrentUser = useCallback(async () => {
+    try {
+        const user = await fetchCurrentUser();
+        setCurrentUser(user);
+    } catch (e) {
+        console.error("Lỗi tải thông tin người dùng:", e);
+    }
+  }, []);
+
+  // Load danh sách nhóm Khám phá (để chọn)
+  const loadCommunities = useCallback(async () => {
+    setCommunitiesLoading(true);
+    try {
+        const discoverGroups = await fetchDiscoverCommunities(0, 10);
+        // Thêm option "Cộng đồng chung" vào đầu
+        const allGroups = [
+            { id: null, name: "Cộng đồng chung", icon: "earth" },
+            ...discoverGroups.map(g => ({
+                id: g.id, 
+                name: g.name, 
+                icon: 'account-group' // Tạm thời dùng icon mặc định
+            }))
+        ];
+        setCommunities(allGroups);
+    } catch (e) {
+        console.error("Lỗi tải nhóm:", e);
+        Alert.alert("Lỗi", "Không thể tải danh sách cộng đồng.");
+    } finally {
+        setCommunitiesLoading(false);
+    }
+  }, []);
+
+  // Gọi load user và Communities khi component mount
+  useEffect(() => {
+    loadCurrentUser();
+    loadCommunities();
+  }, [loadCurrentUser, loadCommunities]);
+
 
   const filteredCommunities = communities.filter((community) =>
     community.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSelectImage = () => {
-    // Mock: Thêm ảnh giả
-    const newImage = {
-      id: Date.now(),
-      uri: "https://picsum.photos/400/300?random=" + Date.now(),
-    };
-    setSelectedImages([...selectedImages, newImage]);
+  const handleSelectImage = async () => {
+    if (loading) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Cần quyền', 'Vui lòng cấp quyền truy cập ảnh/video.');
+      return;
+    }
+    
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.ImagesAndVideos,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+    
+    if (!result.canceled && result.assets) {
+      const newImages = result.assets.map(asset => ({
+        id: Date.now() + Math.random(),
+        uri: asset.uri,
+        type: asset.type,
+      }));
+      setSelectedImages([...selectedImages, ...newImages]);
+    }
   };
 
   const handleRemoveImage = (imageId) => {
     setSelectedImages(selectedImages.filter((img) => img.id !== imageId));
   };
 
-  const handlePost = () => {
+  // --- HÀM XỬ LÝ ĐĂNG BÀI CHÍNH ---
+  const handlePost = async () => {
     if (!content.trim()) {
       Alert.alert("Thông báo", "Vui lòng nhập nội dung bài viết");
       return;
     }
+    if (!currentUser) {
+        Alert.alert("Lỗi", "Vui lòng đăng nhập để đăng bài.");
+        return;
+    }
 
-    const postLocation = selectedCommunity || "Cộng đồng chung";
-    Alert.alert(
-      "Đăng bài thành công",
-      `Bài viết của bạn đã được đăng lên ${postLocation}!`,
-      [
-        {
-          text: "OK",
-          onPress: () => router.push("/community"),
-        },
-      ]
-    );
+    setLoading(true);
+    
+    try {
+      // 1. Upload media files (Dùng hàm uploadFile THỰC TẾ)
+      const uploadPromises = selectedImages.map(img => {
+          return uploadFile(img.uri); // Hàm này trả về URL đã lưu
+      });
+      const mediaUrls = await Promise.all(uploadPromises);
+
+      // 2. Tạo Payload
+      const payload = {
+        content: content,
+        groupId: selectedCommunityId,
+        mediaUrls: mediaUrls,
+      };
+
+      // 3. Gọi API Backend: POST /api/posts
+      await createPost(payload);
+
+      // 4. Thành công
+      Alert.alert(
+        "Đăng bài thành công",
+        `Bài viết của bạn đã được đăng!`,
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setLoading(false);
+              // Quay lại màn hình cộng đồng
+              router.push("/community"); 
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error("Lỗi đăng bài:", error.response?.data || error.message);
+      Alert.alert("Lỗi", "Không thể đăng bài. Vui lòng thử lại.");
+      setLoading(false);
+    }
   };
 
+  const selectedCommunityObject = communities.find(c => c.id === selectedCommunityId);
+  
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
@@ -83,20 +200,24 @@ const CreatePostScreen = () => {
         <TouchableOpacity
           style={[
             styles.postButton,
-            !content.trim() && styles.postButtonDisabled,
+            (!content.trim() || loading || !currentUser) && styles.postButtonDisabled,
           ]}
           onPress={handlePost}
-          disabled={!content.trim()}
+          disabled={!content.trim() || loading || !currentUser}
           activeOpacity={0.8}
         >
-          <Text
-            style={[
-              styles.postButtonText,
-              !content.trim() && styles.postButtonTextDisabled,
-            ]}
-          >
-            Đăng bài
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text
+              style={[
+                styles.postButtonText,
+                (!content.trim() || !currentUser) && styles.postButtonTextDisabled,
+              ]}
+            >
+              Đăng bài
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -104,14 +225,19 @@ const CreatePostScreen = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.userSection}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>BAN</Text>
+            <Text style={styles.avatarText}>
+                {currentUser ? getInitials(currentUser.fullName) : '...'}
+            </Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>Bạn Anh</Text>
-            <Text style={styles.userPrompt}>Đăng lên nhóm cộng đồng</Text>
+            <Text style={styles.userName}>
+                {currentUser ? currentUser.fullName : 'Đang tải...'}
+            </Text>
+            <Text style={styles.userPrompt}>Đăng lên nhóm: {selectedCommunityObject?.name || 'Cộng đồng chung'}</Text>
           </View>
         </View>
 
@@ -127,36 +253,49 @@ const CreatePostScreen = () => {
 
           {selectedImages.length > 0 && (
             <View style={styles.imagesPreview}>
-              {selectedImages.map((image) => (
-                <View key={image.id} style={styles.imagePreviewItem}>
-                  <View style={styles.imagePreviewPlaceholder} />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={() => handleRemoveImage(image.id)}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons
-                      name="close-circle"
-                      size={24}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                {selectedImages.map((media) => ( // Đổi tên biến từ 'image' thành 'media' cho rõ ràng
+                    <View key={media.id} style={styles.imagePreviewItem}>
+                        
+                        {/* LOGIC HIỂN THỊ PREVIEW */}
+                        {media.type === 'video' ? (
+                            // Hiển thị Placeholder cho Video
+                            <View style={[styles.imagePreview, styles.videoPlaceholder]}>
+                                <MaterialCommunityIcons name="video-outline" size={40} color="#666" />
+                                <Text style={styles.videoText}>Video đã chọn</Text>
+                            </View>
+                        ) : (
+                            // Chỉ hiển thị ảnh bằng component Image
+                            <Image source={{ uri: media.uri }} style={styles.imagePreview} />
+                        )}
+                        
+                        <TouchableOpacity
+                            style={styles.removeImageButton}
+                            onPress={() => handleRemoveImage(media.id)}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons
+                              name="close-circle"
+                              size={24}
+                              color="#E63946"
+                            />
+                        </TouchableOpacity>
+                    </View>
+                ))}
             </View>
-          )}
+        )}
         </View>
 
         <View style={styles.imageUploadSection}>
           <TouchableOpacity
             style={styles.imageUploadButton}
             onPress={handleSelectImage}
+            disabled={loading}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="image-plus" size={40} color="#999" />
             <Text style={styles.imageUploadText}>Thêm ảnh hoặc video</Text>
             <Text style={styles.imageUploadSubtext}>
-              Nhấn để chọn từ thiết bị
+              Nhấn để chọn từ thiết bị (Hiện tại đã chọn: {selectedImages.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -168,6 +307,7 @@ const CreatePostScreen = () => {
               style={styles.optionButton}
               onPress={handleSelectImage}
               activeOpacity={0.7}
+              disabled={loading}
             >
               <MaterialCommunityIcons name="image" size={18} color="#007AFF" />
               <Text style={styles.optionText}>Ảnh/Video</Text>
@@ -211,6 +351,7 @@ const CreatePostScreen = () => {
               placeholderTextColor="#999"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              editable={!communitiesLoading}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity
@@ -226,53 +367,57 @@ const CreatePostScreen = () => {
               </TouchableOpacity>
             )}
           </View>
+          
+          {communitiesLoading ? (
+                  <ActivityIndicator size="small" color="#007AFF" style={{marginTop: 20}} />
+          ) : (
+                  filteredCommunities.map((community) => (
+                      <TouchableOpacity
+                      key={community.id || 'general'}
+                      style={[
+                          styles.communityOption,
+                          selectedCommunityId === community.id &&
+                              styles.communityOptionActive,
+                      ]}
+                      onPress={() =>
+                          setSelectedCommunityId(
+                          selectedCommunityId === community.id ? null : community.id
+                          )
+                      }
+                      activeOpacity={0.7}
+                      >
+                      <View
+                          style={[
+                          styles.communityIcon,
+                          selectedCommunityId === community.id &&
+                              styles.communityIconActive,
+                          ]}
+                      >
+                          <MaterialCommunityIcons
+                          name={community.icon}
+                          size={20}
+                          color={
+                              selectedCommunityId === community.id ? "#007AFF" : "#666"
+                          }
+                          />
+                      </View>
+                      <Text style={styles.communityName}>{community.name}</Text>
+                      <MaterialCommunityIcons
+                          name={
+                          selectedCommunityId === community.id
+                              ? "check-circle"
+                              : "check-circle-outline"
+                          }
+                          size={22}
+                          color={
+                          selectedCommunityId === community.id ? "#007AFF" : "#CCC"
+                          }
+                      />
+                      </TouchableOpacity>
+                  ))
+          )}
 
-          {filteredCommunities.map((community) => (
-            <TouchableOpacity
-              key={community.id}
-              style={[
-                styles.communityOption,
-                selectedCommunity === community.name &&
-                  styles.communityOptionActive,
-              ]}
-              onPress={() =>
-                setSelectedCommunity(
-                  selectedCommunity === community.name ? "" : community.name
-                )
-              }
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.communityIcon,
-                  selectedCommunity === community.name &&
-                    styles.communityIconActive,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={community.icon}
-                  size={20}
-                  color={
-                    selectedCommunity === community.name ? "#007AFF" : "#666"
-                  }
-                />
-              </View>
-              <Text style={styles.communityName}>{community.name}</Text>
-              <MaterialCommunityIcons
-                name={
-                  selectedCommunity === community.name
-                    ? "check-circle"
-                    : "check-circle-outline"
-                }
-                size={22}
-                color={
-                  selectedCommunity === community.name ? "#007AFF" : "#CCC"
-                }
-              />
-            </TouchableOpacity>
-          ))}
-
-          {filteredCommunities.length === 0 && (
+          {filteredCommunities.length === 0 && !communitiesLoading && (
             <View style={styles.noResultsContainer}>
               <MaterialCommunityIcons
                 name="alert-circle-outline"
@@ -291,6 +436,7 @@ const CreatePostScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // ... (Styles giữ nguyên)
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
@@ -408,6 +554,40 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  imagesPreview: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  imagePreviewItem: {
+    position: "relative",
+    width: 100,
+    height: 100,
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+    resizeMode: 'cover',
+  },
+  videoPlaceholder: {
+    backgroundColor: '#E8E8E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.8,
+  },
+  videoText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 5,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    // Màu sắc đỏ không bị mất icon
   },
   imageUploadSection: {
     backgroundColor: "#FFFFFF",
@@ -561,35 +741,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 14,
     color: "#999",
-  },
-  imagesPreview: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  imagePreviewItem: {
-    position: "relative",
-    width: 100,
-    height: 100,
-  },
-  imagePreviewPlaceholder: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 12,
-    backgroundColor: "#E8E8E8",
-  },
-  removeImageButton: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    backgroundColor: "#E63946",
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
   },
 });
 

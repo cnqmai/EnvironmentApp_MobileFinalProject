@@ -13,7 +13,7 @@ public class CommunityGroupResponse {
     String name;
     String description;
     String areaType;
-    String areaName;
+    String areaName; // [MỚI] Khu vực hoạt động
     UUID creatorId;
     String creatorName;
     Boolean isPublic;
@@ -21,5 +21,13 @@ public class CommunityGroupResponse {
     Boolean isMember; // User hiện tại có là thành viên không
     String role; // Role của user trong group (nếu là member)
     OffsetDateTime createdAt;
+    
+    // --- FR-12.1.2: Dữ liệu Dashboard ---
+    @Builder.Default
+    Integer totalReports = 0; // [MỚI] Tổng số báo cáo vi phạm
+    @Builder.Default
+    Double recycledWasteKg = 0.0; // [MỚI] Lượng rác tái chế (kg)
+    // ------------------------------------
+    
+    String imageUrl; // [MỚI] Ảnh đại diện nhóm (Cần thêm vào Model nếu sử dụng thực tế)
 }
-

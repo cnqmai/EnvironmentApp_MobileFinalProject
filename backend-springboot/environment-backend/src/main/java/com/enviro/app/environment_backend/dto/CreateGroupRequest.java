@@ -13,5 +13,7 @@ public class CreateGroupRequest {
     String areaName;
     
     Boolean isPublic;
+    
+    // [CẬP NHẬT] Thêm trường imageUrl
+    String imageUrl; 
 }
-

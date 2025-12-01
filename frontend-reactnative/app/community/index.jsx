@@ -1,12 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter, useFocusEffect } from "expo-router"; 
+import React, { useCallback, useState } from "react"; 
 import {
   RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
+  ActivityIndicator, 
+  Alert, 
 } from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,19 +16,110 @@ import CommunityCard from "../../components/community/CommunityCard";
 import EventCard from "../../components/community/EventCard";
 import ForumPostCard from "../../components/community/ForumPostCard";
 import typography from "../../styles/typography";
+import { fetchCommunityFeed, fetchDiscoverCommunities, fetchMyCommunities, toggleLikePost, trackPostShare, } from '../../src/services/communityService';
 
 const CommunityScreen = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("forum");
   const [forumSubTab, setForumSubTab] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State dữ liệu
+  const [posts, setPosts] = useState([]);
+  const [myCommunities, setMyCommunities] = useState([]);
+  const [discoverCommunities, setDiscoverCommunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+
+  // --- LOGIC LẤY DỮ LIỆU CHÍNH (FEED & COMMUNITIES) ---
+  const fetchData = useCallback(async () => {
+    setRefreshing(true);
+    setLoading(true);
+
+    try {
+        const fetchedPosts = await fetchCommunityFeed(forumSubTab); 
+        setPosts(fetchedPosts);
+        const myGroups = await fetchMyCommunities();
+        setMyCommunities(myGroups);
+        const discoverGroups = await fetchDiscoverCommunities();
+        setDiscoverCommunities(discoverGroups);
+
+    } catch (error) {
+        console.error("Lỗi tải dữ liệu cộng đồng:", error);
+        Alert.alert("Lỗi", "Không thể tải dữ liệu cộng đồng.");
+    } finally {
+        setRefreshing(false);
+        setLoading(false);
+    }
+  }, [forumSubTab]); 
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+      setActiveTab("forum"); 
+    }, [fetchData])
+  );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    fetchData();
   };
+  
+  // --- HÀM XỬ LÝ LIKE (OPTIMISTIC UPDATE AN TOÀN & KIỂM TRA) ---
+  const handleLikeToggle = async (postId) => {
+    const originalPost = posts.find(p => p.id === postId);
+    if (!originalPost) return;
+
+    const newLikedState = !originalPost.isLikedByCurrentUser;
+    const optimisticCount = originalPost.likesCount + (newLikedState ? 1 : -1);
+    
+    const originalPosts = posts; 
+
+    // B1: Optimistic update (Màu hồng/Xanh ngay lập tức)
+    setPosts(prevPosts => 
+        prevPosts.map(post => {
+            if (post.id === postId) {
+                return {
+                    ...post,
+                    isLikedByCurrentUser: newLikedState,
+                    likesCount: optimisticCount
+                };
+            }
+            return post;
+        })
+    );
+    
+    // --- KIỂM TRA: Trạng thái Optimistic ---
+    console.log(`[OPTIMISTIC] Post ID: ${postId} | Liked: ${newLikedState} | Count: ${optimisticCount}`);
+    // -------------------------------------
+
+
+    try {
+        // B2: Gọi API. API phải trả về PostResponse MỚI NHẤT
+        const updatedPostResponse = await toggleLikePost(postId); 
+        
+        // --- KIỂM TRA: Response từ API ---
+        console.log(`[API RESPONSE] Post ID: ${postId} | Liked: ${updatedPostResponse.isLikedByCurrentUser} | Count: ${updatedPostResponse.likesCount}`);
+        // ---------------------------------
+
+        // B3: Cập nhật lại state với dữ liệu CHÍNH XÁC từ Backend
+        setPosts(prevPosts => 
+            prevPosts.map(post => {
+                if (post.id === postId) {
+                    // Dùng toàn bộ response từ Backend để đồng bộ hóa
+                    return updatedPostResponse; 
+                }
+                return post;
+            })
+        );
+
+    } catch (error) {
+        console.error("Lỗi thả tim:", error);
+        // B4: Revert nếu lỗi
+        setPosts(originalPosts);
+        Alert.alert("Lỗi", "Thao tác thả tim thất bại.");
+    }
+  };
+
 
   const tabs = [
     { id: "forum", label: "Diễn đàn", icon: "forum" },
@@ -35,146 +128,17 @@ const CommunityScreen = () => {
     { id: "discover", label: "Khám phá", icon: "compass" },
   ];
 
+  // Mock events (giữ nguyên vì chưa có API cho Events)
   const events = [
-    {
-      id: 1,
-      title: "Chiến dịch làm sạch bãi biển",
-      community: "Cộng đồng bảo vệ môi trường Cấp 2",
-      communityId: 1,
-      date: "15/12/2025",
-      time: "07:00 - 11:00",
-      location: "Bãi biển Vũng Tàu",
-      participants: 120,
-      maxParticipants: 200,
-      status: "upcoming",
-      description:
-        "Tham gia cùng chúng tôi dọn sạch bãi biển, bảo vệ môi trường biển",
-      image: "beach-cleanup",
-    },
-    {
-      id: 2,
-      title: "Hội thảo phân loại rác tái chế",
-      community: "Cộng đồng năng động",
-      communityId: 2,
-      date: "20/12/2025",
-      time: "14:00 - 16:00",
-      location: "Nhà văn hóa Quận 1",
-      participants: 45,
-      maxParticipants: 100,
-      status: "upcoming",
-      description: "Chia sẻ kinh nghiệm phân loại rác tái chế hiệu quả",
-      image: "workshop",
-    },
-    {
-      id: 3,
-      title: "Trồng cây xanh tại công viên",
-      community: "Cộng đồng bảo vệ môi trường Cấp 2",
-      communityId: 1,
-      date: "25/12/2025",
-      time: "06:00 - 09:00",
-      location: "Công viên Tao Đàn",
-      participants: 85,
-      maxParticipants: 150,
-      status: "upcoming",
-      description: "Cùng nhau trồng cây xanh, tạo không gian sống xanh",
-      image: "recycle-schedule",
-    },
+    { id: 1, title: "Chiến dịch làm sạch bãi biển", community: "Cộng đồng X", communityId: 'uuid-1', date: "15/12/2025", location: "Bãi biển Vũng Tàu", participants: 120, image: "beach-cleanup" },
   ];
 
-  const posts = [
-    {
-      id: 1,
-      author: "Nguyễn Minh Anh",
-      badge: "Chiến binh môi trường",
-      community: "Sống xanh Sài Gòn",
-      content:
-        "Hôm nay mình đã tham gia dọn dẹp cộng viên cùng nhóm. Thu được gần 50kg rác! Cảm thấy rất vui và ý nghĩa 🌿 Cảm ơn tất cả mọi người đã tham gia! Hẹn gặp lại ở hoạt động tiếp theo!",
-      likes: 124,
-      comments: 18,
-      shares: 5,
-      date: "2 giờ trước",
-      image: true,
-    },
-    {
-      id: 2,
-      author: "Trần Văn Nam",
-      badge: "Nghệ sĩ tái chế",
-      community: "Tái chế sáng tạo",
-      content:
-        "Chia sẻ cách mình tái chế chai nhựa thành chậu cây mini. Ai quan tâm thì mình làm video hướng dẫn nhé! 😊",
-      likes: 67,
-      comments: 23,
-      shares: 8,
-      date: "5 giờ trước",
-      image: false,
-    },
-    {
-      id: 3,
-      author: "Phạm Thị Lan",
-      badge: null,
-      community: "Sống xanh Sài Gòn",
-      content:
-        "Hôm qua mình đã cùng gia đình tham gia sự kiện trồng cây. Thật vui khi được đóng góp vào việc bảo vệ môi trường! 🌱",
-      likes: 89,
-      comments: 12,
-      shares: 3,
-      date: "1 ngày trước",
-      image: true,
-    },
-  ];
-
-  const myPosts = [
-    {
-      id: 1,
-      author: "Bạn",
-      badge: "Thành viên mới",
-      community: "Sống xanh Sài Gòn",
-      content:
-        "Mình mới tham gia nhóm và rất vui được làm quen với mọi người! Hi vọng sẽ học hỏi được nhiều kiến thức về bảo vệ môi trường từ các bạn 🌱",
-      likes: 45,
-      comments: 8,
-      shares: 2,
-      date: "1 ngày trước",
-      image: false,
-    },
-  ];
-
-  const communities = [
-    {
-      id: 1,
-      name: "Cộng đồng bảo vệ môi trường Cấp 2",
-      members: 325,
-      campaigns: 12,
-      recycledWeight: 5420,
-      joined: true,
-      following: true,
-    },
-    {
-      id: 2,
-      name: "Cộng đồng năng động",
-      members: 156,
-      campaigns: 8,
-      recycledWeight: 2340,
-      joined: false,
-      following: false,
-    },
-    {
-      id: 3,
-      name: "Xanh sạch Sài Gòn",
-      members: 892,
-      campaigns: 24,
-      recycledWeight: 12800,
-      joined: true,
-      following: true,
-    },
-  ];
 
   const renderEvents = () => (
     <View style={styles.contentContainer}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Sự kiện sắp diễn ra</Text>
       </View>
-
       {events.map((event) => (
         <EventCard
           key={event.id}
@@ -188,11 +152,11 @@ const CommunityScreen = () => {
     </View>
   );
 
-  const renderCommunities = () => (
+  const renderCommunities = (list, title) => (
     <View style={styles.contentContainer}>
       <TouchableOpacity
         style={styles.createCommunityButton}
-        onPress={() => router.push("/community/create")}
+        onPress={() => router.push("/community/create-community")} 
         activeOpacity={0.8}
       >
         <MaterialCommunityIcons
@@ -202,22 +166,22 @@ const CommunityScreen = () => {
         />
         <Text style={styles.createCommunityButtonText}>Tạo cộng đồng mới</Text>
       </TouchableOpacity>
-
-      {communities
-        .filter((c) => c.joined)
-        .map((community) => (
+        
+      {list.length === 0 && !loading ? (
+        <Text style={styles.noDataText}>Chưa có nhóm nào. Hãy tham gia hoặc tạo nhóm mới!</Text>
+      ) : (
+        list.map((community) => (
           <CommunityCard
             key={community.id}
             community={community}
             onPress={() => router.push(`/community/${community.id}`)}
           />
-        ))}
+        ))
+      )}
     </View>
   );
 
   const renderForum = () => {
-    const displayPosts = forumSubTab === "all" ? posts : myPosts;
-
     return (
       <View style={styles.contentContainer}>
         <View style={styles.forumSubTabs}>
@@ -256,36 +220,33 @@ const CommunityScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.postsContainer}>
-          {displayPosts.map((post) => (
-            <ForumPostCard
-              key={post.id}
-              post={post}
-              onPress={() => router.push(`/community/post/${post.id}`)}
-            />
-          ))}
-        </View>
+        
+        {loading && posts.length === 0 ? (
+            <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}} />
+        ) : (
+            <View style={styles.postsContainer}>
+            {posts.map((post) => (
+                <ForumPostCard
+                key={post.id}
+                post={post}
+                onPress={() => router.push(`/community/post/${post.id}`)}
+                onLike={handleLikeToggle}
+                />
+            ))}
+            </View>
+        )}
       </View>
     );
   };
 
-  const renderDiscover = () => (
-    <View style={styles.contentContainer}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Cộng đồng gợi ý</Text>
-      </View>
-
-      {communities
-        .filter((c) => !c.joined)
-        .map((community) => (
-          <CommunityCard
-            key={community.id}
-            community={community}
-            onPress={() => router.push(`/community/${community.id}`)}
-          />
-        ))}
-    </View>
-  );
+  if (loading && !refreshing) {
+    return (
+        <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={["top"]}>
+             <ActivityIndicator size="large" color="#007AFF" />
+             <Text style={{ marginTop: 10, color: '#666' }}>Đang tải dữ liệu cộng đồng...</Text>
+        </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -355,8 +316,8 @@ const CommunityScreen = () => {
       >
         {activeTab === "events" && renderEvents()}
         {activeTab === "forum" && renderForum()}
-        {activeTab === "my-communities" && renderCommunities()}
-        {activeTab === "discover" && renderDiscover()}
+        {activeTab === "my-communities" && renderCommunities(myCommunities, "Cộng đồng của tôi")}
+        {activeTab === "discover" && renderCommunities(discoverCommunities, "Khám phá")}
       </ScrollView>
     </SafeAreaView>
   );
@@ -537,6 +498,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
+  noDataText: {
+    ...typography.body,
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#666",
+    textAlign: 'center',
+    marginTop: 20
+  }
 });
 
 export default CommunityScreen;

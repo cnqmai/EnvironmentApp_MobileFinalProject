@@ -15,5 +15,9 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
      * Lấy tất cả comments của một post, sắp xếp theo thời gian mới nhất
      */
     List<Comment> findByPostOrderByCreatedAtDesc(Post post);
+    
+    /**
+     * [BỔ SUNG SỬA LỖI] Đếm số lượng comments của một post
+     */
+    long countByPost(Post post);
 }
-

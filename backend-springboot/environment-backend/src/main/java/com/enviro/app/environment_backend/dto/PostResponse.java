@@ -17,6 +17,13 @@ public class PostResponse {
     UUID id;
     String content;
     
+    // Thông tin nhóm (Nếu bài viết thuộc nhóm nào đó)
+    UUID groupId;
+    String groupName;
+    
+    // Media (Ảnh/Video)
+    List<String> mediaUrls; // FR-8.1.1
+    
     // Thông tin user tạo post
     UUID userId;
     String userFullName;
@@ -25,9 +32,11 @@ public class PostResponse {
     // Số lượng likes và comments
     long likesCount;
     long commentsCount;
+    @Builder.Default
+    long sharesCount = 0;
     
     // User hiện tại đã like chưa
-    boolean isLikedByCurrentUser;
+    Boolean isLikedByCurrentUser;
     
     // Danh sách comments (optional - có thể null nếu không cần)
     List<CommentResponse> comments;
@@ -35,4 +44,3 @@ public class PostResponse {
     OffsetDateTime createdAt;
     OffsetDateTime updatedAt;
 }
-

@@ -46,6 +46,10 @@ public class CommunityGroup {
     @Column(name = "member_count")
     @Builder.Default
     private Integer memberCount = 0;
+    
+    // [MỚI] Ảnh đại diện nhóm
+    @Column(name = "image_url")
+    private String imageUrl; 
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -55,4 +59,3 @@ public class CommunityGroup {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 }
-
