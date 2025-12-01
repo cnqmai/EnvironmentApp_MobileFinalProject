@@ -372,7 +372,7 @@ const EnvironmentDataScreen = () => {
         )}
 
         {/* --- DANH SÁCH KHU VỰC ĐÃ THÊM --- */}
-        <Text style={styles.sectionTitle}>Chỉ số theo khu vực đã thêm ({customAreas.length})</Text>
+        <Text style={styles.sectionTitleIndex}>Chỉ số theo khu vực đã thêm ({customAreas.length})</Text>
 
         {customAreas.length > 0 ? (
           customAreas.map((item, index) => {
@@ -421,11 +421,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: '500', color: '#000', flex: 1 },
 
   content: { padding: 24 },
-  currentLocationTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 10 },
+  currentLocationTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 20 },
 
   // Main Card
   mainCard: {
-    backgroundColor: '#00C853', borderRadius: 16, padding: 24, minHeight: 180,
+    backgroundColor: '#00C853', borderRadius: 16, padding: 24, minHeight: 160,
     justifyContent: 'space-between', marginBottom: 24, position: 'relative', overflow: 'hidden'
   },
   mainTitle: { fontSize: 16, color: '#FFF', opacity: 0.9 },
@@ -443,14 +443,15 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '45%',
-    backgroundColor: '#F9F9F9', borderRadius: 12, paddingVertical: 20,
+    backgroundColor: '#F9F9F9', borderRadius: 12, paddingVertical: 10,
     alignItems: 'center', justifyContent: 'center'
   },
-  statLabel: { fontSize: 12, color: '#666', marginBottom: 8, textAlign: 'center' },
+  statLabel: { fontSize: 12, color: '#666', marginBottom: 5, textAlign: 'center' },
   statValue: { fontSize: 18, color: '#000', fontWeight: '500', textAlign: 'center' },
 
   // Area List
-  sectionTitle: { fontSize: 20, fontWeight: '500', color: '#000', marginBottom: 16, marginTop: 10 },
+  sectionTitle: { fontSize: 20, fontWeight: '500', color: '#000', marginBottom: 15, marginTop: 0 },
+  sectionTitleIndex: { fontSize: 20, fontWeight: '600', color: '#000', marginBottom: 15, marginTop: 20 },
   areaCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderWidth: 1, borderColor: '#DDD', borderRadius: 16, padding: 20, marginBottom: 16
