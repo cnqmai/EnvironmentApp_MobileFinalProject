@@ -42,6 +42,7 @@ public class QuizService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional 
     public QuizResponse getQuizById(UUID id) {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
@@ -63,7 +64,8 @@ public class QuizService {
         for (QuizQuestion q : questions) {
             if (answers.containsKey(q.getId())) {
                 Integer selectedOption = answers.get(q.getId());
-                if (selectedOption != null && selectedOption.equals(q.getCorrectOptionIndex())) {
+                // Sử dụng phương thức tiện ích getCorrectOptionIndex() của Entity
+                if (selectedOption != null && selectedOption.equals(q.getCorrectOptionIndex())) { 
                     correctCount++;
                 }
             }
@@ -77,21 +79,18 @@ public class QuizService {
                     .multiply(BigDecimal.valueOf(100));
         }
 
-        // 2. Cộng điểm cho User (Luôn cộng tích lũy mỗi lần làm bài - Gameification)
+        // 2. Cộng điểm cho User 
         user.setPoints(user.getPoints() + pointsEarned);
         userRepository.save(user);
         badgeService.checkAndAssignBadges(user);
 
-        // 3. [FIX] Lưu hoặc Cập nhật kết quả bài thi
-        // Kiểm tra xem user đã làm bài này chưa
+        // 3. Lưu hoặc Cập nhật kết quả bài thi
         Optional<UserQuizScore> existingScore = userQuizScoreRepository.findByUserAndQuiz(user, quiz);
         
         UserQuizScore scoreToSave;
         if (existingScore.isPresent()) {
-            // Nếu đã làm rồi -> Cập nhật kết quả mới nhất (ghi đè)
             scoreToSave = existingScore.get();
         } else {
-            // Nếu chưa làm -> Tạo mới
             scoreToSave = new UserQuizScore();
             scoreToSave.setUser(user);
             scoreToSave.setQuiz(quiz);
@@ -120,8 +119,9 @@ public class QuizService {
     }
 
     private QuizResponse mapToResponseFull(Quiz quiz) {
+        // Ánh xạ danh sách Questions đã được tải đầy đủ nhờ @Transactional
         List<QuizQuestionResponse> questions = quiz.getQuestions().stream()
-                .map(q -> QuizQuestionResponse.builder()
+                .map(q -> QuizQuestionResponse.builder() // <-- Đã fix lỗi biên dịch Builder
                         .id(q.getId())
                         .questionText(q.getQuestionText())
                         .optionA(q.getOptionA())
@@ -137,7 +137,7 @@ public class QuizService {
                 .title(quiz.getTitle())
                 .description(quiz.getDescription())
                 .timeLimitMinutes(quiz.getTimeLimitMinutes())
-                .questions(questions)
+                .questions(questions) // Gán danh sách Questions đã ánh xạ
                 .build();
     }
 

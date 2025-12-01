@@ -41,8 +41,7 @@ public class Quiz {
     @Builder.Default
     private Boolean isActive = true;
 
-    // Liên kết với QuizQuestions (một-nhiều)
-    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, fetch = FetchType.LAZY) 
     private List<QuizQuestion> questions;
 
     @CreationTimestamp

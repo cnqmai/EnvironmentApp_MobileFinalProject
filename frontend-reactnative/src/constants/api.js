@@ -9,7 +9,7 @@ console.log('DEBUG - debuggerHost:', debuggerHost);
 console.log('DEBUG - localhost:', localhost);
 
 // SỬ DỤNG ĐỊA CHỈ NÀY KHI CHẠY TRÊN THIẾT BỊ ANDROID THẬT
-const PC_LAN_IP = '192.168.1.7'; 
+const PC_LAN_IP = '192.168.100.190'; 
 
 let API_BASE_URL;
 

@@ -29,10 +29,9 @@ public class KnowledgeArticle {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    private ArticleType type = ArticleType.ARTICLE;
+    @Column(name = "type")
+    @Convert(converter = ArticleTypeConverter.class) // Cần ArticleTypeConverter tùy chỉnh
+    private ArticleType type;
 
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;

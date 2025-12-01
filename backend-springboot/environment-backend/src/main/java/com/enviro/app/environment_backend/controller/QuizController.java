@@ -9,6 +9,7 @@ import com.enviro.app.environment_backend.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,23 +24,30 @@ public class QuizController {
         this.quizService = quizService;
         this.userService = userService;
     }
+    
+    // Helper function (Giả định tồn tại trong UserService)
+    private User getCurrentUser() {
+        return userService.getCurrentUser();
+    }
 
-    // 1. Lấy danh sách tất cả bài Quiz
     @GetMapping
     public ResponseEntity<List<QuizResponse>> getAllQuizzes() {
         return ResponseEntity.ok(quizService.getAllQuizzes());
     }
 
-    // 2. Lấy chi tiết bài Quiz (để bắt đầu làm bài)
+    // Lấy chi tiết Quiz (Frontend gọi API này)
     @GetMapping("/{id}")
     public ResponseEntity<QuizResponse> getQuizById(@PathVariable UUID id) {
         return ResponseEntity.ok(quizService.getQuizById(id));
     }
 
-    // 3. Nộp bài
     @PostMapping("/{id}/submit")
-    public ResponseEntity<QuizScoreResponse> submitQuiz(@PathVariable UUID id, @RequestBody QuizSubmitRequest request) {
-        User user = userService.getCurrentUser();
-        return ResponseEntity.ok(quizService.submitQuiz(user.getId(), id, request));
+    public ResponseEntity<QuizScoreResponse> submitQuiz(
+            @PathVariable UUID id,
+            @Valid @RequestBody QuizSubmitRequest request) {
+        
+        User user = getCurrentUser();
+        QuizScoreResponse response = quizService.submitQuiz(user.getId(), id, request);
+        return ResponseEntity.ok(response);
     }
 }

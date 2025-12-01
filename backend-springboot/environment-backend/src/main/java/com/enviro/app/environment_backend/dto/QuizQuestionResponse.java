@@ -5,7 +5,7 @@ import lombok.Value;
 import java.util.UUID;
 
 @Value
-@Builder
+@Builder // <-- BẮT BUỘC
 public class QuizQuestionResponse {
     UUID id;
     String questionText;
@@ -14,4 +14,5 @@ public class QuizQuestionResponse {
     String optionC;
     String optionD;
     Integer orderNumber;
+    // KHÔNG BAO GỒM correctAnswer/correctOptionIndex ở Frontend DTO
 }

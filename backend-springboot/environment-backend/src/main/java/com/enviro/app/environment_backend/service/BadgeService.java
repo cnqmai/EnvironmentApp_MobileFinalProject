@@ -42,7 +42,6 @@ public class BadgeService {
     @Transactional
     public void checkAndAssignBadges(User user) {
         int points = user.getPoints();
-        if (points >= 100) assignBadge(user, "Người Xanh");
         if (points >= 500) assignBadge(user, "Chiến binh Môi trường");
         if (points >= 1000) assignBadge(user, "Thành phố Sạch");
     }
@@ -76,7 +75,7 @@ public class BadgeService {
                 .name(badge.getName())
                 .description(badge.getDescription())
                 .iconUrl(badge.getIconUrl())
-                .criteria(badge.getCriteria())
+                .requiredPoints(badge.getRequiredPoints()) // Sử dụng trường này nếu có trong Badge entity
                 .build();
     }
 }

@@ -30,8 +30,8 @@ public class Reward {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "type")
+    @Convert(converter = RewardTypeConverter.class) 
     private RewardType type;
 
     @Column(name = "points_cost", nullable = false)
