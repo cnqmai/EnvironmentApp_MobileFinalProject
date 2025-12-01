@@ -143,6 +143,29 @@ export const getCurrentUserFlexible = async () => {
 };
 
 // ===================================================================
+// *** API MỚI CHO CỘNG ĐIỂM (FR-9.1.1) ***
+// ===================================================================
+
+/**
+ * Cộng 10 điểm cho hành động phân loại rác thành công
+ * POST /api/users/me/points/recycle
+ */
+export const addRecyclePoints = async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/me/points/recycle`, {
+        method: 'POST',
+    });
+
+    if (!response.ok) {
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi cộng điểm phân loại rác' }));
+        // Không throw error để không làm hỏng flow chính, chỉ log
+        console.error("Không thể cộng điểm: ", errorDetail.message || 'Lỗi không xác định.');
+    }
+
+    // Không cần trả về body, chỉ cần biết request đã được gửi
+    return response.ok;
+};
+
+// ===================================================================
 // *** API MỚI CHO CÀI ĐẶT THÔNG BÁO (FR-2.2.2) ***
 // ===================================================================
 

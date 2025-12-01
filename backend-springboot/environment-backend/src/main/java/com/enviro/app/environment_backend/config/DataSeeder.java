@@ -14,7 +14,7 @@ import com.enviro.app.environment_backend.repository.QuizQuestionRepository;
 import com.enviro.app.environment_backend.repository.KnowledgeArticleRepository;
 import com.enviro.app.environment_backend.repository.RewardRepository;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -63,7 +63,7 @@ public class DataSeeder implements CommandLineRunner {
     
     @Transactional
     private void seedQuizzes() {
-        //if (quizRepository.count() == 0) {
+        if (quizRepository.count() == 0) {
             System.out.println(">>> [DataSeeder] Đang khởi tạo 2 QUIZ mẫu...");
 
             List<Quiz> quizzes = Arrays.asList(
@@ -162,7 +162,7 @@ public class DataSeeder implements CommandLineRunner {
             quizQuestionRepository.saveAll(questions2);
             
             System.out.println(">>> [DataSeeder] Đã nạp thành công Quiz và Questions!");
-        //}
+        }
     }
     
     private void seedDailyTips() {

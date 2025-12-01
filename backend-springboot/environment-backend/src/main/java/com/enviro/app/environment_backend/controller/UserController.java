@@ -10,6 +10,7 @@ import com.enviro.app.environment_backend.dto.UploadResponse;
 import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.UserService;
+import com.enviro.app.environment_backend.service.BadgeService; // <--- THÊM IMPORT
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,9 +24,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserController {
 
     private final UserService userService;
+    private final BadgeService badgeService; // <--- THÊM FIELD
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, BadgeService badgeService) { // <--- CẬP NHẬT CONSTRUCTOR
         this.userService = userService;
+        this.badgeService = badgeService;
     }
 
     private User getCurrentUser() {
@@ -118,5 +121,22 @@ public class UserController {
         User currentUser = getCurrentUser();
         PrivacySettingsResponse updatedSettings = userService.updatePrivacySettings(currentUser.getId(), request);
         return ResponseEntity.ok(updatedSettings);
+    }
+    
+    /**
+     * API CỘNG ĐIỂM PHÂN LOẠI RÁC (FR-9.1.1)
+     * POST /api/users/me/points/recycle
+     */
+    @PostMapping("/me/points/recycle")
+    public ResponseEntity<Void> addRecyclePoints() {
+        User currentUser = getCurrentUser();
+        
+        // 1. Gọi service cộng điểm, nhận lại user đã cập nhật
+        User updatedUser = badgeService.addRecyclePoints(currentUser, 10);
+        
+        // 2. Lưu user (Phá vỡ vòng lặp phụ thuộc bằng cách để Controller/UserService lưu)
+        userService.save(updatedUser); 
+        
+        return ResponseEntity.ok().build();
     }
 }
