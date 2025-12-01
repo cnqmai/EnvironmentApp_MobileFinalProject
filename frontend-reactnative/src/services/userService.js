@@ -142,3 +142,44 @@ export const getCurrentUserFlexible = async () => {
     throw new Error('Không thể lấy thông tin người dùng từ các endpoint chuẩn.');
 };
 
+// ===================================================================
+// *** API MỚI CHO CÀI ĐẶT THÔNG BÁO (FR-2.2.2) ***
+// ===================================================================
+
+/**
+ * Lấy cài đặt thông báo hiện tại
+ * GET /api/users/me/notifications
+ */
+export const getNotificationSettings = async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/me/notifications`, {
+        method: 'GET',
+    });
+
+    if (!response.ok) {
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy cài đặt thông báo' }));
+        throw new Error(errorDetail.message || 'Không thể lấy cài đặt thông báo.');
+    }
+
+    return response.json();
+};
+
+/**
+ * Cập nhật cài đặt thông báo (bao gồm ngưỡng AQI)
+ * PUT /api/users/me/notifications
+ */
+export const updateNotificationSettings = async (settingsData) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/me/notifications`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settingsData),
+    });
+
+    if (!response.ok) {
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi cập nhật cài đặt thông báo' }));
+        throw new Error(errorDetail.message || 'Không thể cập nhật cài đặt thông báo.');
+    }
+
+    return response.json();
+};

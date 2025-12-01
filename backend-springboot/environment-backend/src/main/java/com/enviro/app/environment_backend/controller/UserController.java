@@ -1,6 +1,8 @@
 package com.enviro.app.environment_backend.controller;
 
 import com.enviro.app.environment_backend.dto.DeleteAccountRequest;
+import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
+import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
 import com.enviro.app.environment_backend.dto.PrivacySettingsRequest;
 import com.enviro.app.environment_backend.dto.PrivacySettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
@@ -82,6 +84,18 @@ public class UserController {
         User currentUser = getCurrentUser();
         UserStatisticsResponse statistics = userService.getUserStatistics(currentUser.getId());
         return ResponseEntity.ok(statistics);
+    }
+
+    @GetMapping("/me/notifications")
+    public ResponseEntity<NotificationSettingsResponse> getMyNotificationSettings() {
+        User currentUser = getCurrentUser();
+        return ResponseEntity.ok(userService.getNotificationSettings(currentUser.getId()));
+    }
+
+    @PutMapping("/me/notifications")
+    public ResponseEntity<NotificationSettingsResponse> updateMyNotificationSettings(@RequestBody NotificationSettingsRequest request) {
+        User currentUser = getCurrentUser();
+        return ResponseEntity.ok(userService.updateNotificationSettings(currentUser.getId(), request));
     }
 
     /**

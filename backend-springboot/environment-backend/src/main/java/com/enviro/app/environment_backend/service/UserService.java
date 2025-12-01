@@ -207,7 +207,6 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại
         NotificationSettings settings = notificationService.getOrCreateSettings(user);
         
         return NotificationSettingsResponse.builder()
@@ -226,23 +225,36 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
-        // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại
         NotificationSettings settings = notificationService.getOrCreateSettings(user);
         
-        // --- LOGIC: CHỈ CẬP NHẬT NGƯỠNG VÀ BẮT BUỘC BẬT TẤT CẢ CỜ KHÁC ---
+        // --- LOGIC CẬP NHẬT: CHỈ CẬP NHẬT NHỮNG GÌ REQUEST GỬI LÊN ---
         
-        // 1. Cập nhật Ngưỡng AQI (Chỉ khi gửi)
+        // 1. Cập nhật Ngưỡng AQI
         if (request.getAqiThreshold() != null) {
             settings.setAqiThreshold(request.getAqiThreshold());
         }
         
-        // 2. BẮT BUỘC BẬT TẤT CẢ CÁC CỜ DÙ FRONTEND KHÔNG CHO PHÉP TÙY CHỈNH
-        settings.setAqiAlertEnabled(true);
-        settings.setCollectionReminderEnabled(true);
-        settings.setCampaignNotificationsEnabled(true);
-        // Các cờ khác cũng giữ nguyên TRUE (vì getOrCreateSettings đã tạo là TRUE)
+        // 2. Cập nhật các cờ Boolean (CHỈ NẾU CÓ DỮ LIỆU)
+        if (request.getAqiAlertEnabled() != null) {
+            settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
+        }
+        if (request.getCollectionReminderEnabled() != null) {
+            settings.setCollectionReminderEnabled(request.getCollectionReminderEnabled());
+        }
+        if (request.getCampaignNotificationsEnabled() != null) {
+            settings.setCampaignNotificationsEnabled(request.getCampaignNotificationsEnabled());
+        }
+        if (request.getWeatherAlertEnabled() != null) {
+            settings.setWeatherAlertEnabled(request.getWeatherAlertEnabled());
+        }
+        if (request.getBadgeNotificationsEnabled() != null) {
+            settings.setBadgeNotificationsEnabled(request.getBadgeNotificationsEnabled());
+        }
+        if (request.getReportStatusNotificationsEnabled() != null) {
+            settings.setReportStatusNotificationsEnabled(request.getReportStatusNotificationsEnabled());
+        }
         
-        // Bỏ qua mọi trường boolean khác từ request để chúng không bị ghi đè thành NULL
+        // --- ĐÃ LOẠI BỎ: CÁC DÒNG TỰ ĐỘNG SET TRUE ---
         
         NotificationSettings updatedSettings = notificationSettingsRepository.save(settings);
         

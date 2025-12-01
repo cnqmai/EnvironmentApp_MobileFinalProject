@@ -220,7 +220,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 20,
     paddingVertical: 6,
-    elevation: 2
+    elevation: 2,
+    backgroundColor: "#0088FF",
   },
 });
 

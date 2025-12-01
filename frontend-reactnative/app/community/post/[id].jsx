@@ -17,6 +17,8 @@ const PostDetailScreen = () => {
   const { id } = useLocalSearchParams();
   const [liked, setLiked] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [commentLikes, setCommentLikes] = useState({});
+  const [replyingTo, setReplyingTo] = useState(null);
 
   // Mock data
   const post = {
@@ -42,6 +44,24 @@ const PostDetailScreen = () => {
       content: "Cảm ơn bạn đã chia sẻ! Mình cũng đang áp dụng những mẹo này",
       time: "2 giờ trước",
       likes: 5,
+      replies: [
+        {
+          id: 101,
+          author: "Nguyễn Minh Anh",
+          initials: "NMA",
+          content: "Cảm ơn bạn! Hy vọng sẽ hữu ích cho bạn nhé 😊",
+          time: "1 giờ trước",
+          likes: 2,
+        },
+        {
+          id: 102,
+          author: "Trần Văn Nam",
+          initials: "TVN",
+          content: "Mình cũng đang thử nghiệm, hiệu quả lắm",
+          time: "30 phút trước",
+          likes: 1,
+        },
+      ],
     },
     {
       id: 2,
@@ -50,6 +70,7 @@ const PostDetailScreen = () => {
       content: "Rất hữu ích! Mình sẽ thử áp dụng từ ngày mai",
       time: "1 giờ trước",
       likes: 3,
+      replies: [],
     },
   ];
 
@@ -57,16 +78,37 @@ const PostDetailScreen = () => {
     setLiked(!liked);
   };
 
+  const handleCommentLike = (commentId) => {
+    setCommentLikes((prev) => ({
+      ...prev,
+      [commentId]: !prev[commentId],
+    }));
+  };
+
+  const handleReply = (commentId, authorName) => {
+    setReplyingTo({ id: commentId, author: authorName });
+    setCommentText(`@${authorName} `);
+  };
+
   const handleComment = () => {
     if (commentText.trim()) {
-      console.log("Adding comment:", commentText);
+      if (replyingTo) {
+        console.log(`Replying to ${replyingTo.author}:`, commentText);
+      } else {
+        console.log("Adding comment:", commentText);
+      }
       setCommentText("");
+      setReplyingTo(null);
     }
   };
 
   const handleShare = () => {
     console.log("Sharing post");
   };
+
+  const totalComments = comments.reduce((total, comment) => {
+    return total + 1 + (comment.replies ? comment.replies.length : 0);
+  }, 0);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -93,154 +135,263 @@ const PostDetailScreen = () => {
       </View>
 
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.postCard}>
-          <View style={styles.authorSection}>
-            <View style={styles.avatarContainer}>
-              <MaterialCommunityIcons
-                name={post.author.avatar}
-                size={40}
-                color="#0A0A0A"
-              />
+          <View style={styles.postHeader}>
+            <View style={styles.authorAvatar}>
+              <Text style={styles.avatarText}>{post.author.initials}</Text>
             </View>
             <View style={styles.authorInfo}>
-              <Text style={styles.authorName}>{post.author.name}</Text>
-              <Text style={styles.authorRole}>{post.author.role}</Text>
-              <Text style={styles.postTime}>
-                {post.date} • {post.time}
+              <View style={styles.authorRow}>
+                <Text style={styles.authorName}>{post.author.name}</Text>
+                {post.author.badge && (
+                  <View style={styles.badge}>
+                    <MaterialCommunityIcons
+                      name="star"
+                      size={11}
+                      color="#FFB800"
+                    />
+                    <Text style={styles.badgeText} numberOfLines={1}>
+                      {post.author.badge}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.postMeta} numberOfLines={1}>
+                {post.date} • Nhóm: {post.community}
               </Text>
             </View>
           </View>
 
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{post.category}</Text>
-          </View>
-
-          <Text style={styles.postTitle}>{post.title}</Text>
           <Text style={styles.postContent}>{post.content}</Text>
 
-          <View style={styles.postActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleLike}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name={liked ? "heart" : "heart-outline"}
-                size={24}
-                color={liked ? "#FF3B30" : "#666"}
-              />
-              <Text
-                style={[styles.actionText, liked && styles.actionTextActive]}
+          <View style={styles.postImage} />
+
+          <View style={styles.postFooter}>
+            <View style={styles.postStats}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={handleLike}
+                activeOpacity={0.7}
               >
-                {post.likes + (liked ? 1 : 0)}
-              </Text>
-            </TouchableOpacity>
+                <MaterialCommunityIcons
+                  name={liked ? "heart" : "heart-outline"}
+                  size={18}
+                  color={liked ? "#E63946" : "#666"}
+                />
+                <Text
+                  style={[styles.statsText, liked && styles.statsTextActive]}
+                >
+                  {post.likes + (liked ? 1 : 0)}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-              <MaterialCommunityIcons
-                name="comment-outline"
-                size={24}
-                color="#666"
-              />
-              <Text style={styles.actionText}>{post.comments}</Text>
-            </TouchableOpacity>
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="comment-outline"
+                  size={18}
+                  color="#666"
+                />
+                <Text style={styles.statsText}>{post.comments}</Text>
+              </View>
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleShare}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name="share-variant"
-                size={24}
-                color="#666"
-              />
-              <Text style={styles.actionText}>{post.shares}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={handleShare}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="share-outline"
+                  size={18}
+                  color="#666"
+                />
+                <Text style={styles.statsText}>{post.shares}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
         <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>
-            Bình luận ({comments.length})
-          </Text>
+          <Text style={styles.commentsTitle}>Bình luận ({totalComments})</Text>
 
-          {comments.map((comment) => (
-            <View key={comment.id} style={styles.commentCard}>
-              <View style={styles.commentAvatar}>
-                <MaterialCommunityIcons
-                  name={comment.avatar}
-                  size={32}
-                  color="#0A0A0A"
-                />
-              </View>
-              <View style={styles.commentContent}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.commentAuthor}>{comment.author}</Text>
-                  <Text style={styles.commentTime}>{comment.time}</Text>
-                </View>
-                <Text style={styles.commentText}>{comment.content}</Text>
-                <View style={styles.commentActions}>
-                  <TouchableOpacity
-                    style={styles.commentAction}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons
-                      name="heart-outline"
-                      size={16}
-                      color="#666"
-                    />
-                    <Text style={styles.commentActionText}>
-                      {comment.likes}
+          {comments.map((comment) => {
+            const isLiked = commentLikes[comment.id];
+            const likeCount = comment.likes + (isLiked ? 1 : 0);
+
+            return (
+              <View key={comment.id}>
+                <View style={styles.commentCard}>
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentAvatarText}>
+                      {comment.initials}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.commentAction}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.commentActionText}>Trả lời</Text>
-                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.commentContent}>
+                    <View style={styles.commentBubble}>
+                      <Text style={styles.commentAuthor}>{comment.author}</Text>
+                      <Text style={styles.commentText}>{comment.content}</Text>
+                    </View>
+                    <View style={styles.commentActions}>
+                      <Text style={styles.commentTime}>{comment.time}</Text>
+                      <TouchableOpacity
+                        style={styles.commentAction}
+                        onPress={() => handleCommentLike(comment.id)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.commentActionWithIcon}>
+                          <MaterialCommunityIcons
+                            name={isLiked ? "heart" : "heart-outline"}
+                            size={14}
+                            color={isLiked ? "#E63946" : "#666"}
+                          />
+                          {likeCount > 0 && (
+                            <Text
+                              style={[
+                                styles.commentActionText,
+                                isLiked && styles.commentActionTextActive,
+                              ]}
+                            >
+                              {likeCount}
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.commentAction}
+                        onPress={() => handleReply(comment.id, comment.author)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.commentActionText}>Trả lời</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
+
+                {/* Render replies */}
+                {comment.replies && comment.replies.length > 0 && (
+                  <View style={styles.repliesContainer}>
+                    {comment.replies.map((reply) => {
+                      const isReplyLiked = commentLikes[reply.id];
+                      const replyLikeCount =
+                        reply.likes + (isReplyLiked ? 1 : 0);
+
+                      return (
+                        <View key={reply.id} style={styles.replyCard}>
+                          <View style={styles.commentAvatar}>
+                            <Text style={styles.commentAvatarText}>
+                              {reply.initials}
+                            </Text>
+                          </View>
+                          <View style={styles.commentContent}>
+                            <View style={styles.commentBubble}>
+                              <Text style={styles.commentAuthor}>
+                                {reply.author}
+                              </Text>
+                              <Text style={styles.commentText}>
+                                {reply.content}
+                              </Text>
+                            </View>
+                            <View style={styles.commentActions}>
+                              <Text style={styles.commentTime}>
+                                {reply.time}
+                              </Text>
+                              <TouchableOpacity
+                                style={styles.commentAction}
+                                onPress={() => handleCommentLike(reply.id)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.commentActionWithIcon}>
+                                  <MaterialCommunityIcons
+                                    name={
+                                      isReplyLiked ? "heart" : "heart-outline"
+                                    }
+                                    size={14}
+                                    color={isReplyLiked ? "#E63946" : "#666"}
+                                  />
+                                  {replyLikeCount > 0 && (
+                                    <Text
+                                      style={[
+                                        styles.commentActionText,
+                                        isReplyLiked &&
+                                          styles.commentActionTextActive,
+                                      ]}
+                                    >
+                                      {replyLikeCount}
+                                    </Text>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.commentAction}
+                                onPress={() =>
+                                  handleReply(comment.id, reply.author)
+                                }
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.commentActionText}>
+                                  Trả lời
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
 
       <View style={styles.commentInputContainer}>
-        <View style={styles.commentInputAvatar}>
-          <MaterialCommunityIcons
-            name="emoticon-happy-outline"
-            size={32}
-            color="#0A0A0A"
+        {replyingTo && (
+          <View style={styles.replyingBanner}>
+            <Text style={styles.replyingText}>
+              Đang trả lời {replyingTo.author}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setReplyingTo(null);
+                setCommentText("");
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="close" size={16} color="#666" />
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.inputRow}>
+          <View style={styles.commentInputAvatar}>
+            <Text style={styles.inputAvatarText}>BAN</Text>
+          </View>
+          <TextInput
+            style={styles.commentInput}
+            placeholder={
+              replyingTo
+                ? `Trả lời ${replyingTo.author}...`
+                : "Viết bình luận..."
+            }
+            placeholderTextColor="#999"
+            value={commentText}
+            onChangeText={setCommentText}
           />
+          <TouchableOpacity
+            onPress={handleComment}
+            disabled={!commentText.trim()}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="arrow-up-circle"
+              size={36}
+              color={commentText.trim() ? "#007AFF" : "#D0D0D0"}
+            />
+          </TouchableOpacity>
         </View>
-        <TextInput
-          style={styles.commentInput}
-          placeholder="Viết bình luận..."
-          placeholderTextColor="#999"
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            commentText.trim() && styles.sendButtonActive,
-          ]}
-          onPress={handleComment}
-          disabled={!commentText.trim()}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons
-            name="send"
-            size={20}
-            color={commentText.trim() ? "#FFFFFF" : "#999"}
-          />
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -263,10 +414,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
     backgroundColor: "#F0EFED",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
   },
   backButton: {
     width: 44,
@@ -279,6 +429,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#0A0A0A",
+    letterSpacing: -0.3,
   },
   moreButton: {
     width: 44,
@@ -289,26 +440,34 @@ const styles = StyleSheet.create({
 
   postCard: {
     backgroundColor: "#FFFFFF",
-    marginTop: 12,
-    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   postHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
   },
   authorAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#007AFF",
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: {
     ...typography.body,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -318,8 +477,9 @@ const styles = StyleSheet.create({
   authorRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 2,
+    flexWrap: "wrap",
   },
   authorName: {
     ...typography.body,
@@ -331,20 +491,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFF9E6",
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 12,
-    gap: 4,
+    borderRadius: 10,
+    gap: 3,
+    maxWidth: 200,
   },
   badgeText: {
     ...typography.small,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
     color: "#FFB800",
+    flexShrink: 1,
   },
   postMeta: {
     ...typography.small,
-    fontSize: 13,
+    fontSize: 12,
     color: "#666",
   },
   postContent: {
@@ -352,89 +514,89 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0A0A0A",
     lineHeight: 22,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   postImage: {
     width: "100%",
-    height: 300,
+    height: 240,
     borderRadius: 12,
-    backgroundColor: "#F0F0F0",
-    marginBottom: 16,
+    backgroundColor: "#E8E8E8",
+    marginBottom: 12,
   },
   postFooter: {
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
   postStats: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 16,
+    paddingHorizontal: 2,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
   statsText: {
     ...typography.small,
     fontSize: 13,
-    color: "#666",
-  },
-  statsSeparator: {
-    ...typography.small,
-    fontSize: 13,
-    color: "#CCC",
-  },
-  postActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingVertical: 8,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  actionText: {
-    ...typography.body,
-    fontSize: 14,
     fontWeight: "500",
     color: "#666",
   },
-  actionTextActive: {
+  statsTextActive: {
     color: "#E63946",
+    fontWeight: "600",
   },
 
   commentsSection: {
     backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
     marginTop: 8,
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   commentsTitle: {
     ...typography.body,
     fontSize: 16,
     fontWeight: "600",
     color: "#0A0A0A",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   commentCard: {
     flexDirection: "row",
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  repliesContainer: {
+    marginLeft: 46,
+    marginBottom: 8,
+  },
+  replyCard: {
+    flexDirection: "row",
+    marginBottom: 10,
+    gap: 10,
   },
   commentAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#34C759",
     alignItems: "center",
     justifyContent: "center",
   },
   commentAvatarText: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -443,51 +605,84 @@ const styles = StyleSheet.create({
   },
   commentBubble: {
     backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 6,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 4,
   },
   commentAuthor: {
     ...typography.body,
     fontSize: 14,
     fontWeight: "600",
     color: "#0A0A0A",
-    marginBottom: 4,
+    marginBottom: 3,
   },
   commentText: {
     ...typography.body,
     fontSize: 14,
     color: "#0A0A0A",
-    lineHeight: 20,
+    lineHeight: 19,
   },
   commentActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 12,
   },
   commentTime: {
     ...typography.small,
-    fontSize: 12,
+    fontSize: 11,
     color: "#999",
   },
   commentAction: {
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
+  },
+  commentActionWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   commentActionText: {
     ...typography.small,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     color: "#666",
   },
+  commentActionTextActive: {
+    color: "#007AFF",
+  },
 
   commentInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 30,
     borderTopWidth: 1,
-    borderTopColor: "#E5E5E5",
+    borderTopColor: "#E8E8E8",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  replyingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  replyingText: {
+    ...typography.small,
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   commentInputAvatar: {
@@ -513,17 +708,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E5E5E5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonActive: {
-    backgroundColor: "#007AFF",
   },
 });
 

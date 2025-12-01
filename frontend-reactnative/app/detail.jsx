@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Modal,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
@@ -15,14 +16,21 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AQIRecommendation from "../components/AQIRecommendation";
 import { getAqiInfo } from "../components/AQICard";
 import typography, { FONT_FAMILY } from "../styles/typography";
+// Import service mới
+import { getAqiForecast } from "../src/services/aqiService";
 
 const screenWidth = Dimensions.get("window").width;
 
 const AQIDetailScreen = () => {
   const router = useRouter();
   const routeParams = useLocalSearchParams();
-  const { locationName, locationCity, aqi, isSensitiveGroup } = routeParams;
+  const { locationName, locationCity, aqi, isSensitiveGroup, lat, lon } = routeParams;
   const [menuVisible, setMenuVisible] = useState(false);
+  
+  // State cho dữ liệu biểu đồ
+  const [chartLabels, setChartLabels] = useState(["0h", "4h", "8h", "12h", "16h", "20h"]);
+  const [chartValues, setChartValues] = useState([50, 50, 50, 50, 50, 50]); 
+  const [loadingChart, setLoadingChart] = useState(true);
 
   const location = {
     name: locationName || "Unknown",
@@ -30,9 +38,67 @@ const AQIDetailScreen = () => {
   };
 
   const isSensitive = isSensitiveGroup === "true" || isSensitiveGroup === true;
+  const currentAqi = parseFloat(aqi) || 0;
 
-  // Dữ liệu biểu đồ AQI theo giờ với màu sắc động
-  const hourlyAqiData = [48, 65, 115, 143, 95, 82, 135, 188, 165];
+  // --- LOGIC LẤY DỮ LIỆU BIỂU ĐỒ THẬT ---
+  useEffect(() => {
+    // --- [DEBUG START] LOG KIỂM TRA TỌA ĐỘ ---
+    console.log("---------------------------------------------------");
+    console.log("📍 [DETAIL SCREEN] Nhận được params:", routeParams);
+    console.log("👉 Latitude (lat):", lat);
+    console.log("👉 Longitude (lon):", lon);
+    // -----------------------------------------------------------
+
+    const fetchChartData = async () => {
+      let queryLat = lat;
+      let queryLon = lon;
+
+      if (!queryLat || !queryLon) {
+        console.warn("⚠️ CẢNH BÁO: Không tìm thấy tọa độ. Đang dùng tọa độ mặc định (Hà Nội) để test.");
+        // Fallback tạm thời để không chết App khi test
+        queryLat = 21.0285;
+        queryLon = 105.8542;
+      } else {
+        console.log("✅ Đã có tọa độ, bắt đầu gọi API OpenWeatherMap...");
+      }
+
+      try {
+        const forecastList = await getAqiForecast(queryLat, queryLon);
+        
+        console.log(`📡 Kết quả API trả về: ${forecastList?.length || 0} mốc thời gian.`);
+
+        if (forecastList && forecastList.length > 0) {
+          // Lấy 8 mốc thời gian tiếp theo (mỗi mốc cách nhau 3 tiếng -> 24h)
+          const filteredData = forecastList.filter((_, index) => index % 3 === 0).slice(0, 8);
+
+          const labels = filteredData.map(item => {
+            const date = new Date(item.dt * 1000);
+            return `${date.getHours()}h`;
+          });
+
+          const values = filteredData.map(item => {
+            const pm25 = item.components.pm2_5;
+            let estimatedAqi = pm25 * 3.8; 
+            if (estimatedAqi > 300) estimatedAqi = 300; 
+            return Math.round(estimatedAqi);
+          });
+
+          setChartLabels(labels);
+          setChartValues(values);
+        } else {
+          console.log("❌ API trả về danh sách rỗng.");
+        }
+      } catch (error) {
+        console.error("❌ Lỗi tải dữ liệu biểu đồ:", error);
+        setChartValues([48, 65, 115, 143, 95, 82, 135, currentAqi]);
+      } finally {
+        setLoadingChart(false);
+      }
+    };
+
+    fetchChartData();
+  }, [lat, lon]);
+  // --------------------------------------
 
   const getChartColor = (values) => {
     const maxValue = Math.max(...values);
@@ -52,17 +118,16 @@ const AQIDetailScreen = () => {
   };
 
   const chartData = {
-    labels: ["0h", "3h", "6h", "9h", "12h", "15h", "18h", "21h", "24h"],
+    labels: chartLabels,
     datasets: [
       {
-        data: hourlyAqiData,
+        data: chartValues,
         color: (opacity = 1) =>
-          hexToRgba(getChartColor(hourlyAqiData), opacity),
+          hexToRgba(getChartColor(chartValues), opacity),
         strokeWidth: 3,
       },
-      // Dataset ẩn để thiết lập scale Y theo các mốc AQI
       {
-        data: [0, 300], // Min và max để tạo scale phù hợp
+        data: [0, 300], 
         withDots: false,
         strokeWidth: 0,
         color: () => "transparent",
@@ -70,7 +135,17 @@ const AQIDetailScreen = () => {
     ],
   };
 
-  const { color, status } = getAqiInfo(parseFloat(aqi));
+  const { color, status, recommendations } = getAqiInfo(currentAqi);
+
+  const getIconForRecommendation = (text) => {
+    if (!text) return "information";
+    const lower = text.toLowerCase();
+    if (lower.includes("khẩu trang")) return "face-mask";
+    if (lower.includes("cửa sổ") || lower.includes("nhà")) return "home-alert";
+    if (lower.includes("hoạt động") || lower.includes("vận động")) return "run-fast";
+    if (lower.includes("bệnh viện") || lower.includes("sức khỏe")) return "hospital-box";
+    return "information";
+  };
 
   const renderColoredAreas = () => {
     const legendItems = [
@@ -114,12 +189,14 @@ const AQIDetailScreen = () => {
           <Text style={styles.menuDots}>•••</Text>
         </TouchableOpacity>
       </View>
+      
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* CARD TỔNG QUAN */}
         <View style={styles.aqiSummaryCard}>
           <View style={styles.summaryHeader}>
             <View style={styles.summaryLocationContainer}>
               <Text style={styles.summaryLocationText}>
-                {location?.name || "Unknown"}, {location?.city || "Unknown"}
+                {location.name}, {location.city}
               </Text>
               {isSensitive && (
                 <Text style={styles.summarySensitiveText}>
@@ -132,7 +209,7 @@ const AQIDetailScreen = () => {
                 style={[styles.summaryAqiContainer, { borderColor: color }]}
               >
                 <Text style={[styles.summaryAqiText, { color }]}>
-                  {aqi || "0"}
+                  {currentAqi}
                 </Text>
                 <Text style={styles.summaryAqiLabel}>AQI</Text>
               </View>
@@ -143,70 +220,115 @@ const AQIDetailScreen = () => {
           </View>
         </View>
 
+        {/* CARD BIỂU ĐỒ */}
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>
-            Chỉ số chất lượng không khí theo giờ - Hôm nay
+            Chỉ số chất lượng không khí theo giờ
           </Text>
-          <LineChart
-            data={chartData}
-            width={screenWidth - 60}
-            height={220}
-            yAxisLabel=""
-            yAxisSuffix=""
-            segments={5}
-            withVerticalLines={false}
-            withHorizontalLines={true}
-            withInnerLines={true}
-            withOuterLines={false}
-            chartConfig={{
-              backgroundColor: "#ffffff",
-              backgroundGradientFrom: "#ffffff",
-              backgroundGradientTo: "#ffffff",
-              decimalPlaces: 0,
-              color: (opacity = 1) =>
-                hexToRgba(getChartColor(hourlyAqiData), opacity),
-              labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
-              propsForDots: {
-                r: "8",
-                strokeWidth: "0",
-                stroke: "transparent",
-                fill: getChartColor(hourlyAqiData),
-                fillOpacity: 1,
-              },
-              propsForBackgroundLines: {
-                strokeDasharray: "0",
-                stroke: "#E8E8E8",
-                strokeWidth: 1,
-              },
-              fillShadowGradient: getChartColor(hourlyAqiData),
-              fillShadowGradientFrom: getChartColor(hourlyAqiData),
-              fillShadowGradientFromOpacity: 0.3,
-              fillShadowGradientTo: "#ffffff",
-              fillShadowGradientToOpacity: 0.05,
-              useShadowColorFromDataset: false,
-            }}
-            bezier
-            style={styles.chartStyle}
-            fromZero={true}
-            yLabelsOffset={8}
-          />
+          <Text style={styles.chartSubTitle}>
+             Dự báo 24h tới
+          </Text>
+          
+          {loadingChart ? (
+             <ActivityIndicator size="large" color={color} style={{ marginVertical: 80 }} />
+          ) : (
+            <LineChart
+              data={chartData}
+              width={screenWidth - 60}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              segments={5}
+              withVerticalLines={false}
+              withHorizontalLines={true}
+              withInnerLines={true}
+              withOuterLines={false}
+              chartConfig={{
+                backgroundColor: "#ffffff",
+                backgroundGradientFrom: "#ffffff",
+                backgroundGradientTo: "#ffffff",
+                decimalPlaces: 0,
+                color: (opacity = 1) =>
+                  hexToRgba(getChartColor(chartValues), opacity),
+                labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
+                propsForDots: {
+                  r: "4",
+                  strokeWidth: "0",
+                  stroke: "transparent",
+                  fill: getChartColor(chartValues),
+                  fillOpacity: 1,
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: "0",
+                  stroke: "#E8E8E8",
+                  strokeWidth: 1,
+                },
+                fillShadowGradient: getChartColor(chartValues),
+                fillShadowGradientFrom: getChartColor(chartValues),
+                fillShadowGradientFromOpacity: 0.3,
+                fillShadowGradientTo: "#ffffff",
+                fillShadowGradientToOpacity: 0.05,
+                useShadowColorFromDataset: false,
+              }}
+              bezier
+              style={styles.chartStyle}
+              fromZero={true}
+              yLabelsOffset={8}
+              renderDotContent={({ x, y, index, indexData }) => {
+                 if (index % 2 !== 0 && index !== chartValues.length -1) return null;
+                 return (
+                  <View
+                    key={index}
+                    style={{
+                      position: "absolute",
+                      top: y - 20,
+                      left: x - 10,
+                      width: 20,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#666" }}>
+                      {Math.round(indexData)}
+                    </Text>
+                  </View>
+                );
+              }}
+            />
+          )}
           {renderColoredAreas()}
         </View>
 
+        {/* CARD KHUYẾN NGHỊ */}
         <View style={styles.recommendationCard}>
           <Text style={styles.recommendationTitle}>Khuyến nghị hành động</Text>
-          <AQIRecommendation
-            iconName="account-alert"
-            iconColor="#FFA726"
-            text="Người già, trẻ em, người có bệnh hô hấp nên hạn chế ra ngoài"
-          />
-          <AQIRecommendation
-            iconName="face-mask"
-            iconColor="#FFA726"
-            text="Đeo khẩu trang chống bụi mịn khi ra ngoài"
-          />
+          
+          {recommendations && recommendations.length > 0 ? (
+            recommendations.map((item, index) => (
+              <AQIRecommendation
+                key={index}
+                iconName={getIconForRecommendation(item.text)}
+                iconColor={color}
+                text={item.text}
+              />
+            ))
+          ) : (
+            <>
+              <AQIRecommendation
+                iconName="account-alert"
+                iconColor="#FFA726"
+                text="Người già, trẻ em, người có bệnh hô hấp nên hạn chế ra ngoài"
+              />
+              <AQIRecommendation
+                iconName="face-mask"
+                iconColor="#FFA726"
+                text="Đeo khẩu trang chống bụi mịn khi ra ngoài"
+              />
+            </>
+          )}
         </View>
       </ScrollView>
+
+      {/* Modal Menu */}
       <Modal
         animation="slide"
         transparent={true}
@@ -260,13 +382,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', 
     alignItems: 'center', 
     elevation: 2 
-  },
-  backText: {
-    ...typography.h3,
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#007AFF",
-    letterSpacing: -0.2,
   },
   menuButton: {
     padding: 12,
@@ -382,12 +497,21 @@ const styles = StyleSheet.create({
   },
   chartTitle: {
     ...typography.h2,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
-    marginBottom: 32,
+    marginBottom: 5,
     color: "#0A0A0A",
     textAlign: "center",
     letterSpacing: -0.5,
+  },
+  chartSubTitle: {
+    ...typography.h3,
+    fontSize: 16,
+    marginBottom: 32,
+    color: "#6a6a6aff",
+    textAlign: "center",
+    letterSpacing: -0.5,
+    fontStyle: 'italic', // Chữ nghiêng
   },
   chartStyle: {
     borderRadius: 20,
@@ -510,32 +634,6 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     flex: 1,
     letterSpacing: -0.2,
-  },
-
-  bottomButton: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E8E9EA",
-  },
-  settingsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-  },
-  settingsIcon: {
-    fontSize: 18,
-    marginRight: 12,
-    color: "#666",
-  },
-  settingsText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
   },
 });
 

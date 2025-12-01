@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Text, Button } from "react-native-paper";
+import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
 
@@ -106,7 +106,10 @@ const NotificationSettingsScreen = () => {
       >
         <View style={styles.settingLeft}>
           <MaterialCommunityIcons name={icon} size={22} color="#0A0A0A" />
-          <Text style={styles.menuItemText}>{label}</Text>
+          {/* SỬA: Bọc Text trong textContainer để có marginLeft giống các mục dưới */}
+          <View style={styles.textContainer}>
+            <Text style={styles.menuItemText}>{label}</Text>
+          </View>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
       </TouchableOpacity>
@@ -169,15 +172,7 @@ const NotificationSettingsScreen = () => {
               "Thông báo cuối tuần về các hoạt động môi trường."
           )}
           
-          {/* Cập nhật Trạng thái Báo cáo */}
-          {renderSwitchItem(
-              "Cập nhật Trạng thái Báo cáo", 
-              "reportStatusNotificationsEnabled", 
-              "file-document-check-outline", 
-              "Nhận thông báo khi báo cáo của bạn được xử lý."
-          )}
-          
-          {/* Thông báo Huy hiệu/Điểm */}
+          {/* Thông báo Huy hiệu/Điểm (Giữ lại để triển khai sau) */}
           {renderSwitchItem(
               "Thông báo Huy hiệu & Điểm", 
               "badgeNotificationsEnabled", 
@@ -191,12 +186,48 @@ const NotificationSettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0EFED" },
-  scrollContent: { paddingBottom: 40, flexGrow: 1, },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 20, },
-  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "#0A0A0A", letterSpacing: -0.3, },
-  placeholder: { width: 44, },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#F0EFED" 
+  },
+
+  scrollContent: { 
+    paddingBottom: 40, 
+    flexGrow: 1, 
+  },
+
+  header: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "space-between", 
+    paddingHorizontal: 24, 
+    paddingTop: 16, 
+    paddingBottom: 20, 
+  },
+
+  backButton: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    backgroundColor: "#FFFFFF", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    elevation: 2, 
+    shadowColor: "#000", 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 4, 
+  },
+
+  headerTitle: { fontSize: 20, 
+    fontWeight: "700", 
+    color: "#0A0A0A", 
+    letterSpacing: -0.3,
+   },
+
+  placeholder: { 
+    width: 44, 
+  },
   
   menuSection: {
     backgroundColor: "#FFFFFF",
@@ -212,6 +243,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
+  
   sectionTitle: {
       fontSize: 14,
       fontWeight: 'bold',
@@ -220,7 +252,7 @@ const styles = StyleSheet.create({
       marginBottom: 5,
       textTransform: 'uppercase',
   },
-  // Đã tối ưu các styles dưới đây
+
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -229,26 +261,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0EFED",
   },
+
   settingItemWithSwitch: {
     paddingVertical: 18,
   },
+
   navigationItem: {
     paddingVertical: 18,
   },
+
   settingLeft: { 
     flexDirection: "row", 
     alignItems: "center", 
     flex: 1,
   },
+
   textContainer: { 
-      marginLeft: 12, 
+      marginLeft: 12, // Tạo khoảng cách với icon
       flex: 1,
   },
+
   menuItemText: {
     fontSize: 15,
     fontWeight: "600",
     color: "#0A0A0A",
   },
+
   statusText: {
       fontSize: 13,
       color: '#666',
