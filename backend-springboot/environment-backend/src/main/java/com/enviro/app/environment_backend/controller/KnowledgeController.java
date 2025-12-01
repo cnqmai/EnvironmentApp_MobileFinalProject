@@ -19,31 +19,22 @@ public class KnowledgeController {
         this.knowledgeService = knowledgeService;
     }
 
+    /**
+     * API duy nhất để lấy danh sách bài viết.
+     * Hỗ trợ lọc theo: category, type, search (từ khóa).
+     * Các tham số đều là tùy chọn (required = false).
+     */
     @GetMapping
-    public ResponseEntity<List<ArticleResponse>> getAllArticles() {
-        return ResponseEntity.ok(knowledgeService.getAllArticles());
+    public ResponseEntity<List<ArticleResponse>> getArticles(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) ArticleType type,
+            @RequestParam(required = false) String search
+    ) {
+        return ResponseEntity.ok(knowledgeService.getArticles(category, type, search));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ArticleResponse> getArticleById(@PathVariable UUID id) {
         return ResponseEntity.ok(knowledgeService.getArticleById(id));
     }
-
-    @GetMapping(params = "category")
-    public ResponseEntity<List<ArticleResponse>> getArticlesByCategory(@RequestParam String category) {
-        return ResponseEntity.ok(knowledgeService.getArticlesByCategory(category));
-    }
-
-    @GetMapping(params = "type")
-    public ResponseEntity<List<ArticleResponse>> getArticlesByType(@RequestParam ArticleType type) {
-        return ResponseEntity.ok(knowledgeService.getArticlesByType(type));
-    }
-    // ... các method cũ ...
-
-    // [MỚI] API Tìm kiếm: GET /api/knowledge?search=...
-    @GetMapping(params = "search")
-    public ResponseEntity<List<ArticleResponse>> searchArticles(@RequestParam String search) {
-        return ResponseEntity.ok(knowledgeService.searchArticles(search));
-    }
 }
-
