@@ -10,10 +10,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
+import org.springframework.data.domain.Sort;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit; // Thêm import này
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +38,7 @@ public class QuizService {
     }
 
     public List<QuizResponse> getAllQuizzes() {
-        return quizRepository.findAll().stream()
+      return quizRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
                 .map(this::mapToResponseLite)
                 .collect(Collectors.toList());
     }
@@ -56,6 +57,29 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId)
              .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
 
+        // === BƯỚC MỚI: KIỂM TRA GIỚI HẠN GỬI BÀI HÀNG NGÀY (PER-USER) ===
+        // 1. Tính toán thời điểm bắt đầu của ngày hiện tại (00:00:00)
+        // Phương thức này giữ nguyên múi giờ (offset) hiện tại của OffsetDateTime.now() 
+        // và đặt giờ, phút, giây, nano giây về 0.
+        OffsetDateTime startOfDay = OffsetDateTime.now()
+                .withHour(0)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0);
+
+        Optional<UserQuizScore> existingScore = userQuizScoreRepository.findByUserAndQuiz(user, quiz);
+
+        if (existingScore.isPresent()) {
+            UserQuizScore score = existingScore.get();
+            // Kiểm tra xem bài thi đã được hoàn thành sau 00:00 của ngày hôm nay chưa.
+            // Việc này đảm bảo giới hạn nộp bài là 1 lần mỗi ngày cho TỪNG TÀI KHOẢN.
+            if (score.getCompletedAt() != null && score.getCompletedAt().isAfter(startOfDay)) {
+                // Ném ra ngoại lệ nếu người dùng đã hoàn thành bài quiz này hôm nay.
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User can only submit this quiz once per day. Try again tomorrow at 00:00.");
+            }
+        }
+        // ==================================================================
+        
         // 1. Tính điểm
         int correctCount = 0;
         List<QuizQuestion> questions = quiz.getQuestions();
@@ -85,8 +109,7 @@ public class QuizService {
         badgeService.checkAndAssignBadges(user);
 
         // 3. Lưu hoặc Cập nhật kết quả bài thi
-        Optional<UserQuizScore> existingScore = userQuizScoreRepository.findByUserAndQuiz(user, quiz);
-        
+        // existingScore đã được lấy ở bước kiểm tra phía trên
         UserQuizScore scoreToSave;
         if (existingScore.isPresent()) {
             scoreToSave = existingScore.get();

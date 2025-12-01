@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS rewards CASCADE;
 DROP TABLE IF EXISTS community_groups CASCADE;
 DROP TABLE IF EXISTS group_members CASCADE;
 DROP TABLE IF EXISTS waste_collection_points CASCADE;
+DROP TABLE IF EXISTS user_daily_tip_completions CASCADE; -- ĐÃ THÊM DROP TABLE
 
 -- Xóa các ENUM cũ
 DROP TYPE IF EXISTS collection_point_type CASCADE;
@@ -190,6 +191,14 @@ CREATE TABLE daily_tips (
     display_date DATE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- --- Bảng theo dõi hoàn thành Daily Tip của Người dùng (SỬA LỖI: ĐÃ BỎ UNIQUE) ---
+CREATE TABLE user_daily_tip_completions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    daily_tip_id UUID NOT NULL REFERENCES daily_tips(id) ON DELETE CASCADE,
+    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- --- 9. Bảng Chatbot History ---
