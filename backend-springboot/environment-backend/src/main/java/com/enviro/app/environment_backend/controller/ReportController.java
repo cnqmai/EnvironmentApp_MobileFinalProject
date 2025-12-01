@@ -8,6 +8,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.enviro.app.environment_backend.dto.CommunityReportExportRequest;
 import com.enviro.app.environment_backend.dto.ReportRequest;
 import com.enviro.app.environment_backend.dto.ReportStatusUpdateRequest;
 import com.enviro.app.environment_backend.model.Report;
@@ -18,6 +19,7 @@ import com.enviro.app.environment_backend.service.UserService;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -73,5 +75,25 @@ public class ReportController {
         headers.setContentLength(pdfBytes.length);
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    // --- FR-12.1.3: API MỚI XUẤT BÁO CÁO CỘNG ĐỒNG VÀ GỬI EMAIL ---
+    @PostMapping("/export/community")
+    public ResponseEntity<Map<String, Object>> exportCommunityReport(
+            @Valid @RequestBody CommunityReportExportRequest request) {
+        
+        User user = getCurrentUser();
+        
+        // Gọi Service để xử lý việc tạo PDF và Gửi Email
+        String recipientEmail = reportService.exportCommunityReport(user, request);
+        
+        // Trả về phản hồi thành công (200 OK)
+        return ResponseEntity.ok(
+            Map.of(
+                "success", true,
+                "message", "Báo cáo đã được tạo và gửi qua email.",
+                "email", recipientEmail // Trả về email để Frontend có thể hiển thị
+            )
+        );
     }
 }

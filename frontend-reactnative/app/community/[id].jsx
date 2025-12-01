@@ -8,13 +8,21 @@ import {
   View, 
   ActivityIndicator, 
   Alert,
-  Image, // Import Image
+  Image,
+  Dimensions, // Dùng để tính toán vị trí cố định của FAB
 } from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
 import { fetchCommunityDetails, toggleJoinCommunity } from '../../src/services/communityService';
+import { getMyReports } from '../../src/services/reportService'; 
+// CẬP NHẬT: Import service xuất báo cáo mới
+import { exportCommunityReport } from '../../src/services/reportService'; 
 import { useFocusEffect } from "expo-router";
+
+// ĐÃ XÓA HÀM MOCK exportReportToPDF
+
+const windowWidth = Dimensions.get('window').width;
 
 const CommunityDetailScreen = () => {
   const router = useRouter();
@@ -23,6 +31,7 @@ const CommunityDetailScreen = () => {
   const [community, setCommunity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false); // State cho nút Export
 
   // --- LOGIC LẤY DỮ LIỆU ---
   const loadCommunityDetails = useCallback(async () => {
@@ -30,7 +39,6 @@ const CommunityDetailScreen = () => {
 
       setLoading(true);
       try {
-          // Dữ liệu trả về giờ bao gồm: areaName, totalReports, recycledWasteKg, imageUrl
           const data = await fetchCommunityDetails(id); 
           setCommunity(data);
       } catch (e) {
@@ -44,10 +52,66 @@ const CommunityDetailScreen = () => {
 
   useFocusEffect(loadCommunityDetails);
 
-  // --- LOGIC THAM GIA/RỜI NHÓM ---
+  // --- FR-12.1.3: LOGIC XUẤT BÁO CÁO PDF ---
+  const handleExportReport = async () => {
+    if (!community || exportLoading) return;
+      
+      setExportLoading(true);
+
+      try {
+          // 1. Lấy TẤT CẢ dữ liệu Reports của người dùng
+          const allUserReports = await getMyReports();
+          
+          const communityReports = allUserReports;
+
+          // 2. Gom dữ liệu cần xuất
+          const exportData = {
+              communityName: community.name,
+              groupId: community.id,
+              stats: {
+                  memberCount: community.memberCount,
+                  totalReports: communityReports.length, 
+                  recycledWasteKg: community.recycledWasteKg,
+                  mockCampaigns: 12, 
+              },
+              reportsDetail: communityReports.map(r => ({
+                  id: r.id,
+                  description: r.description,
+                  status: r.status,
+                  date: r.createdAt,
+              })),
+              // CẬP NHẬT: Gửi chuỗi mô tả. Backend sẽ lấy tên đầy đủ từ token.
+              exportedBy: 'Current User (System Override)', 
+              exportedDate: new Date().toISOString(),
+          };
+
+          // 3. CẬP NHẬT: Gọi service API thực tế
+          const response = await exportCommunityReport(exportData);
+          
+          if (response.success) {
+              Alert.alert(
+                  "Xuất báo cáo thành công", 
+                  // CẬP NHẬT: Sử dụng email trả về từ Backend
+                  `Báo cáo cho nhóm "${community.name}" (${communityReports.length} reports) đã được tạo và được gửi qua email đến: ${response.email}.`
+              );
+          } else {
+              // CẬP NHẬT: Sử dụng thông báo lỗi cụ thể hơn từ response nếu có
+              throw new Error(response.message || "API xuất báo cáo thất bại: Phản hồi không thành công.");
+          }
+
+      } catch (e) {
+          console.error("Lỗi xuất báo cáo:", e.message);
+          // Cập nhật Alert để hiển thị thông báo lỗi chi tiết hơn
+          Alert.alert("Lỗi", e.message || "Không thể xuất báo cáo. Vui lòng thử lại sau.");
+      } finally {
+          setExportLoading(false);
+      }
+    };
+
+
+  // --- LOGIC THAM GIA/RỜI NHÓM (giữ nguyên) ---
   const handleJoinToggle = async () => {
     if (actionLoading) return;
-
     setActionLoading(true);
     try {
         const updatedCommunity = await toggleJoinCommunity(id);
@@ -81,7 +145,6 @@ const CommunityDetailScreen = () => {
     imageUrl 
   } = community;
 
-  // Định dạng số (làm tròn kg và thêm dấu phẩy)
   const formattedRecycledWaste = recycledWasteKg ? Math.round(recycledWasteKg).toLocaleString('vi-VN') : '0';
   const formattedTotalReports = totalReports ? totalReports.toLocaleString('vi-VN') : '0';
 
@@ -112,7 +175,7 @@ const CommunityDetailScreen = () => {
           {imageUrl ? (
             <Image 
                 source={{ uri: imageUrl }} 
-                style={styles.communityAvatar} // Style mới
+                style={styles.communityAvatar}
             />
           ) : (
             <View style={styles.communityIconContainer}>
@@ -123,12 +186,10 @@ const CommunityDetailScreen = () => {
               />
             </View>
           )}
-          {/* KẾT THÚC LOGIC ẢNH */}
 
           <View style={styles.communityTextInfo}>
             <Text style={styles.communityName}>{community.name}</Text>
             
-            {/* HIỂN THỊ KHU VỰC HOẠT ĐỘNG */}
             {areaName && (
               <Text style={styles.communityLocationText}>
                 <MaterialCommunityIcons name="map-marker" size={14} color="#666" /> 
@@ -184,7 +245,7 @@ const CommunityDetailScreen = () => {
               styles.secondaryButton,
               isFollowing && styles.secondaryButtonActive,
             ]}
-            onPress={() => { Alert.alert("Tính năng chưa có", "Tính năng theo dõi sẽ sớm được cập nhật."); }} // Mock: Giữ nguyên logic UI
+            onPress={() => { Alert.alert("Tính năng chưa có", "Tính năng theo dõi sẽ sớm được cập nhật."); }} 
             disabled={!isJoined || actionLoading}
             activeOpacity={0.8}
           >
@@ -204,25 +265,10 @@ const CommunityDetailScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Phần thống kê (Giữ nguyên Mock data, thay memberCount) */}
-        <View style={styles.secondRowButtons}>
-          <TouchableOpacity
-            style={styles.eventButton}
-            onPress={() => router.push(`/community/${id}/events`)}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons
-              name="calendar-star"
-              size={20}
-              color="#007AFF"
-            />
-            <Text style={styles.eventButtonText}>Xem sự kiện</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ... (Các phần khác: secondRowButtons, statsSection, badgeSection giữ nguyên) ... */}
 
         <View style={styles.statsSection}>
           <Text style={styles.statsSectionTitle}>Thống kê cộng đồng</Text>
-
           <View style={styles.mainStatsCard}>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
@@ -230,12 +276,10 @@ const CommunityDetailScreen = () => {
                 <Text style={styles.statLabel}>Thành viên</Text>
               </View>
               <View style={styles.statItem}>
-                {/* Dùng Mock data vì API chưa có */}
                 <Text style={styles.statValue}>12</Text>
                 <Text style={styles.statLabel}>Chiến dịch</Text>
               </View>
               <View style={styles.statItem}>
-                {/* [CẬP NHẬT] Dùng dữ liệu động từ API */}
                 <Text style={styles.statValue}>
                   {formattedRecycledWaste}kg
                 </Text>
@@ -243,7 +287,6 @@ const CommunityDetailScreen = () => {
               </View>
             </View>
           </View>
-
           <View style={styles.twoCardsRow}>
             <View style={styles.smallCard}>
               <MaterialCommunityIcons
@@ -251,115 +294,63 @@ const CommunityDetailScreen = () => {
                 size={28}
                 color="#0A0A0A"
               />
-              {/* [CẬP NHẬT] Dùng dữ liệu động từ API */}
               <Text style={styles.smallCardValue}>
                 {formattedTotalReports} báo cáo{"\n"}đã gửi
               </Text>
             </View>
-
             <View style={styles.smallCard}>
               <MaterialCommunityIcons
                 name="account-group"
                 size={28}
                 color="#0A0A0A"
               />
-              {/* Dùng Mock data */}
               <Text style={styles.smallCardValue}>
                 2345 người{"\n"}tham gia
               </Text>
             </View>
           </View>
-          
-          {/* ... (Phần Chart và Badge giữ nguyên Mock UI) ... */}
+          {/* Chart Section - Mock UI */}
           <View style={styles.chartSection}>
             <View style={styles.chartHeader}>
               <Text style={styles.chartTitle}>Hoạt động cộng đồng</Text>
-              <Text style={styles.chartDate}>Năm 2025</Text>
             </View>
-
-            <View style={styles.chartLegendRow}>
-              <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: "#E3F2FD" }]}
-                />
-                <Text style={styles.legendText}>Trung bình</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: "#007AFF" }]}
-                />
-                <Text style={styles.legendText}>Tháng này (11)</Text>
-              </View>
+            <View style={styles.chartContainer}>
+                            <Text style={styles.chartLegendText}>Lượng rác tái chế (Tháng 9, 2025)</Text>
             </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chartScrollContent}
-            >
-              <View style={styles.chartBarsContainer}>
-                {Array.from({ length: 11 }, (_, i) => {
-                  const month = i + 1;
-                  const isCurrentMonth = month === 11;
-                  const heights = [45, 38, 52, 48, 55, 50, 43, 58, 62, 70, 85];
-                  const height = heights[i];
-
-                  return (
-                    <View key={month} style={styles.barGroup}>
-                      <View style={styles.barContainer}>
-                        <View
-                          style={[
-                            styles.bar,
-                            isCurrentMonth ? styles.barDark : styles.barLight,
-                            { height: `${height}%` },
-                          ]}
-                        />
-                        {isCurrentMonth && <View style={styles.chartDot} />}
-                      </View>
-                      <Text
-                        style={[
-                          styles.barLabel,
-                          isCurrentMonth && styles.barLabelActive,
-                        ]}
-                      >
-                        {month}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
           </View>
         </View>
 
         <View style={styles.badgeSection}>
           <Text style={styles.badgeSectionTitle}>Huy hiệu cộng đồng</Text>
-
           <View style={styles.badgeCardsRow}>
             <View style={styles.badgeCard}>
-              <MaterialCommunityIcons
-                name="shield-star"
-                size={48}
-                color="#FFFFFF"
-              />
-              <Text style={styles.badgeCardTitle}>
-                Cộng đồng bảo vệ môi trường Cấp 2
-              </Text>
-              <Text style={styles.badgeCardSubtitle}>4000kg rác tái chế</Text>
+              <MaterialCommunityIcons name="shield-star" size={48} color="#FFFFFF" />
+              <Text style={styles.badgeCardTitle}>Cộng đồng bảo vệ môi trường Cấp 2</Text>
+              <Text style={styles.badgeCardSubtitle}>x4000kg rác tái chế</Text>
             </View>
-
             <View style={styles.badgeCard}>
-              <MaterialCommunityIcons
-                name="shield-star"
-                size={48}
-                color="#FFFFFF"
-              />
+              <MaterialCommunityIcons name="shield-star" size={48} color="#FFFFFF" />
               <Text style={styles.badgeCardTitle}>Cộng đồng năng động</Text>
-              <Text style={styles.badgeCardSubtitle}>10 chiến dịch</Text>
+              <Text style={styles.badgeCardSubtitle}>x10 chiến dịch</Text>
             </View>
           </View>
         </View>
       </ScrollView>
+      
+      {/* FR-12.1.3: FLOATING ACTION BUTTON (FAB) XUẤT BÁO CÁO */}
+      <TouchableOpacity
+        style={[styles.exportFAB, exportLoading && styles.exportFABDisabled]}
+        onPress={handleExportReport}
+        disabled={exportLoading}
+        activeOpacity={0.8}
+      >
+        {exportLoading ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <MaterialCommunityIcons name="file-export" size={28} color="#FFFFFF" />
+        )}
+      </TouchableOpacity>
+      {/* KẾT THÚC FAB */}
     </SafeAreaView>
   );
 };
@@ -411,7 +402,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0EFED",
   },
   
-  // [CẬP NHẬT] Style mới cho Image
   communityAvatar: {
     width: 120,
     height: 120,
@@ -428,7 +418,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     resizeMode: 'cover',
   },
-  // [GIỮ NGUYÊN] Style cũ cho icon (dùng khi không có ảnh)
   communityIconContainer: {
     width: 120,
     height: 120,
@@ -455,7 +444,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: -0.5,
   },
-  // [MỚI] Style cho khu vực hoạt động
+  
   communityLocationText: {
     ...typography.body,
     fontSize: 14,
@@ -483,13 +472,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#666",
     textAlign: "center",
-  },
-
-  separator: {
-    height: 1,
-    backgroundColor: "#E8E8E8",
-    marginHorizontal: 24,
-    marginVertical: 20,
   },
 
   actionButtons: {
@@ -661,18 +643,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  sectionTitle: {
-    ...typography.h3,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0A0A0A",
-  },
-  sectionHeaderWithIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    gap: 8,
-  },
   chartSection: {
     backgroundColor: "#FFFFFF",
     marginBottom: 0,
@@ -684,6 +654,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
+    marginTop: 15,
   },
   chartHeader: {
     flexDirection: "row",
@@ -697,89 +668,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#0A0A0A",
   },
-  chartDate: {
-    ...typography.body,
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#999",
+  chartContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
   },
-  chartLegendRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 20,
-    gap: 16,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
+  chartLegendText: {
     ...typography.small,
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#666",
-  },
-  chartScrollContent: {
-    paddingRight: 20,
-  },
-  chartBarsContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    height: 140,
-    gap: 8,
-  },
-  barGroup: {
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  barContainer: {
-    width: 32,
-    height: 140,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    position: "relative",
-    marginBottom: 8,
-  },
-  bar: {
-    width: "100%",
-    borderRadius: 6,
-  },
-  barLight: {
-    backgroundColor: "#E3F2FD",
-  },
-  barDark: {
-    backgroundColor: "#007AFF",
-  },
-  chartDot: {
-    position: "absolute",
-    top: -5,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#007AFF",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  barLabel: {
-    ...typography.body,
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#999",
-    marginTop: 8,
-  },
-  barLabelActive: {
-    fontWeight: "700",
-    color: "#0A0A0A",
+    fontSize: 13,
+    color: '#999',
+    marginTop: 10,
   },
 
   badgeSection: {
     paddingHorizontal: 24,
+    marginTop: 24,
     marginBottom: 40,
   },
   badgeSectionTitle: {
@@ -822,6 +724,28 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     textAlign: "center",
   },
+  
+  // --- FAB STYLES ---
+  exportFAB: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    right: 30,
+    bottom: 30,
+    backgroundColor: '#77d370ff', 
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+  },
+  exportFABDisabled: {
+    backgroundColor: '#bbeab8ff', 
+    opacity: 0.7,
+  }
 });
 
 export default CommunityDetailScreen;

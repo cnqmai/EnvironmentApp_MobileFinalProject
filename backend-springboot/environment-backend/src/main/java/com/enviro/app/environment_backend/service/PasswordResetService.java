@@ -118,6 +118,50 @@ public class PasswordResetService {
         }
     }
 
+    // --- FR-12.1.3: HÀM MỚI GỬI EMAIL BÁO CÁO CỘNG ĐỒNG CÓ ĐÍNH KÈM FILE ---
+    public void sendReportEmailWithAttachment(
+        String toAddress, 
+        String name, 
+        String communityName, 
+        String contentBody, 
+        byte[] attachmentBytes, 
+        String attachmentFileName
+    ) throws MessagingException {
+        
+        MimeMessage message = mailSender.createMimeMessage();
+        // Cần 'true' cho tham số thứ hai để bật chế độ multipart (hỗ trợ attachment)
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8"); 
+        
+        helper.setFrom(fromEmail);
+        helper.setTo(toAddress);
+        
+        // --- 1. ĐỊNH NGHĨA NỘI DUNG ---
+        String subject = String.format("Báo cáo Hoạt động Cộng đồng \"%s\" - Enviroment App", communityName);
+        
+        helper.setSubject(subject);
+        
+        // --- 2. TẠO NỘI DUNG HTML ---
+        String htmlContent = "<div style=\"font-family: Arial, sans-serif; padding: 20px;\">"
+                        + "<h2>Xin chào " + name + ",</h2>"
+                        + "<p>Chúng tôi đã hoàn tất việc xuất báo cáo chi tiết cho Cộng đồng <b>" + communityName + "</b>.</p>"
+                        + "<p>" + contentBody + "</p>" // Nội dung từ ReportService
+                        + "<p>File báo cáo PDF <b>" + attachmentFileName + "</b> đã được đính kèm theo email này.</p>"
+                        + "<p>Xin cảm ơn vì những đóng góp tích cực của bạn cho cộng đồng.</p>"
+                        + "<p style=\"margin-top: 30px;\">Trân trọng,<br>Đội ngũ Enviroment App</p>"
+                        + "</div>";
+
+        helper.setText(htmlContent, true);
+        
+        // --- 3. ĐÍNH KÈM FILE (ATTACHMENT) ---
+        // Giả định attachmentBytes là byte[] của file PDF
+        // Cần import jakarta.activation.DataSource nếu không dùng ByteArrayDataSource
+        helper.addAttachment(attachmentFileName, new jakarta.mail.util.ByteArrayDataSource(attachmentBytes, "application/pdf"));
+        
+        // --- 4. GỬI MAIL ---
+        mailSender.send(message);
+        System.out.println(">>> [COMMUNITY REPORT] Email sent to: " + toAddress + " with attachment: " + attachmentFileName);
+    }
+
     // Hàm gửi email chung (đã sửa để hỗ trợ 2 loại mail)
     private void sendHtmlEmail(String toAddress, String link, String name, String type) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();

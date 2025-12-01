@@ -61,20 +61,25 @@ export const updateReportStatus = async (reportId, newStatus) => {
 };
 
 /**
- * Xuất báo cáo PDF (FR-13.1.3)
- * GET /api/reports/export/pdf
+ * FR-12.1.3: Xuất báo cáo cộng đồng và gửi qua email
+ * POST /api/reports/export/community
+ * @param {object} exportData - Dữ liệu cần xuất báo cáo (community stats, reports details, etc.)
  */
-export const exportReportPdf = async () => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/reports/export/pdf`, {
-        method: 'GET',
+export const exportCommunityReport = async (exportData) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports/export/community`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(exportData),
     });
 
     if (!response.ok) {
-        throw new Error('Không thể xuất báo cáo PDF.');
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi xuất báo cáo.' }));
+        // Nếu backend trả về thông báo lỗi, dùng thông báo đó, nếu không dùng thông báo chung
+        throw new Error(errorDetail.message || 'Không thể xuất báo cáo cộng đồng. Vui lòng thử lại.');
     }
 
-    // Trả về blob để download
-    const blob = await response.blob();
-    return blob;
+    // Giả định backend trả về { success: true, email: 'user@example.com' }
+    return response.json();
 };
-
