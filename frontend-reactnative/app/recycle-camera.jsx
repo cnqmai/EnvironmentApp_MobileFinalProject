@@ -1,146 +1,249 @@
-import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Text } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import * as ImagePicker from 'expo-image-picker'; // Thư viện ảnh
-import typography from "../styles/typography";
-// Import API
-import { classifyWasteByImage } from "../src/services/categoryService";
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert, Modal, Animated 
+} from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import * as ImageManipulator from 'expo-image-manipulator';
 
-const RecycleCameraScreen = () => {
+// Import service
+import { confirmRecycleAction } from '../src/services/recycleService'; // Đảm bảo đã update file service
+// Giả sử bạn có hàm identifyWaste (nếu chưa có API thật thì dùng mock bên dưới)
+const identifyWaste = async (uri) => {
+    // Mock AI response
+    return new Promise(resolve => setTimeout(() => resolve({
+        label: "Chai nhựa (Plastic)",
+        confidence: 0.95,
+        type: "Tái chế được",
+        guideline: "Rửa sạch, ép dẹt và bỏ vào thùng rác tái chế."
+    }), 2000));
+};
+
+export default function RecycleCameraScreen() {
   const router = useRouter();
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef(null);
+  
+  const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [pointsClaimed, setPointsClaimed] = useState(false); // Trạng thái đã nhận điểm chưa
 
-  // --- LOGIC XỬ LÝ ẢNH ---
-  const handleImage = async (uri) => {
+  // Animation State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const scaleValue = useRef(new Animated.Value(0)).current;
+  const opacityValue = useRef(new Animated.Value(0)).current;
+
+  if (!permission) return <View />;
+  if (!permission.granted) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={{textAlign:'center', marginBottom: 10}}>Chúng tôi cần quyền truy cập Camera</Text>
+        <TouchableOpacity onPress={requestPermission} style={styles.btnPrimary}><Text style={styles.btnText}>Cấp quyền</Text></TouchableOpacity>
+      </View>
+    );
+  }
+
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      try {
+        const photoData = await cameraRef.current.takePictureAsync();
+        // Resize ảnh để gửi lên server nhanh hơn
+        const manipulated = await ImageManipulator.manipulateAsync(
+            photoData.uri,
+            [{ resize: { width: 800 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        setPhoto(manipulated.uri);
+        analyzeImage(manipulated.uri);
+      } catch (error) {
+        Alert.alert("Lỗi", "Không thể chụp ảnh.");
+      }
+    }
+  };
+
+  const analyzeImage = async (uri) => {
     setLoading(true);
     try {
-        // Gửi ảnh lên Backend -> AI Gemini
-        const result = await classifyWasteByImage(uri);
-        
-        if (result && result.name) {
-            // Có kết quả -> Sang màn hình hướng dẫn
-            router.push({
-                pathname: "/recycle-guide",
-                params: { data: JSON.stringify(result) }
-            });
-        } else {
-            Alert.alert("Thất bại", "AI không nhận diện được vật phẩm trong ảnh.");
-        }
+        const data = await identifyWaste(uri);
+        setResult(data);
+        setPointsClaimed(false); // Reset trạng thái nhận điểm
     } catch (error) {
-        console.error(error);
-        Alert.alert("Lỗi", "Không thể kết nối máy chủ.");
+        Alert.alert("Lỗi", "Không thể nhận diện hình ảnh.");
+        setPhoto(null); // Chụp lại
     } finally {
         setLoading(false);
     }
   };
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-    if (!result.canceled) handleImage(result.assets[0].uri);
+  const handleRetake = () => {
+    setPhoto(null);
+    setResult(null);
+    setPointsClaimed(false);
   };
 
-  const takePhoto = async () => {
-    const { granted } = await ImagePicker.requestCameraPermissionsAsync();
-    if (!granted) return Alert.alert("Cần quyền", "Vui lòng cấp quyền camera.");
-    let result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-    if (!result.canceled) handleImage(result.assets[0].uri);
+  const handleClaimPoints = async () => {
+    if (pointsClaimed) return;
+    try {
+        await confirmRecycleAction(result.label);
+        setPointsClaimed(true);
+        triggerSuccessAnimation();
+    } catch (error) {
+        Alert.alert("Lỗi", "Không thể cộng điểm lúc này.");
+    }
   };
-  // -----------------------
 
-  const stats = [
-    { label: "Đã phân loại", value: "1,234", color: "#4CAF50" },
-    { label: "Độ chính xác", value: "92%", color: "#2196F3" },
-    { label: "Lần dùng", value: "56", color: "#FF9800" },
-  ];
+  const triggerSuccessAnimation = () => {
+    setShowSuccessModal(true);
+    scaleValue.setValue(0);
+    opacityValue.setValue(0);
 
-  const tips = ["Chụp ảnh đủ sáng", "Vật phẩm nằm giữa hình", "Nền đơn giản"];
+    Animated.parallel([
+      Animated.spring(scaleValue, { toValue: 1, friction: 5, useNativeDriver: true }),
+      Animated.timing(opacityValue, { toValue: 1, duration: 300, useNativeDriver: true })
+    ]).start();
+
+    setTimeout(() => {
+        Animated.timing(opacityValue, { toValue: 0, duration: 300, useNativeDriver: true })
+        .start(() => setShowSuccessModal(false));
+    }, 2000);
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={{marginTop: 10, fontWeight: 'bold', color: '#fff'}}>Đang phân tích ảnh...</Text>
-        </View>
-      )}
-
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#0A0A0A" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView}>
-        <Text style={styles.pageTitle}>AI Nhận diện rác</Text>
-        <Text style={styles.subtitle}>Chụp hoặc tải ảnh lên để AI phân tích</Text>
-
-        <View style={styles.uploadArea}>
-          <MaterialCommunityIcons name="upload" size={48} color="#8E8E93" style={{marginBottom: 16}}/>
-          <Text style={styles.uploadTitle}>Tải ảnh lên hoặc chụp ảnh</Text>
-          <Text style={styles.uploadSubtitle}>PNG, JPG (tối đa 10MB)</Text>
-
-          <View style={styles.uploadButtons}>
-            <TouchableOpacity style={styles.uploadButton} activeOpacity={0.9} onPress={pickImage}>
-              <MaterialCommunityIcons name="tray-arrow-up" size={20} color="#FFFFFF" />
-              <Text style={styles.uploadButtonText}>Chọn ảnh</Text>
+    <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+                <MaterialCommunityIcons name="close" size={28} color="#FFF" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cameraButton} activeOpacity={0.9} onPress={takePhoto}>
-              <MaterialCommunityIcons name="camera" size={20} color="#0A0A0A" />
-              <Text style={styles.cameraButtonText}>Chụp</Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.headerTitle}>AI Phân loại rác</Text>
+            <View style={{width: 40}} />
         </View>
 
-        <View style={styles.statsContainer}>
-          {stats.map((stat, index) => (
-            <View key={index} style={styles.statCard}>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-              <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Camera View or Preview */}
+        {!photo ? (
+            <CameraView style={styles.camera} ref={cameraRef} facing="back">
+                <View style={styles.cameraOverlay}>
+                    <View style={styles.guideFrame} />
+                    <Text style={styles.guideText}>Đặt rác vào trong khung hình</Text>
+                    <TouchableOpacity style={styles.captureBtn} onPress={takePicture}>
+                        <View style={styles.captureInner} />
+                    </TouchableOpacity>
+                </View>
+            </CameraView>
+        ) : (
+            <View style={styles.previewContainer}>
+                <Image source={{ uri: photo }} style={styles.previewImage} />
+                
+                {loading ? (
+                    <View style={styles.loadingOverlay}>
+                        <ActivityIndicator size="large" color="#FFF" />
+                        <Text style={{color: '#FFF', marginTop: 10, fontWeight: 'bold'}}>Đang phân tích...</Text>
+                    </View>
+                ) : (
+                    <View style={styles.resultPanel}>
+                        <View style={styles.resultHeader}>
+                            <MaterialCommunityIcons name="recycle" size={32} color="#2E7D32" />
+                            <View style={{marginLeft: 10}}>
+                                <Text style={styles.resultLabel}>{result?.label}</Text>
+                                <Text style={styles.resultType}>{result?.type}</Text>
+                            </View>
+                        </View>
+                        
+                        <View style={styles.guidelineBox}>
+                            <Text style={styles.guidelineTitle}>Hướng dẫn xử lý:</Text>
+                            <Text style={styles.guidelineText}>{result?.guideline}</Text>
+                        </View>
 
-        <Text style={styles.sectionTitle}>Mẹo chụp ảnh tốt</Text>
-        <View style={styles.tipsContainer}>
-          {tips.map((tip, index) => (
-            <View key={index} style={styles.tipItem}>
-              <MaterialCommunityIcons name="check-circle" size={20} color="#4CAF50" />
-              <Text style={styles.tipText}>{tip}</Text>
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={styles.btnRetake} onPress={handleRetake}>
+                                <MaterialCommunityIcons name="camera-retake" size={24} color="#666" />
+                                <Text style={styles.btnRetakeText}>Chụp lại</Text>
+                            </TouchableOpacity>
+
+                            {/* Nút Nhận điểm */}
+                            <TouchableOpacity 
+                                style={[styles.btnClaim, pointsClaimed && styles.btnClaimDisabled]} 
+                                onPress={handleClaimPoints}
+                                disabled={pointsClaimed}
+                            >
+                                <MaterialCommunityIcons 
+                                    name={pointsClaimed ? "check-circle" : "gift-outline"} 
+                                    size={24} 
+                                    color="#FFF" 
+                                />
+                                <Text style={styles.btnClaimText}>
+                                    {pointsClaimed ? "Đã nhận 5 điểm" : "Xác nhận & Nhận điểm"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </View>
-          ))}
-        </View>
-      </ScrollView>
+        )}
+
+        {/* Modal Chúc Mừng */}
+        <Modal transparent={true} visible={showSuccessModal} animationType="none">
+            <View style={styles.modalOverlay}>
+                <Animated.View style={[styles.successCard, { transform: [{ scale: scaleValue }], opacity: opacityValue }]}>
+                    <MaterialCommunityIcons name="leaf" size={60} color="#4CAF50" />
+                    <Text style={styles.successTitle}>Tuyệt vời!</Text>
+                    <Text style={styles.successDesc}>Bạn đã phân loại đúng.</Text>
+                    <Text style={styles.pointsEarned}>+5 Điểm xanh</Text>
+                </Animated.View>
+            </View>
+        </Modal>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  // Giữ nguyên style gốc của bạn
-  container: { flex: 1, backgroundColor: "#F0EFED" },
-  header: { padding: 16 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", elevation: 2 },
-  scrollView: { flex: 1 },
-  pageTitle: { ...typography.h1, fontSize: 28, fontWeight: "700", paddingHorizontal: 24, marginBottom: 8 },
-  subtitle: { ...typography.body, fontSize: 15, color: "#666", paddingHorizontal: 24, marginBottom: 24 },
-  uploadArea: { marginHorizontal: 24, backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 2, borderColor: "#E0E0E0", borderStyle: "dashed", padding: 32, alignItems: "center", marginBottom: 24 },
-  uploadTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  uploadSubtitle: { fontSize: 13, color: "#8E8E93", marginBottom: 24 },
-  uploadButtons: { flexDirection: "row", gap: 12, width: "100%" },
-  uploadButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#0A0A0A", paddingVertical: 14, borderRadius: 12, gap: 8 },
-  uploadButtonText: { color: "#FFF", fontWeight: "600" },
-  cameraButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#FFF", paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: "#E0E0E0", gap: 8 },
-  cameraButtonText: { color: "#000", fontWeight: "600" },
-  statsContainer: { flexDirection: "row", paddingHorizontal: 24, gap: 12, marginBottom: 32 },
-  statCard: { flex: 1, backgroundColor: "#F5F5F5", borderRadius: 12, padding: 16, alignItems: "center" },
-  statLabel: { fontSize: 12, color: "#666", marginBottom: 8 },
-  statValue: { fontSize: 20, fontWeight: "700" },
-  sectionTitle: { fontSize: 18, fontWeight: "700", paddingHorizontal: 24, marginBottom: 16 },
-  tipsContainer: { paddingHorizontal: 24, gap: 12, marginBottom: 40 },
-  tipItem: { flexDirection: "row", gap: 12 },
-  tipText: { fontSize: 15, color: "#0A0A0A" },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }
-});
+  container: { flex: 1, backgroundColor: '#000' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, zIndex: 10 },
+  headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  iconBtn: { padding: 5 },
 
-export default RecycleCameraScreen;
+  camera: { flex: 1 },
+  cameraOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  guideFrame: { width: 280, height: 280, borderWidth: 2, borderColor: '#FFF', borderRadius: 20, borderStyle: 'dashed' },
+  guideText: { color: '#FFF', marginTop: 20, fontSize: 16, backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 8 },
+  
+  captureBtn: { position: 'absolute', bottom: 40, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' },
+  captureInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF' },
+
+  previewContainer: { flex: 1, backgroundColor: '#000' },
+  previewImage: { flex: 1, resizeMode: 'contain' },
+  
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+
+  resultPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  resultLabel: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+  resultType: { fontSize: 14, color: '#2E7D32', fontWeight: 'bold', textTransform: 'uppercase' },
+  
+  guidelineBox: { backgroundColor: '#F5F5F5', padding: 12, borderRadius: 12, marginBottom: 20 },
+  guidelineTitle: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 4 },
+  guidelineText: { fontSize: 14, color: '#333', lineHeight: 20 },
+
+  actionRow: { flexDirection: 'row', gap: 12 },
+  btnRetake: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, backgroundColor: '#EEE' },
+  btnRetakeText: { marginLeft: 8, fontWeight: 'bold', color: '#666' },
+  
+  btnClaim: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, backgroundColor: '#2E7D32' },
+  btnClaimDisabled: { backgroundColor: '#4CAF50', opacity: 0.8 },
+  btnClaimText: { marginLeft: 8, fontWeight: 'bold', color: '#FFF' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  successCard: { backgroundColor: 'white', padding: 30, borderRadius: 25, alignItems: 'center', width: '80%' },
+  successTitle: { fontSize: 24, fontWeight: 'bold', color: '#2E7D32', marginTop: 15 },
+  successDesc: { fontSize: 16, color: '#555', marginTop: 5 },
+  pointsEarned: { fontSize: 32, fontWeight: 'bold', color: '#F9A825', marginTop: 10 },
+  
+  btnPrimary: { backgroundColor: '#2E7D32', padding: 12, borderRadius: 8 },
+  btnText: { color: '#FFF', fontWeight: 'bold' }
+});

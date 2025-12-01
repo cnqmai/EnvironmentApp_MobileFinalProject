@@ -62,3 +62,16 @@ export const searchWasteGuide = async (query) => {
     return response.json();
 };
 
+export const confirmRecycleAction = async (wasteType) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/recycle/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wasteType }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Không thể cộng điểm.');
+    }
+
+    return response.json();
+};

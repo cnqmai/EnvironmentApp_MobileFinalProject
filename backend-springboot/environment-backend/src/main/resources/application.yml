@@ -118,4 +118,4 @@ logging:
     com.enviro.app: DEBUG
 # --- Gemini Configuration ---
 gemini:
-  api-key: "AIzaSyDDtPZQ-utdy3iwOuZY2DTHjNZu3bmg4wA" 
+  api-key: "AIzaSyBpX-213nZk7pG8ItH3eedDDXACvBdMevI" 

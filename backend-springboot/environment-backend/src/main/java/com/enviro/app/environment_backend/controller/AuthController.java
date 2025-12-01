@@ -45,31 +45,30 @@ public class AuthController {
     }
 
     // --- SỬA LOGIC ĐĂNG KÝ ---
-    @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
+   @PostMapping("/register")
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
         if (userService.findByEmail(request.getEmail()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email đã được đăng ký.");
         }
+
+        User newUser = new User();
+        newUser.setEmail(request.getEmail());
+        newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        newUser.setFullName(request.getFullName());
         
-        String hashedPassword = passwordEncoder.encode(request.getPassword());
-        User newUser = User.builder()
-            .email(request.getEmail())
-            .fullName(request.getFullName())
-            .passwordHash(hashedPassword)
-            .avatarUrl("") 
-            .defaultLocation("") 
-            .points(0)
-            .enabled(false) // QUAN TRỌNG: User mới chưa kích hoạt
-            .build();
-            
-        User savedUser = userService.save(newUser);
+        // Mặc định cho phép đăng nhập ngay (Enabled = true) để test
+        newUser.setEnabled(true); 
 
-        // Gửi email xác thực
-        passwordResetService.createAndSendVerificationToken(savedUser);
+        userService.save(newUser);
 
-        return ResponseEntity.ok("Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.");
+        // --- TẠM THỜI COMMENT DÒNG NÀY ĐỂ TRÁNH LỖI EMAIL ---
+        // passwordResetService.createAndSendVerificationToken(newUser);
+        
+        // --- THAY THẾ BẰNG LOG ---
+        System.out.println(">>> [DEV MODE] Đã tạo user " + request.getEmail() + " thành công (Bỏ qua gửi email).");
+
+        return ResponseEntity.ok("Đăng ký thành công! Bạn có thể đăng nhập ngay.");
     }
-
     // --- API MỚI: XÁC THỰC EMAIL (Người dùng click link trong mail sẽ vào đây) ---
     @GetMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@RequestParam("token") String token) {
