@@ -13,10 +13,12 @@ import java.util.UUID;
 @Repository
 public interface UserQuizScoreRepository extends JpaRepository<UserQuizScore, UUID> {
     
+    // Lấy danh sách điểm của user
     List<UserQuizScore> findByUserOrderByCompletedAtDesc(User user);
     
+    // Tìm điểm của user cho một quiz cụ thể
     Optional<UserQuizScore> findByUserAndQuiz(User user, Quiz quiz);
     
+    // Kiểm tra xem user đã làm quiz này chưa
     boolean existsByUserAndQuiz(User user, Quiz quiz);
 }
-

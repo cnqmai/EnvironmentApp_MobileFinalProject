@@ -1,119 +1,103 @@
-import React from "react";
-import { Tabs } from "expo-router";
-import { StyleSheet, Platform, View } from "react-native";
-import {
-  MaterialIcons,
-  Ionicons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import TabOverflowMenu from "../../components/TabOverflowMenu";
-
-const TabsLayout = () => {
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#00796B",
-        tabBarInactiveTintColor: "#555",
-        tabBarShowLabel: false,
         headerShown: false,
+        tabBarActiveTintColor: '#2E7D32', // Màu xanh lá chủ đạo
+        tabBarInactiveTintColor: '#888',
         tabBarStyle: {
-          ...styles.tabBar,
-          height: Platform.OS === "android" ? 70 : 90,
+          backgroundColor: '#FFF',
+          borderTopWidth: 1,
+          borderTopColor: '#F0F0F0',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="dashboard" size={28} color={color} />
+          title: 'Trang chủ',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
           ),
         }}
       />
+      
       <Tabs.Screen
         name="recycle"
         options={{
-          title: "Tái chế",
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="recycling" size={32} color={color} />
+          title: 'Thu gom',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="recycle" size={size} color={color} />
           ),
         }}
       />
+
+      {/* Nút chụp ảnh ở giữa nổi bật (nếu cần) */}
+      <Tabs.Screen
+        name="camera-placeholder" // Tên tạm, sẽ handle nút này mở camera sau
+        options={{
+          title: '',
+          tabBarIcon: ({ focused }) => (
+            <MaterialCommunityIcons 
+                name="camera-iris" 
+                size={32} 
+                color="#FFF" 
+                style={{
+                    backgroundColor: '#2E7D32',
+                    borderRadius: 30,
+                    padding: 10,
+                    marginTop: -20, // Đẩy icon lên trên
+                    elevation: 5
+                }} 
+            />
+          ),
+        }}
+        listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault(); // Chặn chuyển tab
+              navigation.navigate('recycle-camera'); // Chuyển sang màn hình Camera nằm ngoài tabs
+            },
+        })}
+      />
+
       <Tabs.Screen
         name="notifications"
         options={{
-          title: "Thông báo",
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="notifications" size={28} color={color} />
-          ),
-          tabBarBadge: 3,
-          tabBarBadgeStyle: styles.badge,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Hồ sơ",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person-circle" size={30} color={color} />
+          title: 'Thông báo',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="bell-outline" size={size} color={color} />
           ),
         }}
       />
+
       <Tabs.Screen
         name="more"
         options={{
-          title: "Thêm",
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons
-              name="dots-horizontal-circle"
-              size={28}
-              color={color}
-            />
+          title: 'Mở rộng',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="menu" size={size} color={color} />
           ),
-          tabBarButton: (props) => (
-            <TabOverflowMenu {...props} /> // Component tùy chỉnh của bạn
-          ),
+        }}
+      />
+
+      {/* Ẩn tab profile đi nếu muốn truy cập từ 'More' hoặc để hiển thị nếu cần */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null, // Ẩn khỏi thanh tab bar nhưng vẫn register route
         }}
       />
     </Tabs>
   );
-};
-
-// Styles gốc từ tệp của bạn
-const styles = StyleSheet.create({
-  tabBar: {
-    position: "absolute",
-    bottom: 25,
-    left: 20,
-    right: 20,
-    borderRadius: 15,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderTopWidth: 0,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 5.46,
-  },
-  badge: {
-    backgroundColor: "#FF6347", // Màu đỏ
-    color: "#fff",
-    fontSize: 11,
-    lineHeight: 14,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    textAlign: "center",
-    overflow: "hidden",
-    position: "absolute",
-    top: 10,
-    right: 18,
-  },
-});
-
-export default TabsLayout;
+}

@@ -1,19 +1,25 @@
 package com.enviro.app.environment_backend.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-@Value
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class QuizQuestionResponse {
-    UUID id;
-    String questionText;
-    String optionA;
-    String optionB;
-    String optionC;
-    String optionD;
-    // Không trả về correctAnswer để user không biết đáp án trước
+    private UUID id;
+    private String questionText;
+    private String optionA;
+    private String optionB;
+    private String optionC;
+    private String optionD;
+    
+    private String correctAnswer; 
+    private String explanation;   
+    private Integer orderNumber;  
 }
-

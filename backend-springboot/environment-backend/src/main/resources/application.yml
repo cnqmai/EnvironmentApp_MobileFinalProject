@@ -80,5 +80,5 @@ logging:
 
 # --- Gemini Configuration ---
 gemini:
-  api-key: "AIzaSyAtXwVcMg-h08LOcE17sK8gDINtHBMxHmY" 
+  api-key: "AIzaSyDDtPZQ-utdy3iwOuZY2DTHjNZu3bmg4wA" 
   # Hãy thay thế "YOUR_GEMINI_API_KEY_HERE" bằng mã khóa thực tế của bạn

@@ -18,7 +18,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,6 +66,9 @@ public class QuizService {
                         .optionB(q.getOptionB())
                         .optionC(q.getOptionC())
                         .optionD(q.getOptionD())
+                        .correctAnswer(includeAnswers ? q.getCorrectAnswer() : null)
+                        .explanation(includeAnswers ? q.getExplanation() : null)
+                        .orderNumber(q.getOrderNumber())
                         .build())
                 .collect(Collectors.toList());
 
@@ -79,56 +86,73 @@ public class QuizService {
 
     @Transactional
     public QuizScoreResponse submitQuiz(User user, QuizSubmitRequest request) {
+        // 1. Kiểm tra Quiz tồn tại
         Quiz quiz = quizRepository.findById(request.getQuizId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy quiz"));
 
+        // 2. Lấy danh sách câu hỏi
         List<QuizQuestion> questions = questionRepository.findByQuizOrderByOrderNumberAsc(quiz);
-        
         if (questions.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quiz không có câu hỏi");
         }
 
-        // Kiểm tra xem user đã làm quiz này chưa (nếu cần chỉ cho phép làm 1 lần)
-        // if (scoreRepository.existsByUserAndQuiz(user, quiz)) {
-        //     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn đã làm quiz này rồi");
-        // }
+        // 3. Lấy câu trả lời (xử lý null)
+        Map<UUID, String> userAnswers = request.getAnswers();
+        if (userAnswers == null) {
+            userAnswers = new HashMap<>();
+        }
 
-        // Chấm điểm
+        // 4. Chấm điểm
         int correctAnswers = 0;
         for (QuizQuestion question : questions) {
-            String userAnswer = request.getAnswers().get(question.getId());
-            if (question.getCorrectAnswer().equalsIgnoreCase(userAnswer)) {
+            String userAnswer = userAnswers.get(question.getId());
+            if (question.getCorrectAnswer() != null && 
+                question.getCorrectAnswer().equalsIgnoreCase(userAnswer)) {
                 correctAnswers++;
             }
         }
 
+        // 5. Tính phần trăm
         int totalQuestions = questions.size();
-        BigDecimal percentage = BigDecimal.valueOf(correctAnswers)
-                .divide(BigDecimal.valueOf(totalQuestions), 2, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100));
+        BigDecimal percentage = BigDecimal.ZERO;
+        if (totalQuestions > 0) {
+            percentage = BigDecimal.valueOf(correctAnswers)
+                    .divide(BigDecimal.valueOf(totalQuestions), 2, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100));
+        }
+        
+        int timeTaken = request.getTimeTakenSeconds() != null ? request.getTimeTakenSeconds() : 0;
 
-        // Lưu kết quả
-        UserQuizScore score = UserQuizScore.builder()
-                .user(user)
-                .quiz(quiz)
-                .score(correctAnswers)
-                .totalQuestions(totalQuestions)
-                .percentage(percentage)
-                .timeTakenSeconds(request.getTimeTakenSeconds())
-                .build();
+        // 6. [QUAN TRỌNG] Kiểm tra xem đã có kết quả chưa để UPDATE thay vì INSERT
+        Optional<UserQuizScore> existingScoreOpt = scoreRepository.findByUserAndQuiz(user, quiz);
+        
+        UserQuizScore scoreToSave;
+        
+        if (existingScoreOpt.isPresent()) {
+            // -- CẬP NHẬT KẾT QUẢ CŨ --
+            scoreToSave = existingScoreOpt.get();
+            scoreToSave.setScore(correctAnswers);
+            scoreToSave.setPercentage(percentage);
+            scoreToSave.setTimeTakenSeconds(timeTaken);
+            scoreToSave.setCompletedAt(OffsetDateTime.now());
+            // Có thể cộng dồn điểm cho User vào bảng User nếu muốn, nhưng ở đây ta chỉ update log
+        } else {
+            // -- TẠO MỚI --
+            scoreToSave = UserQuizScore.builder()
+                    .user(user)
+                    .quiz(quiz)
+                    .score(correctAnswers)
+                    .totalQuestions(totalQuestions)
+                    .percentage(percentage)
+                    .timeTakenSeconds(timeTaken)
+                    .completedAt(OffsetDateTime.now())
+                    .build();
+        }
 
-        UserQuizScore saved = scoreRepository.save(score);
+        // Lưu vào DB (save sẽ tự động Update nếu object đã có ID, Insert nếu chưa)
+        UserQuizScore saved = scoreRepository.save(scoreToSave);
 
-        return QuizScoreResponse.builder()
-                .id(saved.getId())
-                .quizId(quiz.getId())
-                .quizTitle(quiz.getTitle())
-                .score(saved.getScore())
-                .totalQuestions(saved.getTotalQuestions())
-                .percentage(saved.getPercentage())
-                .timeTakenSeconds(saved.getTimeTakenSeconds())
-                .completedAt(saved.getCompletedAt())
-                .build();
+        return mapToScoreResponse(saved);
     }
 
     public List<QuizScoreResponse> getUserQuizScores(User user) {
@@ -139,7 +163,9 @@ public class QuizService {
     }
 
     private QuizResponse mapToQuizResponse(Quiz quiz) {
-        int questionCount = questionRepository.findByQuizOrderByOrderNumberAsc(quiz).size();
+        // Đếm số câu hỏi
+        int questionCount = questionRepository.countByQuizId(quiz.getId());
+        
         return QuizResponse.builder()
                 .id(quiz.getId())
                 .title(quiz.getTitle())
@@ -147,7 +173,7 @@ public class QuizService {
                 .difficulty(quiz.getDifficulty())
                 .timeLimitMinutes(quiz.getTimeLimitMinutes())
                 .questionCount(questionCount)
-                .questions(null) // Không load questions trong list
+                .questions(null)
                 .createdAt(quiz.getCreatedAt())
                 .build();
     }
@@ -165,4 +191,3 @@ public class QuizService {
                 .build();
     }
 }
-

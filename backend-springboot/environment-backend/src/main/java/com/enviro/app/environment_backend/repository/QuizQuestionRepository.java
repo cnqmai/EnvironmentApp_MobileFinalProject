@@ -10,7 +10,9 @@ import java.util.UUID;
 
 @Repository
 public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, UUID> {
-    
+    // Lấy danh sách câu hỏi theo Quiz, sắp xếp theo thứ tự
     List<QuizQuestion> findByQuizOrderByOrderNumberAsc(Quiz quiz);
+    
+    // --- HÀM MỚI CẦN THÊM (để sửa lỗi countByQuizId undefined) ---
+    int countByQuizId(UUID quizId);
 }
-

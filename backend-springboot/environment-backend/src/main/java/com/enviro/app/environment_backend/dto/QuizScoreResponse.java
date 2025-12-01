@@ -19,4 +19,3 @@ public class QuizScoreResponse {
     Integer timeTakenSeconds;
     OffsetDateTime completedAt;
 }
-
