@@ -13,7 +13,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/daily-tips")
+@RequestMapping("/api/tips")
 public class DailyTipController {
 
     private final DailyTipService dailyTipService;
@@ -24,11 +24,20 @@ public class DailyTipController {
         this.userService = userService;
     }
 
+    @GetMapping("/random")
+    public ResponseEntity<DailyTipResponse> getRandomTip() {
+        DailyTip tip = dailyTipService.getRandomTip();
+        if (tip == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(mapToResponse(tip));
+    }
+
     @GetMapping("/today")
     public ResponseEntity<DailyTipResponse> getTodayTip() {
         DailyTip tip = dailyTipService.getTodayTip();
         if (tip == null) return ResponseEntity.noContent().build();
-        return ResponseEntity.ok(mapToResponse(tip)); // [FIX] Map to DTO
+        return ResponseEntity.ok(mapToResponse(tip));
     }
 
     @GetMapping
@@ -39,25 +48,25 @@ public class DailyTipController {
         } else {
             tips = dailyTipService.getAllTips();
         }
-        // [FIX] Map List<Entity> to List<DTO>
         return ResponseEntity.ok(tips.stream().map(this::mapToResponse).collect(Collectors.toList()));
     }
 
     @PostMapping("/{id}/complete")
-    public ResponseEntity<String> completeTip(@PathVariable UUID id) { // [FIX] UUID
+    public ResponseEntity<String> completeTip(@PathVariable UUID id) {
         User user = userService.getCurrentUser();
         dailyTipService.markTipAsCompleted(user.getId(), id);
-        return ResponseEntity.ok("Ghi nhận thành công!");
+        return ResponseEntity.ok("Ghi nhận thành công! (+10 điểm)");
     }
 
-    // Helper map Entity -> DTO
     private DailyTipResponse mapToResponse(DailyTip tip) {
         return DailyTipResponse.builder()
                 .id(tip.getId())
                 .title(tip.getTitle())
-                .description(tip.getDescription()) // hoặc .content() tùy Entity của bạn
+                .description(tip.getDescription()) 
+                // .content(...) -> ĐÃ XÓA dòng này vì DTO không có field 'content'
                 .category(tip.getCategory())
-                .pointsReward(10) // Hardcode hoặc lấy từ DB
+                .pointsReward(tip.getPointsReward() != null ? tip.getPointsReward() : 10)
+                .iconUrl(tip.getIconUrl()) // -> ĐÃ SỬA: Dùng .iconUrl() thay vì .imageUrl()
                 .build();
     }
 }

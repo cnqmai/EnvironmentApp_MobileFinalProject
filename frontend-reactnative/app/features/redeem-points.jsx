@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router'; // THÊM Stack
 import { getAllRewards, redeemReward } from '../../src/services/rewardService';
 import { getMyStatistics } from '../../src/services/userService';
 
@@ -19,12 +19,10 @@ const RedeemPointsScreen = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Lấy danh sách quà và điểm hiện tại của user song song
       const [rewardsData, statsData] = await Promise.all([
         getAllRewards(),
         getMyStatistics()
       ]);
-      
       setRewards(rewardsData || []);
       setPoints(statsData.currentPoints || 0);
     } catch (error) {
@@ -51,7 +49,7 @@ const RedeemPointsScreen = () => {
             try {
               await redeemReward(item.id);
               Alert.alert("Thành công", "Đổi quà thành công! Hãy kiểm tra kho quà.");
-              loadData(); // Tải lại điểm
+              loadData(); 
             } catch (error) {
               Alert.alert("Lỗi", error.message || "Đổi quà thất bại");
             }
@@ -64,8 +62,7 @@ const RedeemPointsScreen = () => {
   const renderItem = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.cardImageContainer}>
-         {/* Placeholder icon nếu không có ảnh */}
-         <MaterialCommunityIcons name="gift-outline" size={40} color="#EF6C00" />
+         <MaterialCommunityIcons name="gift-outline" size={32} color="#EF6C00" />
       </View>
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>{item.name}</Text>
@@ -84,10 +81,15 @@ const RedeemPointsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Points */}
+      {/* FIX: TẮT HEADER MẶC ĐỊNH */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <View style={styles.header}>
-        <View>
-            <Text style={styles.headerLabel}>Điểm hiện tại của bạn</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{padding: 5}}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <View style={{alignItems: 'center'}}>
+            <Text style={styles.headerLabel}>Điểm khả dụng</Text>
             <Text style={styles.pointsValue}>{points} ☘️</Text>
         </View>
         <TouchableOpacity style={styles.historyBtn} onPress={() => router.push('/features/reward-history')}>
@@ -96,7 +98,7 @@ const RedeemPointsScreen = () => {
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.sectionTitle}>Danh sách quà tặng</Text>
+        <Text style={styles.sectionTitle}>Kho quà tặng</Text>
         {loading ? (
             <ActivityIndicator size="large" color="#2E7D32" style={{marginTop: 20}} />
         ) : (
@@ -105,7 +107,7 @@ const RedeemPointsScreen = () => {
             renderItem={renderItem}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingBottom: 20 }}
-            ListEmptyComponent={<Text style={{textAlign: 'center', marginTop: 20, color: '#888'}}>Hiện chưa có quà tặng nào.</Text>}
+            ListEmptyComponent={<Text style={styles.emptyText}>Hiện chưa có quà tặng nào.</Text>}
             />
         )}
       </View>
@@ -116,21 +118,18 @@ const RedeemPointsScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: { 
-    backgroundColor: '#2E7D32', padding: 20, 
+    backgroundColor: '#2E7D32', padding: 16, 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderBottomLeftRadius: 20, borderBottomRightRadius: 20
   },
-  headerLabel: { color: '#E8F5E9', fontSize: 14 },
-  pointsValue: { color: '#FFF', fontSize: 28, fontWeight: 'bold', marginTop: 5 },
+  headerLabel: { color: '#E8F5E9', fontSize: 12 },
+  pointsValue: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
   historyBtn: { padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8 },
-  
   body: { flex: 1, padding: 16 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 16 },
-  
   card: { 
     backgroundColor: '#FFF', borderRadius: 12, padding: 12, marginBottom: 12,
-    flexDirection: 'row', alignItems: 'center',
-    elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: {width:0, height:2}
+    flexDirection: 'row', alignItems: 'center', elevation: 2
   },
   cardImageContainer: { 
     width: 60, height: 60, backgroundColor: '#FFF3E0', 
@@ -140,10 +139,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   cardDesc: { fontSize: 12, color: '#666', marginTop: 2 },
   cardCost: { fontSize: 14, fontWeight: 'bold', color: '#EF6C00', marginTop: 4 },
-  
   redeemBtn: { backgroundColor: '#2E7D32', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   disabledBtn: { backgroundColor: '#CCC' },
   redeemBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  emptyText: { textAlign: 'center', marginTop: 20, color: '#888' }
 });
 
 export default RedeemPointsScreen;

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime; // [FIX] Import OffsetDateTime
 import java.util.List;
 import java.util.UUID;
 
@@ -51,7 +51,10 @@ public class RewardService {
         UserReward history = new UserReward();
         history.setUser(user);
         history.setReward(reward);
-        history.setRedeemedAt(LocalDateTime.now());
+        
+        // [FIX] Sử dụng OffsetDateTime để khớp với Model
+        history.setRedeemedAt(OffsetDateTime.now());
+        
         history.setStatus("PENDING");
         userRewardRepository.save(history);
     }

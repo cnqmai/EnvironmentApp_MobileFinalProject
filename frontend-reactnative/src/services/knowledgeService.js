@@ -6,12 +6,26 @@ import { fetchWithAuth } from '../utils/apiHelper';
  * GET /api/knowledge
  * @param {string} category - Lọc theo category (optional)
  * @param {string} type - Lọc theo loại (ARTICLE, VIDEO, INFOGRAPHIC) (optional)
+ * @param {string} search - Tìm kiếm theo từ khóa (optional) [MỚI]
  */
-export const getAllKnowledge = async (category = null, type = null) => {
+export const getAllKnowledge = async (category = null, type = null, search = null) => {
     let url = `${API_BASE_URL}/knowledge`;
     const params = [];
-    if (category) params.push(`category=${category}`);
-    if (type) params.push(`type=${type}`);
+    
+    // [MỚI] Thêm tham số tìm kiếm nếu có
+    if (search) {
+        params.push(`search=${encodeURIComponent(search)}`);
+    }
+    
+    if (category) {
+        params.push(`category=${category}`);
+    }
+    
+    if (type) {
+        params.push(`type=${type}`);
+    }
+    
+    // Ghép các tham số vào URL
     if (params.length > 0) {
         url += `?${params.join('&')}`;
     }
@@ -21,7 +35,7 @@ export const getAllKnowledge = async (category = null, type = null) => {
     });
 
     if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy bài viết' }));
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy danh sách bài viết' }));
         throw new Error(errorDetail.message || 'Không thể lấy danh sách bài viết.');
     }
 
@@ -29,7 +43,7 @@ export const getAllKnowledge = async (category = null, type = null) => {
 };
 
 /**
- * Lấy bài viết theo ID (FR-11.1.1)
+ * Lấy bài viết chi tiết theo ID (FR-11.1.1)
  * GET /api/knowledge/{id}
  */
 export const getKnowledgeById = async (knowledgeId) => {
@@ -44,4 +58,3 @@ export const getKnowledgeById = async (knowledgeId) => {
 
     return response.json();
 };
-

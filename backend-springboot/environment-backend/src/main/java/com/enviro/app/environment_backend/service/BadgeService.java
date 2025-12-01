@@ -4,13 +4,13 @@ import com.enviro.app.environment_backend.dto.BadgeResponse;
 import com.enviro.app.environment_backend.model.Badge;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.model.UserBadge;
-import com.enviro.app.environment_backend.model.UserBadgeId;
+// [FIX] Xóa import UserBadgeId vì không dùng đến
 import com.enviro.app.environment_backend.repository.BadgeRepository;
 import com.enviro.app.environment_backend.repository.UserBadgeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime; // [FIX] Đổi từ LocalDateTime sang OffsetDateTime
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,10 +54,13 @@ public class BadgeService {
             boolean alreadyHas = userBadgeRepository.existsByUserAndBadge(user, badge);
             if (!alreadyHas) {
                 UserBadge userBadge = new UserBadge();
-                userBadge.setId(new UserBadgeId(user.getId(), badge.getId()));
+                // [FIX 1] Bỏ dòng userBadge.setId(...) vì dùng @IdClass thì set User và Badge là đủ
                 userBadge.setUser(user);
                 userBadge.setBadge(badge);
-                userBadge.setEarnedAt(LocalDateTime.now());
+                
+                // [FIX 2] Dùng OffsetDateTime.now() để khớp với kiểu dữ liệu trong Model
+                userBadge.setEarnedAt(OffsetDateTime.now());
+                
                 userBadgeRepository.save(userBadge);
             }
         }

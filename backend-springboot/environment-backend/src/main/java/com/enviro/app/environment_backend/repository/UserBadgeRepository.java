@@ -1,4 +1,3 @@
-// File: src/main/java/com/enviro/app/environment_backend/repository/UserBadgeRepository.java
 package com.enviro.app.environment_backend.repository;
 
 import com.enviro.app.environment_backend.model.Badge;
@@ -16,19 +15,19 @@ import java.util.UUID;
 @Repository
 public interface UserBadgeRepository extends JpaRepository<UserBadge, UserBadgeId> {
     
-    // Tìm badge theo đối tượng User (có sẵn)
+    // Tìm badge theo đối tượng User
     List<UserBadge> findByUserOrderByEarnedAtDesc(User user);
     
-    // Kiểm tra tồn tại (có sẵn)
+    // Kiểm tra tồn tại
     boolean existsByUserAndBadge(User user, Badge badge);
 
-    // [MỚI] Tìm danh sách UserBadge theo userId (Hỗ trợ BadgeService)
+    // [FIX] Thêm phương thức tìm theo userId và sắp xếp (Sửa lỗi BadgeService)
+    @Query("SELECT ub FROM UserBadge ub WHERE ub.user.id = :userId ORDER BY ub.earnedAt DESC")
+    List<UserBadge> findByUserIdOrderByEarnedAtDesc(@Param("userId") UUID userId);
+
+    // Tìm danh sách UserBadge theo userId
     @Query("SELECT ub FROM UserBadge ub WHERE ub.user.id = :userId")
     List<UserBadge> findByUserId(@Param("userId") UUID userId);
-
-    // [MỚI] Kiểm tra tồn tại theo ID (Hỗ trợ BadgeService logic check trùng)
-    @Query("SELECT CASE WHEN COUNT(ub) > 0 THEN true ELSE false END FROM UserBadge ub WHERE ub.user.id = :userId AND ub.badge.id = :badgeId")
-    boolean existsByUserIdAndBadgeId(@Param("userId") UUID userId, @Param("badgeId") UUID badgeId);
 
     void deleteByUser(User user);
 }

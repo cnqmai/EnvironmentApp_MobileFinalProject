@@ -20,7 +20,7 @@ public class KnowledgeService {
     public KnowledgeService(KnowledgeArticleRepository repository) {
         this.repository = repository;
     }
-
+    
     public List<ArticleResponse> getAllArticles() {
         List<KnowledgeArticle> articles = repository.findByIsPublishedTrueOrderByCreatedAtDesc();
         return articles.stream()
@@ -70,6 +70,15 @@ public class KnowledgeService {
                 .viewCount(article.getViewCount())
                 .createdAt(article.getCreatedAt())
                 .build();
+    }
+    // ... các method cũ giữ nguyên ...
+
+    // [MỚI] Hàm tìm kiếm bài viết
+    public List<ArticleResponse> searchArticles(String keyword) {
+        List<KnowledgeArticle> articles = repository.findByTitleContainingIgnoreCaseAndIsPublishedTrueOrderByCreatedAtDesc(keyword);
+        return articles.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 }
 

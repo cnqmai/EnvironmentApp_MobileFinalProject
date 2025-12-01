@@ -38,5 +38,12 @@ public class KnowledgeController {
     public ResponseEntity<List<ArticleResponse>> getArticlesByType(@RequestParam ArticleType type) {
         return ResponseEntity.ok(knowledgeService.getArticlesByType(type));
     }
+    // ... các method cũ ...
+
+    // [MỚI] API Tìm kiếm: GET /api/knowledge?search=...
+    @GetMapping(params = "search")
+    public ResponseEntity<List<ArticleResponse>> searchArticles(@RequestParam String search) {
+        return ResponseEntity.ok(knowledgeService.searchArticles(search));
+    }
 }
 

@@ -1,31 +1,82 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getAllKnowledge } from '../../src/services/knowledgeService';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48 - 30) / 4; // Chia đều 4 cột
+const CARD_WIDTH = (width - 48 - 30) / 4; 
 
 const KnowledgeScreen = () => {
+  const router = useRouter();
   const [searchText, setSearchText] = useState('');
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   const categories = [
-    { id: 1, label: 'Phân\nloại', icon: 'recycle', color: '#E3F2FD', textCol: '#1565C0' },
-    { id: 2, label: 'Tái\nchế', icon: 'palette-outline', color: '#F3E5F5', textCol: '#7B1FA2' },
-    { id: 3, label: 'Sống\nxanh', icon: 'sprout-outline', color: '#E8F5E9', textCol: '#2E7D32' },
-    { id: 4, label: 'Giảm\nrác', icon: 'delete-outline', color: '#FFF3E0', textCol: '#EF6C00' },
+    { id: 'PHAN_LOAI', label: 'Phân\nloại', icon: 'recycle', color: '#E3F2FD', textCol: '#1565C0' },
+    { id: 'TAI_CHE', label: 'Tái\nchế', icon: 'palette-outline', color: '#F3E5F5', textCol: '#7B1FA2' },
+    { id: 'SONG_XANH', label: 'Sống\nxanh', icon: 'sprout-outline', color: '#E8F5E9', textCol: '#2E7D32' },
+    { id: 'GIAM_RAC', label: 'Giảm\nrác', icon: 'delete-outline', color: '#FFF3E0', textCol: '#EF6C00' },
   ];
 
-  const articles = [
-    { id: 1, title: 'Cách phân loại rác tại nhà hiệu quả', tag: 'Phân loại', time: '5 phút', views: 1234, icon: 'trash-can-outline' },
-    { id: 2, title: 'Làm chậu cây từ chai nhựa cũ', tag: 'Tái chế', time: '10 phút', views: 856, icon: 'flower-outline' },
-    { id: 3, title: 'Lợi ích của việc đi xe đạp', tag: 'Sống xanh', time: '3 phút', views: 2300, icon: 'bike' },
-  ];
+  // Gọi API mỗi khi category hoặc searchText thay đổi
+  useEffect(() => {
+    // Sử dụng debounce đơn giản với timeout để tránh gọi API quá nhiều khi gõ
+    const delayDebounceFn = setTimeout(() => {
+      fetchData();
+    }, 500); // Đợi 500ms sau khi ngừng gõ
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchText, selectedCategory]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Gọi API với cả search text và category
+      const data = await getAllKnowledge(selectedCategory, null, searchText);
+      setArticles(data);
+    } catch (error) {
+      console.error("Lỗi tải bài viết:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategoryPress = (catId) => {
+    if (selectedCategory === catId) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(catId);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchText('');
+  };
+
+  const getCategoryLabel = (catCode) => {
+    const cat = categories.find(c => c.id === catCode);
+    return cat ? cat.label.replace('\n', ' ') : 'Kiến thức';
+  };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Thư viện Kiến thức</Text>
+        <View style={{width: 40}} /> 
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Search Bar */}
+        {/* Search Bar Cải tiến */}
         <View style={styles.searchBox}>
           <MaterialCommunityIcons name="magnify" size={24} color="#999" style={{ marginRight: 10 }} />
           <TextInput 
@@ -33,54 +84,97 @@ const KnowledgeScreen = () => {
             placeholder="Tìm kiếm bài viết..." 
             value={searchText}
             onChangeText={setSearchText}
+            returnKeyType="search"
           />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#ccc" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Categories */}
         <Text style={styles.sectionTitle}>Danh mục</Text>
         <View style={styles.catContainer}>
-          {categories.map((cat) => (
-            <TouchableOpacity key={cat.id} style={[styles.catCard, { backgroundColor: cat.color }]}>
-              <MaterialCommunityIcons name={cat.icon} size={28} color={cat.textCol} style={{ marginBottom: 8 }} />
-              <Text style={[styles.catText, { color: cat.textCol }]}>{cat.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <TouchableOpacity 
+                key={cat.id} 
+                style={[
+                    styles.catCard, 
+                    { backgroundColor: cat.color },
+                    isSelected && { borderWidth: 2, borderColor: cat.textCol, transform: [{scale: 1.05}] }
+                ]}
+                onPress={() => handleCategoryPress(cat.id)}
+              >
+                <MaterialCommunityIcons name={cat.icon} size={28} color={cat.textCol} style={{ marginBottom: 8 }} />
+                <Text style={[styles.catText, { color: cat.textCol }]}>{cat.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Featured */}
+        {/* List Header */}
         <View style={styles.featuredHeader}>
-           <Text style={styles.sectionTitle}>Nổi bật</Text>
-           <TouchableOpacity><Text style={styles.seeAll}>Xem tất cả</Text></TouchableOpacity>
+           <Text style={styles.sectionTitle}>
+             {searchText ? `Kết quả cho "${searchText}"` : (selectedCategory ? getCategoryLabel(selectedCategory) : 'Mới nhất')}
+           </Text>
         </View>
 
-        <View style={styles.listContainer}>
-          {articles.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.articleCard}>
-              <View style={styles.thumb}>
-                 <MaterialCommunityIcons name={item.icon} size={30} color="#666" />
-              </View>
-              <View style={styles.info}>
-                 <View style={styles.tagRow}>
-                    <Text style={styles.tag}>{item.tag}</Text>
-                 </View>
-                 <Text style={styles.articleTitle} numberOfLines={2}>{item.title}</Text>
-                 <View style={styles.metaRow}>
-                    <MaterialCommunityIcons name="clock-outline" size={14} color="#888" />
-                    <Text style={styles.metaText}>{item.time}</Text>
-                    <Text style={[styles.metaText, { marginLeft: 10 }]}>• {item.views} lượt xem</Text>
-                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {loading ? (
+            <ActivityIndicator size="large" color="#2E7D32" style={{marginTop: 20}} />
+        ) : (
+            <View style={styles.listContainer}>
+            {articles.map((item) => (
+                <TouchableOpacity 
+                    key={item.id} 
+                    style={styles.articleCard}
+                    onPress={() => router.push(`/features/knowledge/${item.id}`)}
+                >
+                <Image 
+                    source={{ uri: item.thumbnailUrl || 'https://via.placeholder.com/150' }} 
+                    style={styles.thumb} 
+                />
+                <View style={styles.info}>
+                    <View style={styles.tagRow}>
+                        <Text style={styles.tag}>{item.category || 'Chung'}</Text>
+                        <View style={{flex: 1}}/>
+                        {item.type === 'VIDEO' && <MaterialCommunityIcons name="video" size={16} color="#FF5722" />}
+                    </View>
+                    <Text style={styles.articleTitle} numberOfLines={2}>{item.title}</Text>
+                    <View style={styles.metaRow}>
+                        <MaterialCommunityIcons name="clock-outline" size={14} color="#888" />
+                        <Text style={styles.metaText}>
+                            {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                        </Text>
+                        <Text style={[styles.metaText, { marginLeft: 10 }]}>• {item.viewCount} xem</Text>
+                    </View>
+                </View>
+                </TouchableOpacity>
+            ))}
+            {articles.length === 0 && (
+                <View style={{alignItems: 'center', marginTop: 20}}>
+                    <MaterialCommunityIcons name="text-box-search-outline" size={48} color="#ddd" />
+                    <Text style={{textAlign: 'center', color: '#999', marginTop: 10}}>
+                        Không tìm thấy bài viết nào.
+                    </Text>
+                </View>
+            )}
+            </View>
+        )}
 
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  backButton: { padding: 8, borderRadius: 20, backgroundColor: '#f0f0f0' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  
   scrollContent: { padding: 24 },
 
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 24 },
@@ -89,20 +183,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#111', marginBottom: 16 },
   
   catContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
-  catCard: { width: CARD_WIDTH, height: 100, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  catCard: { width: CARD_WIDTH, height: 100, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
   catText: { fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
 
   featuredHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  seeAll: { fontSize: 14, color: '#007AFF', fontWeight: '500' },
 
   listContainer: { gap: 16 },
-  articleCard: { flexDirection: 'row', padding: 16, backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#F0F0F0' },
-  thumb: { width: 70, height: 70, backgroundColor: '#F5F5F5', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  info: { flex: 1, marginLeft: 16 },
-  tagRow: { flexDirection: 'row', marginBottom: 4 },
-  tag: { fontSize: 10, color: '#666', backgroundColor: '#F0F0F0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  articleTitle: { fontSize: 15, fontWeight: 'bold', color: '#111', marginBottom: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center' },
+  articleCard: { flexDirection: 'row', padding: 12, backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#F0F0F0', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3 },
+  thumb: { width: 90, height: 90, borderRadius: 12, backgroundColor: '#eee' },
+  info: { flex: 1, marginLeft: 16, justifyContent: 'space-between' },
+  tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  tag: { fontSize: 10, color: '#666', backgroundColor: '#F5F5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, fontWeight: 'bold' },
+  articleTitle: { fontSize: 15, fontWeight: 'bold', color: '#111', lineHeight: 20 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   metaText: { fontSize: 12, color: '#888', marginLeft: 4 },
 });
 

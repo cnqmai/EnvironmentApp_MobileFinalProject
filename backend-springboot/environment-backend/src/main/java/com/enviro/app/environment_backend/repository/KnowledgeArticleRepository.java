@@ -16,5 +16,7 @@ public interface KnowledgeArticleRepository extends JpaRepository<KnowledgeArtic
     List<KnowledgeArticle> findByCategoryAndIsPublishedTrueOrderByCreatedAtDesc(String category);
     
     List<KnowledgeArticle> findByTypeAndIsPublishedTrueOrderByCreatedAtDesc(ArticleType type);
-}
 
+    // [MỚI] Tìm kiếm theo tiêu đề (không phân biệt hoa thường)
+    List<KnowledgeArticle> findByTitleContainingIgnoreCaseAndIsPublishedTrueOrderByCreatedAtDesc(String title);
+}

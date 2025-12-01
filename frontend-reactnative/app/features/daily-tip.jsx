@@ -1,145 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Image, 
+  Modal, 
+  Animated 
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
-// Import đúng đường dẫn
-import { API_BASE_URL } from '../../src/constants/api';
-import { fetchWithAuth } from '../../src/utils/apiHelper';
+import { getRandomTip, completeTip } from '../../src/services/dailyTipService'; 
+
+const COMPLETED_TIPS_STORAGE_KEY = 'COMPLETED_DAILY_TIPS_V2'; // Đổi key mới để tránh conflict dữ liệu cũ
 
 const DailyTipScreen = () => {
-  const [tip, setTip] = useState(null);
+  const router = useRouter();
+  const [tips, setTips] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [isDone, setIsDone] = useState(false);
+  
+  // State lưu các ID đã hoàn thành
+  const [completedTips, setCompletedTips] = useState(new Set());
+
+  // --- Animation States ---
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState(10);
+  const scaleValue = useRef(new Animated.Value(0)).current;
+  const opacityValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadTip();
+    const initData = async () => {
+        setLoading(true);
+        await checkAndLoadDailyStatus(); // [1] Kiểm tra ngày để reset hoặc load
+        await loadTips();
+        setLoading(false);
+    };
+    initData();
   }, []);
 
-  const loadTip = async () => {
-    const url = `${API_BASE_URL}/daily-tips/today`;
-    console.log("▶️ Đang tải Daily Tip từ:", url); // [DEBUG] Kiểm tra URL trong log
+  // Hàm lấy ngày hiện tại định dạng YYYY-MM-DD
+  const getTodayString = () => {
+    return new Date().toISOString().split('T')[0];
+  };
 
+  // [LOGIC MỚI] Kiểm tra và Reset mỗi ngày
+  const checkAndLoadDailyStatus = async () => {
     try {
-      setLoading(true);
-      const response = await fetchWithAuth(url, { method: 'GET' });
-      
-      console.log("▶️ Daily Tip Status:", response.status); // [DEBUG]
+      const jsonValue = await AsyncStorage.getItem(COMPLETED_TIPS_STORAGE_KEY);
+      const today = getTodayString();
 
-      if (response.status === 204) {
-        // 204 No Content: Không có dữ liệu nhưng không phải lỗi
-        setTip(null);
-        return;
+      if (jsonValue != null) {
+        const data = JSON.parse(jsonValue);
+        
+        // Kiểm tra xem dữ liệu có phải của hôm nay không
+        if (data.date === today) {
+            // Nếu đúng hôm nay -> Load danh sách đã làm
+            setCompletedTips(new Set(data.ids));
+        } else {
+            // Nếu là ngày cũ -> Reset (ngày mới bắt đầu!)
+            console.log("Ngày mới! Reset trạng thái Daily Tips.");
+            await AsyncStorage.removeItem(COMPLETED_TIPS_STORAGE_KEY);
+            setCompletedTips(new Set());
+        }
       }
-
-      if (response.ok) {
-        const data = await response.json();
-        setTip(data);
-      } else {
-        console.warn("API Error:", response.status);
-      }
-    } catch (error) {
-      console.error("❌ Error loading tip:", error);
-      // Không Alert lỗi mạng để tránh spam nếu user offline, chỉ log
-    } finally {
-      setLoading(false);
+    } catch(e) {
+      console.error("Lỗi đọc trạng thái:", e);
     }
   };
 
-  const handleDone = async () => {
-    if (isDone || !tip?.id) return;
-
+  const loadTips = async () => {
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/daily-tips/${tip.id}/complete`, {
-        method: 'POST'
-      });
-
-      if (response.ok) {
-        setIsDone(true);
-        Alert.alert("Tuyệt vời!", `Bạn đã nhận được +${tip.pointsReward || 10} điểm xanh!`);
-      } else {
-        Alert.alert("Lỗi", "Không thể ghi nhận hành động.");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Lỗi mạng", "Vui lòng kiểm tra kết nối internet.");
+        const [t1, t2] = await Promise.all([
+            getRandomTip().catch(() => null),
+            getRandomTip().catch(() => null)
+        ]);
+        
+        const rawTips = [t1, t2].filter(Boolean);
+        const uniqueTips = Array.from(new Map(rawTips.map(item => [item.id, item])).values());
+        setTips(uniqueTips); 
+    } catch (e) {
+        console.error("Lỗi tải tips:", e);
     }
   };
 
-  if (loading) return (
-    <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#2E7D32" />
-        <Text style={{marginTop: 10, color: '#666'}}>Đang tìm mẹo hay...</Text>
-    </View>
-  );
-  
-  if (!tip) return (
-    <View style={[styles.container, styles.centered]}>
-        <MaterialCommunityIcons name="leaf-off" size={50} color="#CCC" />
-        <Text style={{color: '#666', marginTop: 16, fontSize: 16}}>Hôm nay chưa có gợi ý nào mới!</Text>
-        <TouchableOpacity onPress={loadTip} style={{marginTop: 20, padding: 10}}>
-            <Text style={{color: '#2E7D32', fontWeight: 'bold'}}>Thử lại</Text>
-        </TouchableOpacity>
-    </View>
-  );
+  const triggerSuccessAnimation = (points) => {
+    setEarnedPoints(points);
+    setShowSuccessModal(true);
+    scaleValue.setValue(0);
+    opacityValue.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(scaleValue, { toValue: 1, friction: 5, useNativeDriver: true }),
+      Animated.timing(opacityValue, { toValue: 1, duration: 300, useNativeDriver: true })
+    ]).start();
+
+    setTimeout(() => {
+        Animated.timing(opacityValue, { toValue: 0, duration: 300, useNativeDriver: true })
+        .start(() => setShowSuccessModal(false));
+    }, 2000);
+  };
+
+  const handleDone = async (item) => {
+    try {
+        await completeTip(item.id);
+        
+        // [UPDATE] Lưu kèm ngày hiện tại
+        setCompletedTips(prev => {
+            const newSet = new Set(prev);
+            newSet.add(item.id);
+            
+            const storageData = {
+                date: getTodayString(), // Lưu ngày hiện tại
+                ids: Array.from(newSet)
+            };
+            
+            AsyncStorage.setItem(COMPLETED_TIPS_STORAGE_KEY, JSON.stringify(storageData));
+            return newSet;
+        });
+
+        triggerSuccessAnimation(item.pointsReward || 10);
+    } catch (e) {
+        alert("Lỗi kết nối hoặc bạn đã nhận điểm rồi.");
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    const isCompleted = completedTips.has(item.id);
+
+    return (
+      <View style={[styles.card, isCompleted && styles.cardCompleted]}> 
+          <Image 
+              source={{ uri: item.iconUrl || 'https://via.placeholder.com/300x150.png?text=Environment+Tip' }} 
+              style={[styles.image, isCompleted && styles.imageCompleted]} 
+              resizeMode="cover"
+          />
+          <View style={styles.content}>
+              <Text style={[styles.title, isCompleted && styles.textCompleted]}>{item.title}</Text>
+              <Text style={[styles.desc, isCompleted && styles.textCompleted]} numberOfLines={3}>
+                  {item.description || "Hãy thực hiện hành động này để bảo vệ môi trường."}
+              </Text>
+              
+              {!isCompleted && (
+                <View style={styles.pointsTag}>
+                    <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
+                    <Text style={styles.pointsText}>+{item.pointsReward || 10} điểm</Text>
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={[styles.btn, isCompleted && styles.btnDisabled]} 
+                onPress={() => handleDone(item)}
+                disabled={isCompleted}
+              >
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    {isCompleted ? (
+                        <>
+                            <MaterialCommunityIcons name="check-circle" size={20} color="#4CAF50" style={{marginRight: 6}} />
+                            <Text style={[styles.btnText, {color: '#4CAF50'}]}>Hẹn gặp lại ngày mai!</Text>
+                        </>
+                    ) : (
+                        <Text style={styles.btnText}>Thực hiện ngay</Text>
+                    )}
+                  </View>
+              </TouchableOpacity>
+          </View>
+      </View>
+    );
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.headerCenter}>
-        <View style={styles.iconCircle}>
-           <MaterialCommunityIcons name="lightbulb-on" size={32} color="#FFD600" />
-        </View>
-        <Text style={styles.dateText}>Gợi ý hôm nay</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.tagContainer}>
-             <Text style={styles.tagText}>{tip.category || 'MÔI TRƯỜNG'}</Text>
-          </View>
-          <View style={styles.pointsTag}>
-             <Text style={styles.pointsTagText}>+{tip.pointsReward || 10} điểm</Text>
-          </View>
-        </View>
-
-        <Text style={styles.cardTitle}>{tip.title}</Text>
-        <Text style={styles.cardDesc}>{tip.description}</Text>
-
-        <TouchableOpacity 
-          style={[styles.actionBtn, isDone && styles.actionBtnDone]}
-          onPress={handleDone}
-          disabled={isDone}
-        >
-          <MaterialCommunityIcons 
-            name={isDone ? "check-circle" : "checkbox-blank-circle-outline"} 
-            size={24} color="#FFF" style={{ marginRight: 8 }} 
-          />
-          <Text style={styles.actionBtnText}>
-            {isDone ? "Đã nhận điểm" : "Đánh dấu đã làm"}
-          </Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Hành động mỗi ngày</Text>
+        <View style={{width: 40}} /> 
       </View>
-    </ScrollView>
+
+      {loading ? (
+        <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#2E7D32" />
+            <Text style={{marginTop: 10, color: '#666'}}>Đang tải gợi ý...</Text>
+        </View>
+      ) : (
+        <FlatList
+            data={tips}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            renderItem={renderItem}
+            contentContainerStyle={{padding: 16}}
+            ListEmptyComponent={
+                <View style={styles.centerContainer}>
+                    <MaterialCommunityIcons name="leaf" size={48} color="#ccc" />
+                    <Text style={{marginTop: 10, color: '#888'}}>Không có gợi ý nào lúc này.</Text>
+                </View>
+            }
+        />
+      )}
+
+      {/* Modal Chúc Mừng */}
+      <Modal
+        transparent={true}
+        visible={showSuccessModal}
+        animationType="none"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+            <Animated.View style={[
+                styles.successCard, 
+                { transform: [{ scale: scaleValue }], opacity: opacityValue }
+            ]}>
+                <MaterialCommunityIcons name="check-decagram" size={80} color="#4CAF50" />
+                <Text style={styles.successTitle}>Tuyệt vời!</Text>
+                <Text style={styles.successDesc}>Bạn vừa nhận được</Text>
+                <Text style={styles.pointsEarned}>+{earnedPoints} Điểm xanh</Text>
+            </Animated.View>
+        </View>
+      </Modal>
+
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0EFED' },
-  scrollContent: { padding: 20 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerCenter: { alignItems: 'center', marginBottom: 20 },
-  iconCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginBottom: 10, elevation: 2 },
-  dateText: { fontSize: 16, color: '#666', fontWeight: '500' },
-  card: { backgroundColor: '#FFF', borderRadius: 24, padding: 24, elevation: 4 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  tagContainer: { backgroundColor: '#E8F5E9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  tagText: { fontSize: 12, fontWeight: 'bold', color: '#2E7D32', textTransform: 'uppercase' },
-  pointsTag: { backgroundColor: '#FFF3E0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  pointsTagText: { fontSize: 12, fontWeight: 'bold', color: '#EF6C00' },
-  cardTitle: { fontSize: 22, fontWeight: 'bold', color: '#111', marginBottom: 12 },
-  cardDesc: { fontSize: 16, color: '#444', lineHeight: 24, marginBottom: 24 },
-  actionBtn: { backgroundColor: '#111', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 16 },
-  actionBtnDone: { backgroundColor: '#2E7D32' },
-  actionBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', elevation: 2, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  backButton: { padding: 8, borderRadius: 20, backgroundColor: '#f0f0f0' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  
+  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, elevation: 4, overflow: 'hidden' },
+  // [Style mới] Làm mờ thẻ khi đã hoàn thành
+  cardCompleted: { opacity: 0.8, backgroundColor: '#FAFAFA' },
+  
+  image: { width: '100%', height: 160 },
+  imageCompleted: { opacity: 0.6 }, // Làm mờ ảnh
+  
+  content: { padding: 16 },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 6, color: '#2E7D32' },
+  desc: { fontSize: 14, color: '#555', marginBottom: 12, lineHeight: 22 },
+  textCompleted: { color: '#999' }, // Làm mờ chữ
+  
+  pointsTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF8E1', alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, marginBottom: 16 },
+  pointsText: { fontSize: 12, fontWeight: 'bold', color: '#F57F17', marginLeft: 4 },
+  
+  btn: { backgroundColor: '#2E7D32', paddingVertical: 12, borderRadius: 12, alignItems: 'center', elevation: 2 },
+  
+  // [Style mới] Nút khi đã xong: nền trong suốt, viền nhẹ
+  btnDisabled: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    elevation: 0,
+    marginTop: 5
+  },
+  
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  successCard: { backgroundColor: 'white', padding: 30, borderRadius: 25, alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, width: '80%' },
+  successTitle: { fontSize: 24, fontWeight: 'bold', color: '#2E7D32', marginTop: 15 },
+  successDesc: { fontSize: 16, color: '#555', marginTop: 5 },
+  pointsEarned: { fontSize: 32, fontWeight: 'bold', color: '#F9A825', marginTop: 10 }
 });
 
 export default DailyTipScreen;
