@@ -4,13 +4,12 @@ import com.enviro.app.environment_backend.dto.BadgeResponse;
 import com.enviro.app.environment_backend.model.Badge;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.model.UserBadge;
-// [FIX] Xóa import UserBadgeId vì không dùng đến
 import com.enviro.app.environment_backend.repository.BadgeRepository;
 import com.enviro.app.environment_backend.repository.UserBadgeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime; // [FIX] Đổi từ LocalDateTime sang OffsetDateTime
+import java.time.OffsetDateTime; 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,8 +20,10 @@ public class BadgeService {
 
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
+    // ĐÃ XÓA: private final UserService userService;
 
-    public BadgeService(BadgeRepository badgeRepository, UserBadgeRepository userBadgeRepository) {
+    // Chỉ còn 2 dependencies cần thiết cho BadgeService
+    public BadgeService(BadgeRepository badgeRepository, UserBadgeRepository userBadgeRepository) { 
         this.badgeRepository = badgeRepository;
         this.userBadgeRepository = userBadgeRepository;
     }
@@ -39,6 +40,26 @@ public class BadgeService {
                 .collect(Collectors.toList());
     }
 
+    // --- THÊM LOGIC CỘNG ĐIỂM (FR-9.1.1) ---
+    /**
+     * Cộng điểm cho người dùng sau khi phân loại rác và kiểm tra huy hiệu.
+     * @param user Người dùng hiện tại
+     * @param pointsToEarn Số điểm muốn cộng (theo yêu cầu là 10)
+     * @return User đã được cập nhật điểm nhưng chưa được lưu vào DB (để UserController lưu)
+     */
+    @Transactional
+    public User addRecyclePoints(User user, int pointsToEarn) {
+        // 1. Cộng điểm
+        int currentPoints = user.getPoints();
+        user.setPoints(currentPoints + pointsToEarn);
+        
+        // 2. Kiểm tra và gán huy hiệu
+        checkAndAssignBadges(user);
+        
+        // 3. Trả về user đã cập nhật
+        return user;
+    }
+    
     @Transactional
     public void checkAndAssignBadges(User user) {
         int points = user.getPoints();
@@ -53,11 +74,8 @@ public class BadgeService {
             boolean alreadyHas = userBadgeRepository.existsByUserAndBadge(user, badge);
             if (!alreadyHas) {
                 UserBadge userBadge = new UserBadge();
-                // [FIX 1] Bỏ dòng userBadge.setId(...) vì dùng @IdClass thì set User và Badge là đủ
                 userBadge.setUser(user);
                 userBadge.setBadge(badge);
-                
-                // [FIX 2] Dùng OffsetDateTime.now() để khớp với kiểu dữ liệu trong Model
                 userBadge.setEarnedAt(OffsetDateTime.now());
                 
                 userBadgeRepository.save(userBadge);
@@ -75,7 +93,7 @@ public class BadgeService {
                 .name(badge.getName())
                 .description(badge.getDescription())
                 .iconUrl(badge.getIconUrl())
-                .requiredPoints(badge.getRequiredPoints()) // Sử dụng trường này nếu có trong Badge entity
+                .requiredPoints(badge.getRequiredPoints()) 
                 .build();
     }
 }

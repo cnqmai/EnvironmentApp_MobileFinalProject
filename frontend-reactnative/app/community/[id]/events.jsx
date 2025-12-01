@@ -1,74 +1,94 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useState, useEffect, useCallback } from "react"; 
+import {
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  ActivityIndicator, 
+  RefreshControl, 
+} from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import EventCard from "../../../components/community/EventCard";
 import typography from "../../../styles/typography";
+// CẬP NHẬT IMPORT: Sử dụng fetchAllEvents (đã được sửa trong file service trước)
+import { fetchAllEvents } from "../../../src/services/campaignService"; 
+
+// Helper function để format ngày giờ từ OffsetDateTime (giả định)
+const formatDateTime = (offsetDateTime) => {
+    if (!offsetDateTime) return { date: 'N/A', time: 'N/A' };
+    try {
+        const dateObj = new Date(offsetDateTime);
+        const date = dateObj.toLocaleDateString('vi-VN');
+        const time = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        return { date, time };
+    } catch (e) {
+        return { date: 'N/A', time: 'N/A' };
+    }
+};
 
 const CommunityEventsScreen = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [selectedFilter, setSelectedFilter] = useState("all");
 
-  // Mock data - trong thực tế sẽ fetch từ API
-  const events = [
-    {
-      id: 1,
-      title: "Chiến dịch làm sạch bãi biển Nha Trang",
-      description:
-        "Tham gia cùng chúng tôi dọn sạch bãi biển, bảo vệ môi trường biển",
-      date: "15/12/2025",
-      time: "07:00 - 10:00",
-      location: "Bãi biển Trần Phú, Nha Trang",
-      participants: 156,
-      maxParticipants: 200,
-      status: "upcoming",
-      image: null,
-      organizer: "Cộng đồng bảo vệ môi trường Cấp 2",
-    },
-    {
-      id: 2,
-      title: "Hội thảo: Giảm thiểu rác thải nhựa",
-      description:
-        "Chia sẻ kinh nghiệm và giải pháp giảm thiểu rác thải nhựa trong đời sống",
-      date: "20/12/2025",
-      time: "14:00 - 17:00",
-      location: "Trung tâm Văn hóa Quận 1, TP.HCM",
-      participants: 89,
-      maxParticipants: 150,
-      status: "upcoming",
-      image: null,
-      organizer: "Cộng đồng bảo vệ môi trường Cấp 2",
-    },
-    {
-      id: 3,
-      title: "Trồng cây xanh tại công viên Tao Đàn",
-      description: "Cùng nhau trồng 500 cây xanh, tạo không gian sống xanh",
-      date: "10/12/2025",
-      time: "06:00 - 09:00",
-      location: "Công viên Tao Đàn, TP.HCM",
-      participants: 200,
-      maxParticipants: 200,
-      status: "completed",
-      image: null,
-      organizer: "Cộng đồng bảo vệ môi trường Cấp 2",
-    },
-    {
-      id: 4,
-      title: "Phân loại rác tại nguồn - Workshop",
-      description: "Hướng dẫn chi tiết cách phân loại rác tại nguồn hiệu quả",
-      date: "05/12/2025",
-      time: "09:00 - 11:00",
-      location: "Online - Zoom Meeting",
-      participants: 234,
-      maxParticipants: 300,
-      status: "completed",
-      image: null,
-      organizer: "Cộng đồng bảo vệ môi trường Cấp 2",
-    },
-  ];
+  const [events, setEvents] = useState([]); 
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // --- LOGIC FETCH DỮ LIỆU TỪ DB (SỬ DỤNG DTO) ---
+  const fetchEvents = useCallback(async () => {
+    try {
+      // Gọi API lấy TẤT CẢ sự kiện
+      const data = await fetchAllEvents(); 
+      
+      // Ánh xạ dữ liệu từ CampaignResponse DTO sang cấu trúc Frontend Event
+      const mappedEvents = data.map(campaign => {
+          const { date, time } = formatDateTime(campaign.eventDate);
+          
+          let participants = 0;
+          let maxParticipants = 0;
+          const participantParts = campaign.participantInfo.split('/');
+          if (participantParts.length === 2) {
+              participants = parseInt(participantParts[0]);
+              maxParticipants = parseInt(participantParts[1]);
+          }
+
+          return {
+              id: campaign.id,
+              title: campaign.title,
+              description: campaign.description || '',
+              date: date,
+              time: time,
+              location: campaign.location || 'Chưa xác định',
+              participants: participants,
+              maxParticipants: maxParticipants,
+              status: campaign.status,
+              image: campaign.iconCode, // Dùng iconCode làm image
+              communityId: campaign.communityId, // Dùng cho router
+          };
+      });
+
+      setEvents(mappedEvents);
+    } catch (error) {
+      console.error("Lỗi lấy sự kiện cộng đồng:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchEvents();
+  };
+  // --- KẾT THÚC LOGIC FETCH ---
 
   const filterOptions = [
     { value: "all", label: "Tất cả", icon: "calendar" },
@@ -80,6 +100,10 @@ const CommunityEventsScreen = () => {
     selectedFilter === "all"
       ? events
       : events.filter((event) => event.status === selectedFilter);
+      
+  const handleCreateEvent = () => {
+    router.push(`/community/create-event`); 
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -96,7 +120,7 @@ const CommunityEventsScreen = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sự kiện cộng đồng</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.placeholder} /> 
       </View>
 
       <View style={styles.filterContainer}>
@@ -138,8 +162,16 @@ const CommunityEventsScreen = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {filteredEvents.length === 0 ? (
+        {loading ? (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Đang tải sự kiện...</Text>
+            </View>
+        ) : filteredEvents.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons
               name="calendar-blank"
@@ -153,7 +185,7 @@ const CommunityEventsScreen = () => {
         ) : (
           filteredEvents.map((event) => (
             <EventCard
-              key={event.id}
+              key={event.id} 
               event={event}
               showStatus={true}
               onPress={() => router.push(`/community/${id}/events/${event.id}`)}
@@ -161,6 +193,15 @@ const CommunityEventsScreen = () => {
           ))
         )}
       </ScrollView>
+      
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={handleCreateEvent}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="plus" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
+      
     </SafeAreaView>
   );
 };
@@ -226,7 +267,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   filterChipActive: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#4CAF50", // Đổi màu xanh dương sang Xanh lá
     elevation: 2,
   },
   filterChipText: {
@@ -246,6 +287,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 40,
+  },
+  
+  centerContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    ...typography.body,
+    fontSize: 15,
+    color: "#666",
+    marginTop: 10,
+  },
+  fab: { 
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    right: 30,
+    bottom: 30,
+    backgroundColor: '#4CAF50', 
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    zIndex: 10, 
   },
 
   emptyState: {

@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker'; // Thư viện ảnh
 import typography from "../styles/typography";
 // Import API
 import { classifyWasteByImage } from "../src/services/categoryService";
+import { addRecyclePoints } from "../src/services/userService"; // <--- ĐÃ THÊM
 
 const RecycleCameraScreen = () => {
   const router = useRouter();
@@ -20,6 +21,15 @@ const RecycleCameraScreen = () => {
         const result = await classifyWasteByImage(uri);
         
         if (result && result.name) {
+            // *** CỘNG ĐIỂM (FR-9.1.1) ***
+            try {
+                await addRecyclePoints(); 
+                console.log("Đã cộng 10 điểm cho người dùng.");
+            } catch (pointError) {
+                console.error("Lỗi cộng điểm:", pointError);
+            }
+            // ****************************
+
             // Có kết quả -> Sang màn hình hướng dẫn
             router.push({
                 pathname: "/recycle-guide",
@@ -117,7 +127,6 @@ const RecycleCameraScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  // Giữ nguyên style gốc của bạn
   container: { flex: 1, backgroundColor: "#F0EFED" },
   header: { padding: 16 },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", elevation: 2 },

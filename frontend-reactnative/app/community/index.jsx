@@ -16,7 +16,8 @@ import CommunityCard from "../../components/community/CommunityCard";
 import EventCard from "../../components/community/EventCard";
 import ForumPostCard from "../../components/community/ForumPostCard";
 import typography from "../../styles/typography";
-import { fetchCommunityFeed, fetchDiscoverCommunities, fetchMyCommunities, toggleLikePost, trackPostShare, } from '../../src/services/communityService';
+import { fetchCommunityFeed, fetchDiscoverCommunities, fetchMyCommunities, toggleLikePost } from '../../src/services/communityService'; 
+import { fetchAllEvents } from '../../src/services/campaignService';
 
 const CommunityScreen = () => {
   const router = useRouter();
@@ -28,22 +29,30 @@ const CommunityScreen = () => {
   const [posts, setPosts] = useState([]);
   const [myCommunities, setMyCommunities] = useState([]);
   const [discoverCommunities, setDiscoverCommunities] = useState([]);
+  const [allEvents, setAllEvents] = useState([]); // State chứa dữ liệu sự kiện
   const [loading, setLoading] = useState(true);
 
 
-  // --- LOGIC LẤY DỮ LIỆU CHÍNH (FEED & COMMUNITIES) ---
+  // --- LOGIC LẤY DỮ LIỆU CHÍNH ---
   const fetchData = useCallback(async () => {
     setRefreshing(true);
     setLoading(true);
 
     try {
+        // Lời gọi fetchCommunityFeed TỪ communityService
         const fetchedPosts = await fetchCommunityFeed(forumSubTab); 
         setPosts(fetchedPosts);
+        
         const myGroups = await fetchMyCommunities();
         setMyCommunities(myGroups);
+        
         const discoverGroups = await fetchDiscoverCommunities();
         setDiscoverCommunities(discoverGroups);
-
+        
+        // Lời gọi fetchAllEvents TỪ campaignService
+        const eventsData = await fetchAllEvents(); 
+        setAllEvents(eventsData);
+        
     } catch (error) {
         console.error("Lỗi tải dữ liệu cộng đồng:", error);
         Alert.alert("Lỗi", "Không thể tải dữ liệu cộng đồng.");
@@ -64,7 +73,7 @@ const CommunityScreen = () => {
     fetchData();
   };
   
-  // --- HÀM XỬ LÝ LIKE (OPTIMISTIC UPDATE AN TOÀN & KIỂM TRA) ---
+  // --- HÀM XỬ LÝ LIKE (giữ nguyên) ---
   const handleLikeToggle = async (postId) => {
     const originalPost = posts.find(p => p.id === postId);
     if (!originalPost) return;
@@ -74,7 +83,7 @@ const CommunityScreen = () => {
     
     const originalPosts = posts; 
 
-    // B1: Optimistic update (Màu hồng/Xanh ngay lập tức)
+    // B1: Optimistic update
     setPosts(prevPosts => 
         prevPosts.map(post => {
             if (post.id === postId) {
@@ -88,24 +97,18 @@ const CommunityScreen = () => {
         })
     );
     
-    // --- KIỂM TRA: Trạng thái Optimistic ---
     console.log(`[OPTIMISTIC] Post ID: ${postId} | Liked: ${newLikedState} | Count: ${optimisticCount}`);
-    // -------------------------------------
-
 
     try {
-        // B2: Gọi API. API phải trả về PostResponse MỚI NHẤT
+        // B2: Gọi API
         const updatedPostResponse = await toggleLikePost(postId); 
         
-        // --- KIỂM TRA: Response từ API ---
         console.log(`[API RESPONSE] Post ID: ${postId} | Liked: ${updatedPostResponse.isLikedByCurrentUser} | Count: ${updatedPostResponse.likesCount}`);
-        // ---------------------------------
 
         // B3: Cập nhật lại state với dữ liệu CHÍNH XÁC từ Backend
         setPosts(prevPosts => 
             prevPosts.map(post => {
                 if (post.id === postId) {
-                    // Dùng toàn bộ response từ Backend để đồng bộ hóa
                     return updatedPostResponse; 
                 }
                 return post;
@@ -123,34 +126,51 @@ const CommunityScreen = () => {
 
   const tabs = [
     { id: "forum", label: "Diễn đàn", icon: "forum" },
-    { id: "events", label: "Sự kiện nổi bật", icon: "star" },
+    { id: "events", label: "Tất cả sự kiện", icon: "calendar" }, 
     { id: "my-communities", label: "Cộng đồng của tôi", icon: "account-group" },
     { id: "discover", label: "Khám phá", icon: "compass" },
   ];
 
-  // Mock events (giữ nguyên vì chưa có API cho Events)
-  const events = [
-    { id: 1, title: "Chiến dịch làm sạch bãi biển", community: "Cộng đồng X", communityId: 'uuid-1', date: "15/12/2025", location: "Bãi biển Vũng Tàu", participants: 120, image: "beach-cleanup" },
-  ];
 
-
+  // --- HÀM RENDER SỰ KIỆN (SỬ DỤNG DỮ LIỆU THỰC TẾ) ---
   const renderEvents = () => (
     <View style={styles.contentContainer}>
+      {/* NÚT CHUYỂN HƯỚNG TẠO EVENT */}
+      <TouchableOpacity
+        style={styles.createEventButton} 
+        onPress={() => router.push("/community/create-event")} 
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons
+          name="calendar-plus"
+          size={20}
+          color="#FFFFFF"
+        />
+        <Text style={styles.createEventButtonText}>Tạo Sự kiện Mới</Text>
+      </TouchableOpacity>
+      
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Sự kiện sắp diễn ra</Text>
       </View>
-      {events.map((event) => (
-        <EventCard
-          key={event.id}
-          event={event}
-          showStatus={true}
-          onPress={() =>
-            router.push(`/community/${event.communityId}/events/${event.id}`)
-          }
-        />
-      ))}
+
+      {/* HIỂN THỊ EVENTS TỪ STATE allEvents */}
+      {allEvents.length === 0 ? (
+          <Text style={styles.noDataText}>Chưa có sự kiện nào.</Text>
+      ) : (
+          allEvents.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              showStatus={true}
+              onPress={() =>
+                router.push(`/community/${event.communityId}/events/${event.id}`) 
+              }
+            />
+          ))
+      )}
     </View>
   );
+  // --- KẾT THÚC HÀM RENDER SỰ KIỆN ---
 
   const renderCommunities = (list, title) => (
     <View style={styles.contentContainer}>
@@ -331,7 +351,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 30,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -373,7 +392,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
   },
-
   tabsContainer: {
     marginTop: 8,
     marginBottom: 0,
@@ -417,7 +435,6 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: "#FFFFFF",
   },
-
   contentContainer: {
     paddingTop: 8,
     paddingHorizontal: 16,
@@ -459,6 +476,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    marginTop: 10, 
   },
   sectionTitle: {
     ...typography.h3,
@@ -493,6 +511,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   createCommunityButtonText: {
+    ...typography.body,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  createEventButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4CAF50", 
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 10, 
+    gap: 8,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  createEventButtonText: {
     ...typography.body,
     fontSize: 15,
     fontWeight: "700",

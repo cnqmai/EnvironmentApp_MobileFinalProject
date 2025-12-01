@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import typography from "../styles/typography";
 // Import API
 import { searchCategories, classifyWasteByText } from "../src/services/categoryService";
+import { addRecyclePoints } from "../src/services/userService"; // <--- ĐÃ THÊM
 
 const RecycleSearchScreen = () => {
   const router = useRouter();
@@ -40,6 +41,15 @@ const RecycleSearchScreen = () => {
         }
 
         if (targetItem && targetItem.name !== "Không xác định") {
+            // *** CỘNG ĐIỂM (FR-9.1.1) ***
+            try {
+                await addRecyclePoints(); 
+                console.log("Đã cộng 10 điểm cho người dùng.");
+            } catch (pointError) {
+                console.error("Lỗi cộng điểm:", pointError);
+            }
+            // ****************************
+            
             // Chuyển sang trang chi tiết với dữ liệu từ AI
             router.push({
                 pathname: "/recycle-guide",
@@ -124,7 +134,6 @@ const RecycleSearchScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  // Giữ nguyên Styles gốc của bạn
   container: { flex: 1, backgroundColor: "#F0EFED" },
   header: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#F0EFED" },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },

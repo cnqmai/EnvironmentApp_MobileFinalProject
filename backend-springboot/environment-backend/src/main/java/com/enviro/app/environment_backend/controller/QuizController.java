@@ -6,8 +6,10 @@ import com.enviro.app.environment_backend.dto.QuizSubmitRequest;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.QuizService;
 import com.enviro.app.environment_backend.service.UserService;
+import org.springframework.http.HttpStatus; 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException; // Cần import này
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -25,17 +27,13 @@ public class QuizController {
         this.userService = userService;
     }
     
-    // Helper function (Giả định tồn tại trong UserService)
-    private User getCurrentUser() {
-        return userService.getCurrentUser();
-    }
+    // ĐÃ XÓA: private User getCurrentUser() { return userService.getCurrentUser(); }
 
     @GetMapping
     public ResponseEntity<List<QuizResponse>> getAllQuizzes() {
         return ResponseEntity.ok(quizService.getAllQuizzes());
     }
 
-    // Lấy chi tiết Quiz (Frontend gọi API này)
     @GetMapping("/{id}")
     public ResponseEntity<QuizResponse> getQuizById(@PathVariable UUID id) {
         return ResponseEntity.ok(quizService.getQuizById(id));
@@ -46,7 +44,15 @@ public class QuizController {
             @PathVariable UUID id,
             @Valid @RequestBody QuizSubmitRequest request) {
         
-        User user = getCurrentUser();
+        // 1. Lấy User đang đăng nhập từ UserService (đã sửa lỗi)
+        User user = userService.getCurrentUser();
+        
+        // 2. Kiểm tra nếu không có User (chưa đăng nhập/token hết hạn)
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để nộp bài Quiz.");
+        }
+        
+        // 3. Gọi Service với ID chính xác của người dùng hiện tại
         QuizScoreResponse response = quizService.submitQuiz(user.getId(), id, request);
         return ResponseEntity.ok(response);
     }
