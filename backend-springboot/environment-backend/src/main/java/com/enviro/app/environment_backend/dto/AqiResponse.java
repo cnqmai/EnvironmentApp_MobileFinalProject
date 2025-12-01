@@ -2,37 +2,25 @@ package com.enviro.app.environment_backend.dto;
 
 import java.util.Map; // Cần import Map
 import lombok.Builder;
-import lombok.Value;
-import lombok.AllArgsConstructor; // Cần import AllArgsConstructor
+import lombok.Data;
+import java.util.Map;
 
-/**
- * DTO trả về dữ liệu AQI (Chỉ số Chất lượng Không khí) cho client.
- */
-@Value
+@Data
 @Builder
-@AllArgsConstructor // [QUAN TRỌNG] Thêm dòng này để Builder hoạt động ổn định
 public class AqiResponse {
+    // 1. Dữ liệu tính toán (Thang 0-500)
+    private int calculatedAqiValue; // Mới: Giá trị AQI đã tính theo chuẩn Mỹ (0-500)
 
-    // --- Thông tin chung ---
-    int aqiValue; 
-    String status; 
-    String dominantPollutant; 
+    // 2. Dữ liệu gốc và cơ bản
+    private int owmAqiValue; // Gốc: Giá trị AQI OWM (1-5)
+    private String status;
+    private String dominantPollutant;
+    private double latitude;
+    private double longitude;
+    private String city;
+    private String timeObservation;
+    private String healthAdvisory;
     
-    // --- Thông tin địa lý ---
-    double latitude;
-    double longitude;
-    String city; 
-    
-    // --- Thông tin sức khỏe và thời gian ---
-    String healthAdvisory; 
-    String timeObservation; 
-
-    // [QUAN TRỌNG] Thêm trường này để chứa dữ liệu chi tiết (PM2.5, PM10...)
-    // Nếu thiếu, AqiService sẽ báo lỗi khi gọi .components(...)
-    Map<String, Double> components;
-
-    // Getter tường minh (giữ nguyên nếu bạn muốn, dù Lombok đã tự tạo)
-    public int getAqiValue() {
-        return aqiValue;
-    }
+    // 3. Toàn bộ dữ liệu nồng độ chi tiết
+    private Map<String, Double> components; 
 }

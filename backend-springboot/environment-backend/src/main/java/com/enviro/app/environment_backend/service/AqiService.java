@@ -4,10 +4,6 @@ import com.enviro.app.environment_backend.dto.AqiDataPoint;
 import com.enviro.app.environment_backend.dto.AqiResponse;
 import com.enviro.app.environment_backend.dto.GeocodingResponse;
 import com.enviro.app.environment_backend.dto.OpenWeatherMapResponse;
-import com.enviro.app.environment_backend.model.NotificationSettings;
-import com.enviro.app.environment_backend.model.NotificationType;
-import com.enviro.app.environment_backend.model.User;
-import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -19,7 +15,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class AqiService {
@@ -34,134 +29,164 @@ public class AqiService {
     private String geocodingUrl;
 
     private final RestTemplate restTemplate;
-    private final NotificationService notificationService;
-    private final NotificationSettingsRepository settingsRepository;
-    private final UserService userService;
 
-    public AqiService(RestTemplate restTemplate,
-                      NotificationService notificationService,
-                      NotificationSettingsRepository settingsRepository,
-                      UserService userService) {
+    // --- HẰNG SỐ BREAKPOINT US AQI (Chỉ dùng PM2.5 và PM10) ---
+    private static final Map<String, Object[]> AQI_BREAKPOINTS = Map.of(
+        "PM2.5", new Object[][] {
+            {0, 50, 0.0, 12.0}, {51, 100, 12.1, 35.4}, {101, 150, 35.5, 55.4},
+            {151, 200, 55.5, 150.4}, {201, 300, 150.5, 250.4}, {301, 500, 250.5, 500.4}
+        },
+        "PM10", new Object[][] {
+            {0, 50, 0, 54}, {51, 100, 55, 154}, {101, 150, 155, 254},
+            {151, 200, 255, 354}, {201, 300, 355, 424}, {301, 500, 425, 604}
+        }
+    );
+
+    // *** CONSTRUCTOR KHÔI PHỤC VỀ CHỈ CÓ RESTTEMPLATE ***
+    public AqiService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
-        this.notificationService = notificationService;
-        this.settingsRepository = settingsRepository;
-        this.userService = userService;
     }
 
     /**
-     * Lấy chỉ số AQI và tự động gửi cảnh báo nếu vượt ngưỡng
+     * TÍNH AQI CHUẨN MỸ (0-500) từ nồng độ ô nhiễm thô.
+     */
+    private int calculateUsaAqi(Map<String, Double> components) {
+        int maxAqi = 0;
+        // ... (logic tính toán giữ nguyên)
+        Double pm25 = components.get("pm2_5");
+        if (pm25 != null) {
+            maxAqi = Math.max(maxAqi, calculateIAQI(pm25, (Object[][]) AQI_BREAKPOINTS.get("PM2.5")));
+        }
+        Double pm10 = components.get("pm10");
+        if (pm10 != null) {
+            maxAqi = Math.max(maxAqi, calculateIAQI(pm10, (Object[][]) AQI_BREAKPOINTS.get("PM10")));
+        }
+        return maxAqi;
+    }
+
+    /**
+     * Áp dụng công thức OWM cho một chất ô nhiễm
+     */
+    private int calculateIAQI(double C, Object[][] breakpoints) {
+        for (Object[] bp : breakpoints) {
+            int Ilow = (int) bp[0];
+            int Ihigh = (int) bp[1];
+            double Clow = ((Number) bp[2]).doubleValue();
+            double Chigh = ((Number) bp[3]).doubleValue();
+
+            if (C >= Clow && C <= Chigh) {
+                double aqi = ((double) (Ihigh - Ilow) / (Chigh - Clow)) * (C - Clow) + Ilow;
+                return (int) Math.round(aqi);
+            }
+        }
+        return C > ((Number) breakpoints[breakpoints.length - 1][3]).doubleValue() ? 500 : 0;
+    }
+
+
+    // =======================================================
+    // --- CÁC HÀM PUBLIC (ENTRY POINTS) ---
+    // =======================================================
+
+    /**
+     * Lấy thông tin AQI theo tọa độ GPS (Đã sửa để dùng tính toán AQI 0-500)
      */
     public AqiResponse getCurrentAqiByGps(double lat, double lon) {
         String url = String.format("%s?lat=%s&lon=%s&appid=%s", baseUrl, lat, lon, apiKey);
         try {
-            OpenWeatherMapResponse response = restTemplate.getForObject(url, OpenWeatherMapResponse.class);
+            ResponseEntity<OpenWeatherMapResponse> responseEntity = restTemplate.getForEntity(url, OpenWeatherMapResponse.class);
+            OpenWeatherMapResponse response = responseEntity.getBody();
 
             if (response != null && response.getList() != null && !response.getList().isEmpty()) {
                 AqiDataPoint dataPoint = response.getList().get(0);
+                
                 Map<String, Double> components = dataPoint.getComponents();
+                System.out.println(">>> [AQI DEBUG] Nồng độ PM2.5: " + components.get("pm2_5"));
+                System.out.println(">>> [AQI DEBUG] Nồng độ PM10: " + components.get("pm10"));
+                
+                int owmAqi = dataPoint.getMain().getAqi(); // Thang 1-5
                 long dt = dataPoint.getDt();
 
-                // 1. Tính AQI chuẩn US EPA (0-500)
-                double pm25 = components.getOrDefault("pm2_5", 0.0);
-                int standardAqi = calculateUSAQIFromPM25(pm25);
-
+                int calculatedAqi = calculateUsaAqi(components);
+                
                 String city = getCityNameFromGps(lat, lon);
 
-                // 2. Kiểm tra ngưỡng và gửi cảnh báo (YÊU CẦU 1)
-                checkAndSendAlert(standardAqi, city);
-
                 return AqiResponse.builder()
-                        .aqiValue(standardAqi)
-                        .status(mapAqiToStatus(standardAqi))
+                        .calculatedAqiValue(calculatedAqi) 
+                        .owmAqiValue(owmAqi) 
+                        .status(mapAqiToStatus(calculatedAqi)) 
                         .dominantPollutant(findDominantPollutant(components))
                         .latitude(lat)
                         .longitude(lon)
                         .city(city)
                         .timeObservation(convertUnixTime(dt))
-                        .healthAdvisory(getHealthAdvisory(standardAqi))
+                        .healthAdvisory(getHealthAdvisory(calculatedAqi))
+                        .components(components) 
                         .build();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Lỗi gọi API AQI: " + e.getMessage());
         }
         return null;
     }
 
     /**
-     * Logic gửi thông báo đẩy khi vượt ngưỡng an toàn
+     * [MỚI] API Geocoding để tìm tọa độ từ địa chỉ (Khắc phục lỗi Scheduler)
      */
-    private void checkAndSendAlert(int currentAqi, String city) {
-        try {
-            User currentUser = userService.getCurrentUser();
-            if (currentUser == null) return;
-
-            Optional<NotificationSettings> settingsOpt = settingsRepository.findById(currentUser.getId());
-
-            if (settingsOpt.isPresent()) {
-                NotificationSettings settings = settingsOpt.get();
-                // (YÊU CẦU 2): Sử dụng ngưỡng do người dùng tùy chỉnh (settings.getAqiThreshold)
-                if (Boolean.TRUE.equals(settings.getAqiAlertEnabled()) && currentAqi > settings.getAqiThreshold()) {
-                    
-                    String title = "⚠️ Cảnh báo chất lượng không khí";
-                    String message = String.format("Tại %s, chỉ số AQI là %d (%s). Vượt quá ngưỡng an toàn (%d) của bạn.", 
-                                                 city, currentAqi, mapAqiToStatus(currentAqi), settings.getAqiThreshold());
-                    
-                    // Gọi NotificationService (Sửa lỗi tham số: thêm null cho relatedId)
-                    notificationService.createNotification(
-                        currentUser, 
-                        title, 
-                        message, 
-                        NotificationType.AQI_ALERT, 
-                        null 
-                    );
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Lỗi gửi cảnh báo AQI: " + e.getMessage());
-        }
+    public GeocodingResponse geocodeAddress(String address) {
+        return getCoordinatesFromAddress(address);
     }
-
-    // --- CÁC HÀM PHỤ TRỢ (HELPER METHODS) ---
-
-    // 1. Tính toán AQI chuẩn US EPA
-    private int calculateUSAQIFromPM25(double pm25) {
-        if (pm25 < 0) return 0;
-        if (pm25 <= 12.0) return calculateLinear(50, 0, 12.0, 0, pm25);
-        if (pm25 <= 35.4) return calculateLinear(100, 51, 35.4, 12.1, pm25);
-        if (pm25 <= 55.4) return calculateLinear(150, 101, 55.4, 35.5, pm25);
-        if (pm25 <= 150.4) return calculateLinear(200, 151, 150.4, 55.5, pm25);
-        if (pm25 <= 250.4) return calculateLinear(300, 201, 250.4, 150.5, pm25);
-        if (pm25 <= 350.4) return calculateLinear(400, 301, 350.4, 250.5, pm25);
-        if (pm25 <= 500.4) return calculateLinear(500, 401, 500.4, 350.5, pm25);
-        return 500;
-    }
-
-    private int calculateLinear(int aqiHigh, int aqiLow, double concHigh, double concLow, double conc) {
-        return (int) Math.round(((aqiHigh - aqiLow) / (concHigh - concLow)) * (conc - concLow) + aqiLow);
-    }
-
-    // 2. Tìm tọa độ từ địa chỉ (Sửa lỗi Geocoding 404 bằng Retry Loop)
+    
+    /**
+     * [NÂNG CẤP] Tìm tọa độ từ địa chỉ (Có cơ chế thử lại thông minh)
+     */
     public GeocodingResponse getCoordinatesFromAddress(String address) {
-        String currentAddress = address;
-        // Thử tối đa 5 lần cắt chuỗi để tìm địa chỉ phù hợp
-        for (int i = 0; i < 5; i++) {
-            GeocodingResponse result = callGeocodingApi(currentAddress);
-            if (result != null) {
-                return result;
-            }
-            // Cắt bỏ phần đầu trước dấu phẩy (Ví dụ: "Hẻm 123, Phường X, Quận Y" -> "Phường X, Quận Y")
-            if (currentAddress.contains(",")) {
-                String[] parts = currentAddress.split(",", 2);
-                if (parts.length > 1) {
-                    currentAddress = parts[1].trim();
-                } else {
-                    break;
+        // Lần 1: Thử tìm chính xác địa chỉ người dùng nhập
+        GeocodingResponse result = callGeocodingApi(address);
+
+        // Lần 2: Nếu thất bại và địa chỉ có chứa dấu phẩy, thử rút gọn
+        if (result == null && address.contains(",")) {
+            String[] parts = address.split(",", 2); 
+            if (parts.length > 1) {
+                String simplifiedAddress = parts[1].trim();
+                System.out.println("Không tìm thấy địa chỉ chi tiết. Đang thử lại với: " + simplifiedAddress);
+                result = callGeocodingApi(simplifiedAddress);
+                
+                // Lần 3: Nếu vẫn thất bại, thử rút gọn thêm lần nữa (nếu còn dấu phẩy)
+                if (result == null && simplifiedAddress.contains(",")) {
+                    String[] parts2 = simplifiedAddress.split(",", 2);
+                    if (parts2.length > 1) {
+                        String evenSimpler = parts2[1].trim();
+                        System.out.println("Vẫn không thấy. Thử cấp cao hơn: " + evenSimpler);
+                        result = callGeocodingApi(evenSimpler);
+                    }
                 }
-            } else {
-                break;
             }
         }
-        return null;
+        return result;
+    }
+
+    // =======================================================
+    // --- CÁC HÀM PRIVATE HELPER ---
+    // =======================================================
+
+    private String mapAqiToStatus(int aqi) {
+        if (aqi >= 301) return "Hazardous";
+        if (aqi >= 201) return "Very Unhealthy";
+        if (aqi >= 151) return "Unhealthy";
+        if (aqi >= 101) return "Unhealthy for sensitive groups";
+        if (aqi >= 51) return "Moderate";
+        if (aqi >= 0) return "Good";
+        return "Unknown";
+    }
+
+    private String getHealthAdvisory(int aqi) {
+        if (aqi >= 301) return "Khuyến cáo: Mọi người nên tránh ra ngoài. Nhóm nhạy cảm cần ở trong nhà.";
+        if (aqi >= 201) return "Khuyến cáo: Mọi người nên hạn chế hoạt động ngoài trời. Nhóm nhạy cảm nên tránh ra ngoài.";
+        if (aqi >= 151) return "Khuyến cáo: Mọi người nên hạn chế hoạt động ngoài trời kéo dài. Nhóm nhạy cảm nên tránh ra ngoài.";
+        if (aqi >= 101) return "Khuyến cáo: Nhóm nhạy cảm (trẻ em, người già, người bệnh) nên hạn chế ra ngoài.";
+        if (aqi >= 51) return "Chấp nhận được: Có thể có nguy cơ nhỏ cho nhóm nhạy cảm.";
+        if (aqi >= 0) return "Không khí tốt: Thoải mái hoạt động ngoài trời.";
+        return "Không có dữ liệu.";
     }
 
     private GeocodingResponse callGeocodingApi(String address) {
@@ -173,8 +198,10 @@ public class AqiService {
                     .queryParam("appid", apiKey)
                     .build()
                     .toUri();
+            
             ResponseEntity<GeocodingResponse[]> responseEntity = restTemplate.getForEntity(uri, GeocodingResponse[].class);
             GeocodingResponse[] responses = responseEntity.getBody();
+
             if (responses != null && responses.length > 0) {
                 return responses[0];
             }
@@ -196,26 +223,7 @@ public class AqiService {
         }
         return "Unknown Location";
     }
-
-    // 3. Mapping trạng thái và màu sắc (Khớp với Frontend)
-    private String mapAqiToStatus(int aqi) {
-        if (aqi <= 50) return "Tốt";
-        if (aqi <= 100) return "Trung bình";
-        if (aqi <= 150) return "Kém";
-        if (aqi <= 200) return "Xấu";
-        if (aqi <= 300) return "Rất xấu";
-        return "Nguy hiểm";
-    }
-
-    private String getHealthAdvisory(int aqi) {
-        if (aqi <= 50) return "Không khí trong lành, lý tưởng cho hoạt động ngoài trời.";
-        if (aqi <= 100) return "Chấp nhận được. Nhóm nhạy cảm nên hạn chế ra ngoài.";
-        if (aqi <= 150) return "Nhóm nhạy cảm có thể bị ảnh hưởng sức khỏe. Người bình thường ít ảnh hưởng.";
-        if (aqi <= 200) return "Có hại cho sức khỏe. Mọi người bắt đầu cảm thấy ảnh hưởng.";
-        if (aqi <= 300) return "Rất có hại. Cảnh báo sức khỏe khẩn cấp.";
-        return "Nguy hiểm! Báo động đỏ. Tránh hoàn toàn ra ngoài.";
-    }
-
+    
     private String findDominantPollutant(Map<String, Double> components) {
         if (components == null) return "N/A";
         if (components.containsKey("pm2_5")) return "PM2.5";

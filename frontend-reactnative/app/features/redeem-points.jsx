@@ -70,4 +70,8 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
 });
 
+<<<<<<< HEAD
 export default RedeemPoints;
+=======
+export default RedeemPoints;
+>>>>>>> test-merge

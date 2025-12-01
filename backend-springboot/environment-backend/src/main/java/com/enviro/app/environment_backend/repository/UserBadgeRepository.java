@@ -36,5 +36,7 @@ public interface UserBadgeRepository extends JpaRepository<UserBadge, UserBadgeI
      */
     @Query("SELECT ub FROM UserBadge ub WHERE ub.user.id = :userId ORDER BY ub.earnedAt DESC")
     List<UserBadge> findByUserIdOrderByEarnedAtDesc(@Param("userId") UUID userId);
+
+    void deleteByUser(User user);
 }
 

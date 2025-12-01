@@ -1,42 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Image, 
-  Alert, 
-  ActivityIndicator, 
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login } from '../src/services/authService'; 
+import Constants from 'expo-constants';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking'; // Import thêm Linking
+
+import { login, loginWithGoogle } from '../src/services/authService'; 
+import { saveToken } from '../src/utils/apiHelper'; 
 import { FONT_FAMILY } from '../styles/typography';
 
-// --- QUAN TRỌNG: Import saveToken từ apiHelper để đồng bộ key lưu trữ ---
-import { saveToken } from '../src/utils/apiHelper'; 
-// -----------------------------------------------------------------------
-
-import { updateProfile } from '../src/services/userService';
-import { getCurrentDeviceAddress } from '../src/services/locationService';
+// Bắt buộc để nhận Deep Link quay về
+WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
+  const [googleStatus, setGoogleStatus] = useState('');
   const router = useRouter();
+  
+  // Lấy params từ Deep Link (Ngrok trả về token ở đây)
+  const { token, email: emailFromDeepLink, error } = useLocalSearchParams();
+  
+  // Cấu hình NGROK và Google
+  const NGROK_URL = "https://eructative-prodeportation-nikola.ngrok-free.dev";
+  const { google } = Constants.expoConfig?.extra || {};
+  const webClientId = google?.webClientId; // Chỉ cần Web Client ID
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Thông báo', 'Vui lòng nhập email và mật khẩu');
-      return;
+  // --- XỬ LÝ KHI APP ĐƯỢC MỞ LẠI TỪ NGROK ---
+  useEffect(() => {
+    const handleUrl = ({ url }) => {
+      console.log(">>> Link nhận được:", url);
+
+      // 1. QUAN TRỌNG: Nếu là link Reset Password thì bỏ qua ngay
+      // Để cho Expo Router tự điều hướng sang trang ResetPassword
+      if (url && url.includes('reset-password')) {
+        console.log(">>> Đây là link Reset Password, Login component sẽ bỏ qua.");
+        return; 
+      }
+
+      // 2. Logic cũ: Chỉ xử lý nếu là Google Login
+      if (url && url.includes('token=')) {
+        try {
+          const { queryParams } = Linking.parse(url);
+          const token = queryParams?.token;
+          const email = queryParams?.email;
+          const error = queryParams?.error;
+
+          if (error) {
+            Alert.alert("Lỗi", decodeURIComponent(error));
+            setLoading(false);
+          } else if (token) {
+            handleDeepLinkLogin(token, email);
+          }
+        } catch (e) {
+          console.error("Lỗi xử lý link:", e);
+          setLoading(false);
+        }
+      }
+    };
+
+    const sub = Linking.addEventListener('url', handleUrl);
+    Linking.getInitialURL().then((url) => {
+        if (url) handleUrl({ url });
+    });
+
+    return () => sub.remove();
+  }, []);
+
+  // --- HÀM BẮT ĐẦU ĐĂNG NHẬP ---
+  const handleSignInGoogle = async () => {
+    setLoading(true);
+    try {
+      // Tự tạo URL đăng nhập Google thủ công
+      // Lý do: Để ép Google trả về link Ngrok của bạn
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${webClientId}` +
+        `&redirect_uri=${encodeURIComponent(`${NGROK_URL}/api/auth/callback/google`)}` +
+        `&response_type=code` + // Lấy code để Backend tự xử lý lấy Token
+        `&scope=email%20profile%20openid`;
+
+      console.log("🚀 Đang mở trình duyệt đến:", googleAuthUrl);
+
+      // --- SỬA CHỖ 2: Dùng openBrowserAsync ---
+      await WebBrowser.openBrowserAsync(googleAuthUrl);
+      
+      // Loading vẫn quay để chờ App quay lại và useEffect bắt được Token
+    } catch (error) {
+      console.log('❌ Lỗi mở trình duyệt:', error);
+      setLoading(false);
     }
+  };
 
+  const handleDeepLinkLogin = async (jwtToken, userEmail) => {
+    try {
+      // Token này là do Backend (Spring Boot) đã xử lý và tạo ra
+      await saveToken(jwtToken);
+      
+      // Nếu Backend trả về email thì lưu, không thì thôi
+      const userData = userEmail ? { email: userEmail } : {};
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      
+      setLoading(false);
+      Alert.alert("Thành công", "Đăng nhập Google hoàn tất!");
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.log('❌ Lỗi lưu token:', error);
+      Alert.alert('Lỗi', 'Không thể lưu phiên đăng nhập');
+      setLoading(false);
+    }
+  };
+
+  // --- Các hàm Login khác giữ nguyên ---
+  const finishLogin = async (data) => {
+    if (data && data.token) {
+      await saveToken(data.token);
+      await AsyncStorage.setItem('userData', JSON.stringify(data.user || {}));
+      setLoading(false);
+      router.replace('/(tabs)');
+    } else {
+        setLoading(false);
+        Alert.alert("Lỗi", "Server không trả về token.");
+    }
+  };
+
+  const handleLogin = async () => { 
+    if (!email || !password) { Alert.alert('Thông báo', 'Nhập email/pass'); return; }
     setLoading(true);
     try {
       // 1. Gọi API đăng nhập
@@ -81,91 +173,54 @@ const Login = () => {
       router.replace('/(tabs)'); 
 
     } catch (error) {
-      console.error("Login Error:", error);
-      Alert.alert('Lỗi đăng nhập', error.message || 'Có lỗi xảy ra');
-    } finally {
+      Alert.alert('Lỗi', "Sai thông tin đăng nhập");
       setLoading(false);
     }
   };
 
+  const handleGuestLogin = async () => {
+    try { await saveToken('GUEST'); await AsyncStorage.setItem('isGuest', 'true'); router.replace('/(tabs)'); } catch(e){}
+  };
+
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
         <Text style={styles.title}>Đăng nhập</Text>
-
         <View style={styles.form}>
-          
           <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập email"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
+          <TextInput style={styles.input} placeholder="Nhập email" value={email} onChangeText={setEmail} autoCapitalize="none"/>
           <Text style={styles.label}>Mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập mật khẩu"
-            placeholderTextColor="#999"
-            secureTextEntry={true}
-            value={password}
-            onChangeText={setPassword}
-          />
-
+          <TextInput style={styles.input} placeholder="Nhập mật khẩu" secureTextEntry={true} value={password} onChangeText={setPassword}/>
+          
           <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.forgotContainer}>
             <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-              style={[styles.loginButton, loading && styles.buttonDisabled]} 
-              onPress={handleLogin}
-              disabled={loading}
-          >
-            {loading ? (
-               <ActivityIndicator color="#fff" />
-            ) : (
-               <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            )}
+          <TouchableOpacity style={[styles.loginButton, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
+             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Đăng nhập</Text>}
           </TouchableOpacity>
 
-          <View style={styles.dividerContainer}>
-            <View style={styles.line} />
-            <Text style={styles.dividerText}>hoặc đăng nhập với</Text>
-            <View style={styles.line} />
-          </View>
+          <View style={styles.dividerContainer}><View style={styles.line} /><Text style={styles.dividerText}>hoặc đăng nhập với</Text><View style={styles.line} /></View>
 
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Image 
-                source={{uri: 'https://img.icons8.com/color/48/000000/facebook-new.png'}} 
-                style={styles.socialIcon} 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-               <Image 
-                source={{uri: 'https://img.icons8.com/color/48/000000/google-logo.png'}} 
-                style={styles.socialIcon} 
-              />
+            <TouchableOpacity style={styles.socialButton} onPress={handleSignInGoogle} disabled={loading}>
+               <Image source={{uri: 'https://img.icons8.com/color/48/000000/google-logo.png'}} style={styles.socialIcon} />
+               <Text style={styles.socialText}>Google</Text>
             </TouchableOpacity>
           </View>
+          {googleStatus ? (
+            <View style={{alignItems: 'center', marginBottom: 8}}>
+              <Text style={{color: '#666'}}>{googleStatus}</Text>
+            </View>
+          ) : null}
 
-          <TouchableOpacity style={styles.guestButton}>
+          <TouchableOpacity style={styles.guestButton} onPress={handleGuestLogin}>
             <Text style={styles.guestText}>Tiếp tục với chế độ khách</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Chưa có tài khoản? </Text>
-            <TouchableOpacity onPress={() => router.push('/register')}>
-              <Text style={styles.registerLink}>Đăng ký</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/register')}><Text style={styles.registerLink}>Đăng ký</Text></TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -263,8 +318,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   socialButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 84,
+    flexDirection: 'row', // Thêm dòng này để icon và text nằm ngang
+    flex: 1, 
+    paddingVertical: 15,
     borderRadius: 15,
     borderWidth: 1,
     borderColor: '#007bff',
@@ -278,6 +334,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     resizeMode: 'contain',
+    marginRight: 10, // Thêm khoảng cách giữa icon và text
+  },
+  socialText: { // Thêm style cho text Google
+    fontSize: 16,
+    color: '#000',
+    fontFamily: FONT_FAMILY,
+    fontWeight: '600',
   },
   guestButton: {
     backgroundColor: '#F0EFED',

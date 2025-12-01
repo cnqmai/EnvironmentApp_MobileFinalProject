@@ -32,6 +32,12 @@ const typography = StyleSheet.create({
     fontSize: 12,
     color: "#222",
   },
+  italic: {
+    fontFamily: FONT_FAMILY,
+    fontSize: 12,
+    fontStyle: "italic",
+    color: "#222",
+  },
   quote: {
     fontFamily: FONT_FAMILY,
     fontSize: 24,

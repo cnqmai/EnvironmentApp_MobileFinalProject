@@ -1,10 +1,12 @@
 package com.enviro.app.environment_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
+@Data
+@NoArgsConstructor
 public class OAuth2LoginRequest {
     @NotBlank(message = "Token không được để trống")
-    String token;
+    private String token; // ID Token từ Google OAuth
 }

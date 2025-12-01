@@ -23,5 +23,7 @@ public interface NotificationSettingsRepository extends JpaRepository<Notificati
      */
     @Query("SELECT ns FROM NotificationSettings ns WHERE ns.user.id = :userId")
     Optional<NotificationSettings> findByUserId(@Param("userId") UUID userId);
+
+    void deleteByUser(User user);
 }
 

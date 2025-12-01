@@ -8,13 +8,20 @@ import com.enviro.app.environment_backend.service.OAuth2Service;
 import com.enviro.app.environment_backend.service.PasswordResetService;
 import com.enviro.app.environment_backend.service.UserService;
 import jakarta.validation.Valid;
+
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -125,6 +132,17 @@ public class AuthController {
         }
         return ResponseEntity.ok("Nếu email tồn tại, link reset mật khẩu đã được gửi đi.");
     }
+
+    /**
+     * API cầu nối: Nhận request HTTP và chuyển hướng (Redirect) sang Deep Link (exp://)
+     */
+    @GetMapping("/open-app")
+    public ResponseEntity<Void> openApp(@RequestParam("url") String url) {
+        // Trả về mã 302 (Found) để trình duyệt tự động chuyển hướng
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(url))
+                .build();
+    }
     
     @PostMapping("/reset-password")
     @Transactional
@@ -141,5 +159,39 @@ public class AuthController {
         userService.save(user);
         passwordResetService.deleteToken(resetToken);
         return ResponseEntity.ok("Mật khẩu đã được đặt lại thành công.");
+    }
+
+    // ========================================================================
+    // 2. API MỚI: Dành riêng cho GOOGLE LOGIN Callback
+    // Endpoint: /api/auth/callback/google
+    // ========================================================================
+    @GetMapping("/callback/google")
+    public ResponseEntity<Void> googleCallback(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "error", required = false) String error) {
+
+        String appScheme = "exp://duqqiw0-cnqmai-8081.exp.direct/--/";
+
+        if (error != null) {
+             String errorUrl = appScheme + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8);
+             return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(errorUrl)).build();
+        }
+
+        if (code != null) {
+            try {
+                // Đổi code lấy User
+                User user = oAuth2Service.processGoogleCode(code);
+                String token = jwtService.generateToken(user.getId(), user.getEmail());
+                
+                // Redirect về App với Token
+                String deepLink = appScheme + "?token=" + token + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
+                return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(deepLink)).build();
+            } catch (Exception e) {
+                e.printStackTrace();
+                String errLink = appScheme + "?error=" + URLEncoder.encode("Login Error", StandardCharsets.UTF_8);
+                return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(errLink)).build();
+            }
+        }
+        return ResponseEntity.badRequest().build();
     }
 }

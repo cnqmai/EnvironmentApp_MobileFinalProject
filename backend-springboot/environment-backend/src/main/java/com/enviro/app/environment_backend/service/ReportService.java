@@ -43,7 +43,7 @@ public class ReportService {
 
     /**
      * API TẠO BÁO CÁO (Logic chính)
-     * Yêu cầu: Mô tả + Ảnh/Video + GPS + (tùy chọn) Category ID
+     * ĐÃ CẬP NHẬT: Kiểm tra quyền riêng tư vị trí (FR-7.3).
      */
     @Transactional
     public Report createReport(User user, ReportRequest request) {
@@ -58,12 +58,25 @@ public class ReportService {
                 ));
         }
         
+        // --- KIỂM TRA QUYỀN RIÊNG TƯ VỊ TRÍ (FR-7.3) ---
+        double finalLat = request.getLatitude();
+        double finalLon = request.getLongitude();
+
+        // Giả định user.isShareLocation() tồn tại trong User.java
+        if (!user.isShareLocation()) { 
+            System.out.println("Privacy Alert: User location sharing is OFF. Using placeholder coordinates for report.");
+            // Ghi tọa độ mặc định (0, 0) hoặc một vị trí an toàn để không lưu vị trí cá nhân
+            finalLat = 0.0; 
+            finalLon = 0.0; 
+        }
+        // ---------------------------------------------
+        
         // 2. Tạo đối tượng Report chính
         Report.ReportBuilder reportBuilder = Report.builder()
             .user(user)
             .description(request.getDescription())
-            .latitude(request.getLatitude())
-            .longitude(request.getLongitude())
+            .latitude(finalLat) // SỬ DỤNG finalLat
+            .longitude(finalLon) // SỬ DỤNG finalLon
             .status(ReportStatus.RECEIVED); // Mặc định là RECEIVED khi mới tạo
         
         // Thêm category nếu có

@@ -8,6 +8,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/environment_db?stringtype=unspecified
     username: env_app_user
     password: "2112"
+  
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -17,6 +22,19 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
         format_sql: true
   
   security:
@@ -24,32 +42,23 @@ spring:
       client:
         registration:
           google:
-            client-id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-            client-secret: "YOUR_GOOGLE_SECRET"
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
+
           facebook:
-            client-id: "YOUR_FACEBOOK_APP_ID"
-            client-secret: "YOUR_FACEBOOK_APP_SECRET"
+            client-id: ${FACEBOOK_APP_ID}
+            client-secret: ${FACEBOOK_APP_SECRET}
             scope:
               - email
               - public_profile
-
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
 
 # --- CẤU HÌNH CÁC BIẾN MÔI TRƯỜNG ---
 
 # Fix lỗi 1: Cho Service upload
 file:
-  upload:
-    dir: uploads
-
-# Fix lỗi 2: Cho WebConfig
-app:
   upload:
     dir: uploads
 
@@ -69,14 +78,42 @@ aqi:
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
 
+# Cấu hình Upload file
+app:
+  upload:
+    dir: uploads
+
+  security:
+    google:
+      client-ids: "756858259822-3vc9g8jdee93v1v4vajgo33ghao6rsib.apps.googleusercontent.com,756858259822-mvqtudhds35eq2b4h56qn16uefj615jo.apps.googleusercontent.com,756858259822-f887rof3qh7enulq6dkt5hv7d8r4lorj.apps.googleusercontent.com"
+      
+      # [MỚI] Lấy trong Google Console -> Credentials -> Web Client -> Client Secret
+      client-secret: ${GOOGLE_CLIENT_SECRET}
+      
+      # [MỚI] Link Ngrok của bạn (Phải khớp 100% với code frontend và Google Console)
+      redirect-uri: "https://eructative-prodeportation-nikola.ngrok-free.dev/api/auth/callback/google"
+
+
+# Cấu hình Reset Password
+password:
+  reset:
+    expiration:
+      minutes: 15
+      
+  frontend:
+    # Link Deep Link mở App (thay link Tunnel của bạn vào đây)
+    reset-password-url: "exp://duqqiw0-cnqmai-8081.exp.direct/--/reset-password"
+    
+    # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
+    # Trừ khi bạn cài ngrok cho cả Spring Boot
+    backend-url: "http://192.168.100.190:8080"
+
 logging:
   level:
     root: INFO
     org.springframework.web: DEBUG
     org.springframework.security: DEBUG
     com.enviro.app: DEBUG
-
-# ... (các cấu hình khác)
 
 # --- Gemini Configuration ---
 gemini:

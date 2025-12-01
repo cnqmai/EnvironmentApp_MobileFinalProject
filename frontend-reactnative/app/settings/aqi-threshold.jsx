@@ -1,88 +1,74 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  Text,
-  Alert,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, Text, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
 import typography from "../../styles/typography";
 import { Button } from "react-native-paper";
 import Slider from "@react-native-community/slider";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import notificationService from "../../src/services/notificationService";
+import { getNotificationSettings, updateNotificationSettings } from '../../src/services/userService'; // Import API
+
 
 const AQIThresholdSettingsScreen = () => {
   const router = useRouter();
-  const [aqiThreshold, setAqiThreshold] = useState(100); // Giá trị mặc định
-  const [loading, setLoading] = useState(true); // Trạng thái tải dữ liệu
-  const [saving, setSaving] = useState(false); // Trạng thái đang lưu
-  const [fullSettings, setFullSettings] = useState({}); // Lưu toàn bộ settings để merge khi update
-
+  const [aqiThreshold, setAqiThreshold] = useState(100);
+  const [loading, setLoading] = useState(true);
   const [sliderWidth, setSliderWidth] = useState(0);
-  const SLIDER_MIN = 0;
-  const SLIDER_MAX = 300;
+  const SLIDER_MIN = 50; // Ngưỡng an toàn tối thiểu (Good)
+  const SLIDER_MAX = 300; // Ngưỡng nguy hiểm tối đa
   const THUMB_SIZE = 36;
 
-  // 1. Tải cài đặt từ Server khi mở màn hình
+  // --- LOGIC TẢI CÀI ĐẶT HIỆN TẠI ---
   useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setLoading(true);
+        const settings = await getNotificationSettings(); 
+        // Đảm bảo threshold nằm trong phạm vi slider
+        const initialThreshold = Math.min(Math.max(settings.aqiThreshold, SLIDER_MIN), SLIDER_MAX);
+        setAqiThreshold(initialThreshold);
+      } catch (error) {
+        console.error("Lỗi tải cài đặt AQI ngưỡng:", error);
+        Alert.alert("Lỗi", "Không thể tải cài đặt ngưỡng cảnh báo.");
+        setAqiThreshold(100); // Mặc định về ngưỡng chung
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchSettings();
   }, []);
 
-  const fetchSettings = async () => {
+
+  // --- LOGIC LƯU CÀI ĐẶT ---
+  const handleSaveSettings = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await notificationService.getSettings();
-      if (data) {
-        setFullSettings(data);
-        // Nếu server trả về null (lần đầu), dùng mặc định 100
-        setAqiThreshold(data.aqiThreshold ?? 100);
-      }
+      // Gửi toàn bộ DTO cài đặt (chỉ cập nhật ngưỡng, giữ nguyên các boolean khác)
+      await updateNotificationSettings({
+        aqiThreshold: aqiThreshold
+        // Các trường boolean khác (nếu cần)
+      });
+      
+      Alert.alert(
+        "Thành công",
+        `Ngưỡng cảnh báo AQI đã được lưu: ${aqiThreshold}`
+      );
     } catch (error) {
-      console.error("Failed to load settings", error);
-      Alert.alert("Lỗi", "Không thể tải cài đặt hiện tại.");
+      console.error("Lỗi lưu cài đặt ngưỡng:", error);
+      Alert.alert("Lỗi", "Lưu cài đặt thất bại. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Lưu cài đặt lên Server
-  const handleSaveSettings = async () => {
-    try {
-      setSaving(true);
-      
-      // Tạo object request mới, giữ nguyên các setting cũ, chỉ sửa threshold và enable alert
-      const updateRequest = {
-        ...fullSettings,
-        aqiAlertEnabled: true, // Luôn bật cảnh báo khi người dùng đã vào đây chỉnh sửa
-        aqiThreshold: aqiThreshold,
-      };
-
-      await notificationService.updateSettings(updateRequest);
-
-      Alert.alert(
-        "Thành công",
-        `Đã lưu ngưỡng cảnh báo AQI: ${aqiThreshold}. Bạn sẽ nhận thông báo khi chỉ số thực tế vượt mức này.`
+  if (loading) {
+      return (
+          <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator size="large" color="#2196F3" />
+              <Text style={{ marginTop: 10 }}>Đang tải cài đặt...</Text>
+          </SafeAreaView>
       );
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Thất bại", "Có lỗi xảy ra khi lưu cài đặt.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Hàm xác định màu sắc dựa trên ngưỡng chọn
-  const getThresholdColor = (value) => {
-      if (value <= 50) return "#4CAF50"; // Green
-      if (value <= 100) return "#FFC107"; // Yellow
-      if (value <= 150) return "#FF9800"; // Orange
-      if (value <= 200) return "#F44336"; // Red
-      return "#9C27B0"; // Purple
-  };
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -100,74 +86,60 @@ const AQIThresholdSettingsScreen = () => {
           Cài đặt ngưỡng cảnh báo AQI
         </Text>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#2196F3" style={{ marginTop: 50 }} />
-        ) : (
-          <>
-            {/* Phần điều chỉnh */}
-            <View style={styles.settingCard}>
-              <Text style={[typography.h3, styles.label]}>
-                Ngưỡng cảnh báo: <Text style={{color: getThresholdColor(aqiThreshold)}}>{aqiThreshold}</Text>
-              </Text>
-              
+        {/*Phần cài đặt ngưỡng AQI*/}
+        <View style={styles.settingCard}>
+          <Text style={[typography.h3, styles.label]}>Ngưỡng cảnh báo AQI</Text>
+          <View
+            style={{ width: "100%", alignSelf: "center", marginTop: 30 }}
+            onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+          >
+            {sliderWidth > 0 && (
               <View
-                style={{ width: "100%", alignSelf: "center", marginTop: 30 }}
-                onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+                style={{
+                  position: "absolute",
+                  // Tính toán vị trí Thumb Value
+                  left:
+                    ((aqiThreshold - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) *
+                    (sliderWidth - THUMB_SIZE),
+                  top: -30,
+                  width: THUMB_SIZE,
+                  alignItems: "center",
+                  zIndex: 2,
+                }}
               >
-                {sliderWidth > 0 && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      left:
-                        ((aqiThreshold - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) *
-                        (sliderWidth - THUMB_SIZE),
-                      top: -35,
-                      width: 40,
-                      alignItems: "center",
-                      zIndex: 2,
-                    }}
-                  >
-                    <Text style={[typography.body, styles.thresholdBubble]}>
-                      {aqiThreshold}
-                    </Text>
-                  </View>
-                )}
-                <Slider
-                  style={styles.slider}
-                  minimumValue={SLIDER_MIN}
-                  maximumValue={SLIDER_MAX}
-                  step={5}
-                  value={aqiThreshold}
-                  onValueChange={(value) => setAqiThreshold(Math.round(value))}
-                  minimumTrackTintColor={getThresholdColor(aqiThreshold)}
-                  maximumTrackTintColor="#e0e0e0"
-                  thumbTintColor={getThresholdColor(aqiThreshold)}
-                />
+                <Text style={[typography.body, styles.thresholdValue]}>
+                  {aqiThreshold}
+                </Text>
               </View>
-              
-              <View style={styles.scaleLabels}>
-                <Text style={styles.scaleText}>0 (Tốt)</Text>
-                <Text style={styles.scaleText}>300 (Nguy hại)</Text>
-              </View>
-            </View>
+            )}
+            <Slider
+              style={styles.slider}
+              minimumValue={SLIDER_MIN}
+              maximumValue={SLIDER_MAX}
+              step={5}
+              value={aqiThreshold}
+              onValueChange={(value) => setAqiThreshold(Math.round(value))}
+              minimumTrackTintColor="#2196F3"
+              maximumTrackTintColor="#ccc"
+              thumbTintColor="#2196F3"
+            />
+          </View>
+        </View>
+        <Text style={[typography.small, styles.infoText]}>
+          Bạn sẽ nhận thông báo khi AQI vượt quá ngưỡng đã chọn
+        </Text>
 
-            <Text style={[typography.small, styles.infoText]}>
-              Hệ thống sẽ gửi thông báo đẩy cho bạn khi chỉ số AQI (theo chuẩn US EPA) tại vị trí của bạn vượt quá con số {aqiThreshold}.
-            </Text>
-
-            {/* Nút lưu */}
-            <Button
-              mode="contained"
-              onPress={handleSaveSettings}
-              loading={saving}
-              disabled={saving}
-              style={[styles.saveButton, {backgroundColor: getThresholdColor(aqiThreshold)}]}
-              labelStyle={[typography.body, { color: "#fff", fontWeight: "bold" }]}
-            >
-              Lưu cài đặt
-            </Button>
-          </>
-        )}
+        {/*Nút lưu cài đặt*/}
+        <Button
+          mode="contained"
+          onPress={handleSaveSettings}
+          style={styles.saveButton}
+          contentStyle={styles.saveButtonLabel}
+          labelStyle={[typography.body, { color: "#fff", fontWeight: "bold" }]}
+          disabled={loading}
+        >
+          Lưu cài đặt
+        </Button>
       </View>
     </SafeAreaView>
   );

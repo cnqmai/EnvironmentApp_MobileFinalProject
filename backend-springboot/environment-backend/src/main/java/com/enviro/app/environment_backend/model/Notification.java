@@ -1,10 +1,7 @@
 package com.enviro.app.environment_backend.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
@@ -38,7 +35,8 @@ public class Notification {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private NotificationStatus status;
+    @Builder.Default
+    private NotificationStatus status = NotificationStatus.UNREAD; // FIX: Đảm bảo gán giá trị mặc định rõ ràng
 
     @Column(name = "related_id")
     private String relatedId; // ID liên quan (badge_id, report_id, campaign_id, etc.)
@@ -47,4 +45,3 @@ public class Notification {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 }
-

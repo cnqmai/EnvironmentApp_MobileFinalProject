@@ -1,6 +1,5 @@
 import { API_BASE_URL } from '../constants/api';
-// Lưu ý: Đảm bảo import đúng fetchWithAuth từ file helper của bạn
-import { fetchWithAuth } from '../utils/apiHelper';
+import { saveToken } from '../utils/apiHelper';
 
 /**
  * Xử lý lỗi API an toàn
@@ -52,7 +51,13 @@ export const login = async (email, password) => {
       throw new Error(errorMessage);
     }
 
-    return response.json(); // Trả về { token, user }
+    const data = await response.json();
+    
+    if (data.token) {
+        await saveToken(data.token);
+    }
+
+    return data; 
   } catch (error) {
     throw error;
   }
@@ -83,42 +88,81 @@ export const register = async (fullName, email, password) => {
 };
 
 /**
- * Đặt lại mật khẩu (FR-1.1.3)
+ * Gửi yêu cầu quên mật khẩu (gửi email)
+ * ĐÃ SỬA: Chuyển sang fetch và thêm /auth vào URL
+ */
+export const requestPasswordReset = async (email) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const errorMessage = await handleApiError(response);
+      throw new Error(errorMessage);
+    }
+
+    // Backend trả về chuỗi text thông báo, dùng text() thay vì json()
+    return response.text();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Đặt lại mật khẩu mới với token
+ * ĐÃ SỬA: Chuyển sang fetch và thêm /auth vào URL
  */
 export const resetPassword = async (token, newPassword, confirmPassword) => {
-  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ token, newPassword, confirmPassword }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        token, 
+        newPassword, 
+        confirmPassword 
+      }),
+    });
 
-  if (!response.ok) {
-    const errorMessage = await handleApiError(response);
-    throw new Error(errorMessage);
+    if (!response.ok) {
+      const errorMessage = await handleApiError(response);
+      throw new Error(errorMessage);
+    }
+
+    return response.text();
+  } catch (error) {
+    throw error;
   }
-  // API trả về 200/OK nếu đặt lại thành công
 };
 
 /**
  * Đăng nhập bằng Google (FR-1.1.1)
+ * Gửi ID token từ Google OAuth
  */
-export const loginWithGoogle = async (googleToken) => {
+export const loginWithGoogle = async (idToken) => {
+  console.log('loginWithGoogle: sending ID token to', `${API_BASE_URL}/auth/google`);
   const response = await fetch(`${API_BASE_URL}/auth/google`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ token: googleToken }),
+    body: JSON.stringify({ token: idToken }),
   });
 
   if (!response.ok) {
     const errorMessage = await handleApiError(response);
     throw new Error(errorMessage);
   }
-
-  return response.json();
+  const data = await response.json();
+  console.log('loginWithGoogle: server response', data);
+  return data;
 };
 
 /**

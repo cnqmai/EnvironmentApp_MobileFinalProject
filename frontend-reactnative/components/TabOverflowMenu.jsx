@@ -3,7 +3,8 @@ import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import Modal from "react-native-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { removeToken } from "../src/utils/apiHelper";
+
+// (Component MenuItem được định nghĩa ở dưới)
 
 const TabOverflowMenu = (props) => {
   const [isModalVisible, setModalVisible] = useState(false);
@@ -20,15 +21,11 @@ const TabOverflowMenu = (props) => {
 
   const navigateAndClose = (path) => {
     toggleModal();
+    // Điều hướng đến màn hình tương ứng
     router.push(path);
   };
 
-  const handleLogout = async () => {
-    toggleModal();
-    await removeToken(); 
-    router.replace("/(tabs)/login"); 
-  };
-
+  // Nút bấm gốc trên Tab Bar
   const TabBarButton = props.children;
 
   return (
@@ -61,8 +58,8 @@ const TabOverflowMenu = (props) => {
               />
               <MenuItem
                 icon="flag"
-                text="Báo cáo vi phạm"
-                onPress={() => navigateAndClose("/report")}
+                text="Báo cáo" 
+                onPress={() => navigateAndClose("/reports")}
               />
             </>
           )}
@@ -73,11 +70,12 @@ const TabOverflowMenu = (props) => {
             onPress={() => navigateAndClose("/settings")}
           />
 
+          {/* --- NÚT BẢN ĐỒ (Đã sửa đường dẫn thành /map/map) --- */}
           {!inAuthScreen && (
             <MenuItem
-              icon="logout"
-              text="Đăng xuất"
-              onPress={handleLogout}
+              icon="map-search-outline"
+              text="Bản đồ xanh"
+              onPress={() => navigateAndClose("/map/map")} 
             />
           )}
         </View>
@@ -94,12 +92,47 @@ const MenuItem = ({ icon, text, onPress }) => (
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center" },
-  touchable: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
-  modal: { justifyContent: "flex-end", margin: 0, position: "absolute", bottom: 120, right: 20, width: 250 },
-  modalContent: { backgroundColor: "white", borderRadius: 15, padding: 16, elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5 },
-  menuItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 8 },
-  menuItemText: { marginLeft: 16, fontSize: 16, fontWeight: "600", color: "#333" },
+  container: {
+    flex: 0.84,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  touchable: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modal: {
+    justifyContent: "flex-end",
+    margin: 0,
+    position: "absolute",
+    bottom: 100, 
+    right: 20,
+    width: 250,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 16,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  menuItemText: {
+    marginLeft: 16,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
 });
 
 export default TabOverflowMenu;

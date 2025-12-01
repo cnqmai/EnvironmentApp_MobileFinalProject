@@ -97,21 +97,27 @@ public class SecurityConfig {
                 .requestMatchers(mvc.pattern("/api/auth/**")).permitAll()
                 .requestMatchers(mvc.pattern("/auth/**")).permitAll()
                 
-                // 2. Cho phép API AQI (nhưng chặn saved-locations trong AqiController bằng logic riêng nếu cần, 
-                //    tuy nhiên AqiController hiện tại đang dùng SecurityContextHolder nên cần login cho các API con khác
-                //    -> Tốt nhất chỉ public những cái cần thiết)
-                .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/aqi")).permitAll() // Chỉ public GET AQI theo GPS
-                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll() // Public check alert
+                // 2. Cho phép API AQI
+                .requestMatchers(mvc.pattern("/api/aqi/**")).permitAll()
+                .requestMatchers(mvc.pattern("/aqi/**")).permitAll()
+
+                // >>> 3. THÊM DÒNG NÀY: CHO PHÉP TRUY CẬP ẢNH UPLOAD <<<
+                .requestMatchers(mvc.pattern("/uploads/**")).permitAll()
+
+                .requestMatchers("/api/aqi/**").permitAll() 
+                .requestMatchers("/api/environmental-data/**").permitAll()
+                .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll()
                 
                 // --- 3. THÊM MỚI: Cho phép API CATEGORIES (Public) ---
                 .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
                 .requestMatchers(mvc.pattern("/categories/**")).permitAll()
-                // -----------------------------------------------------
+                
+                // ======================================================
                 
                 // 4. Cho phép trang lỗi
                 .requestMatchers(mvc.pattern("/error")).permitAll()
                 
-                // 5. Cho phép OPTIONS
+                // 5. Cho phép OPTIONS (CORS)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
                 // 6. Các request còn lại bắt buộc đăng nhập

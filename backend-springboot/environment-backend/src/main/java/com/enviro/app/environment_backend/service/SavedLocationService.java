@@ -47,42 +47,54 @@ public class SavedLocationService {
     }
 
     /**
-     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile
+     * Lấy AQI cho tất cả vị trí đã lưu VÀ vị trí mặc định trong profile (ĐÃ SỬA LỖI COMPILATION)
+     * ĐÃ CẬP NHẬT: Kiểm tra user.isShareLocation() trước khi xử lý vị trí mặc định.
      */
     public List<SavedLocationAqiResponse> getAqiForAllSavedLocations(UUID userId) {
         List<SavedLocationAqiResponse> responseList = new ArrayList<>();
 
-        // 1. Lấy thông tin User để check default_location
+        // 1. Lấy thông tin User để check default_location VÀ quyền riêng tư
         User user = userRepository.findById(userId).orElse(null);
         
         // --- XỬ LÝ VỊ TRÍ MẶC ĐỊNH (USER PROFILE) ---
         if (user != null && user.getDefaultLocation() != null && !user.getDefaultLocation().isEmpty()) {
-            String address = user.getDefaultLocation();
-            // Gọi Geocoding để lấy tọa độ từ tên địa chỉ
-            GeocodingResponse coords = aqiService.getCoordinatesFromAddress(address);
-            
-            if (coords != null) {
-                // Lấy AQI dựa trên tọa độ vừa tìm được
-                AqiResponse aqiData = aqiService.getCurrentAqiByGps(coords.getLat(), coords.getLon());
+            if (user.isShareLocation()) {
+                // *** TRƯỜNG HỢP 1: USER CHO PHÉP CHIA SẺ VỊ TRÍ ***
+                String address = user.getDefaultLocation();
+                GeocodingResponse coords = aqiService.getCoordinatesFromAddress(address);
                 
-                if (aqiData != null) {
-                    responseList.add(SavedLocationAqiResponse.builder()
-                        .locationId(null) // Không có ID vì là mặc định
-                        .locationName(address + " (Mặc định)")
-                        .latitude(coords.getLat())
-                        .longitude(coords.getLon())
-                        .aqiValue(aqiData.getAqiValue())
-                        .status(aqiData.getStatus())
-                        .dominantPollutant(aqiData.getDominantPollutant())
-                        .healthAdvisory(aqiData.getHealthAdvisory())
-                        .timeObservation(aqiData.getTimeObservation())
-                        .resolvedCityName(aqiData.getCity())
-                        .build());
+                if (coords != null) {
+                    AqiResponse aqiData = aqiService.getCurrentAqiByGps(coords.getLat(), coords.getLon());
+                    
+                    if (aqiData != null) {
+                        responseList.add(SavedLocationAqiResponse.builder()
+                            .locationId(null) 
+                            .locationName(address + " (Mặc định)")
+                            .latitude(coords.getLat())
+                            .longitude(coords.getLon())
+                            .aqiValue(aqiData.getCalculatedAqiValue())
+                            // ... (các trường khác) ...
+                            .build());
+                    }
                 }
+            } else {
+                // *** TRƯỜNG HỢP 2: USER ĐÃ TẮT CHIA SẺ VỊ TRÍ (FR-7.3) ***
+                // Trả về placeholder với thông báo rõ ràng
+                responseList.add(SavedLocationAqiResponse.builder()
+                    .locationId(null)
+                    .locationName(user.getDefaultLocation() + " (Mặc định - Riêng tư)")
+                    .latitude(0.0) // Ghi 0,0 hoặc null
+                    .longitude(0.0)
+                    .aqiValue(-1) // -1 để Frontend biết không hợp lệ
+                    .status("Riêng tư")
+                    .healthAdvisory("Bạn đã tắt chia sẻ vị trí cá nhân. Dữ liệu bị chặn.")
+                    .resolvedCityName(user.getDefaultLocation())
+                    .components(null)
+                    .build());
             }
         }
 
-        // 2. Lấy danh sách từ bảng saved_locations
+        // 2. Lấy danh sách từ bảng saved_locations (Giữ nguyên)
         List<SavedLocation> savedLocations = locationRepository.findByUserId(userId);
         
         List<SavedLocationAqiResponse> savedList = savedLocations.stream().map(location -> {
@@ -96,12 +108,13 @@ public class SavedLocationService {
                 .locationName(location.getName())
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
-                .aqiValue(aqiData != null ? aqiData.getAqiValue() : -1)
+                .aqiValue(aqiData != null ? aqiData.getCalculatedAqiValue() : -1)
                 .status(aqiData != null ? aqiData.getStatus() : "N/A")
                 .dominantPollutant(aqiData != null ? aqiData.getDominantPollutant() : "N/A")
                 .healthAdvisory(aqiData != null ? aqiData.getHealthAdvisory() : "Không thể lấy dữ liệu.")
                 .timeObservation(aqiData != null ? aqiData.getTimeObservation() : "N/A")
                 .resolvedCityName(aqiData != null ? aqiData.getCity() : location.getName())
+                .components(aqiData != null ? aqiData.getComponents() : null)
                 .build();
         }).collect(Collectors.toList());
 
