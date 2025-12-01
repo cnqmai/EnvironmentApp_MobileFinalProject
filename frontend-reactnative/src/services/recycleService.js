@@ -1,67 +1,52 @@
 import { API_BASE_URL } from '../constants/api';
-import { fetchWithAuth, getToken } from '../utils/apiHelper';
+import { fetchWithAuth } from '../utils/apiHelper';
 
 /**
- * Nhận diện loại rác từ hình ảnh (FR-3.2.2)
- * POST /api/recycle/recognize
- * @param {FormData} formData - FormData chứa file ảnh
+ * Gửi ảnh lên Server để nhận diện loại rác (API THẬT)
+ * POST /api/recycle/identify
+ * @param {string} imageUri - Đường dẫn ảnh trên thiết bị
  */
-export const recognizeWasteImage = async (imageUri) => {
-    try {
-        // Tạo FormData cho multipart upload
-        const formData = new FormData();
-        formData.append('image', {
-            uri: imageUri,
-            type: 'image/jpeg', // hoặc 'image/png'
-            name: 'waste_image.jpg',
-        });
-
-        // Lấy token để gửi kèm
-        const token = await getToken();
-        const headers = {
-            'Content-Type': 'multipart/form-data',
-        };
-        
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/recycle/recognize`, {
-            method: 'POST',
-            headers,
-            body: formData,
-        });
-
-        if (!response.ok) {
-            const errorDetail = await response.json().catch(() => ({ message: 'Lỗi nhận diện ảnh' }));
-            throw new Error(errorDetail.message || 'Không thể nhận diện loại rác từ ảnh.');
-        }
-
-        return response.json();
-    } catch (error) {
-        console.error('Error recognizing waste image:', error);
-        throw error;
-    }
-};
-
-/**
- * Tìm kiếm hướng dẫn xử lý rác theo tên vật phẩm (FR-3.2.1)
- * GET /api/recycle/search?query=...
- * @param {string} query - Tên vật phẩm cần tìm
- */
-export const searchWasteGuide = async (query) => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/recycle/search?query=${encodeURIComponent(query)}`, {
-        method: 'GET',
+export const identifyWaste = async (imageUri) => {
+    // 1. Tạo FormData để upload file
+    const formData = new FormData();
+    formData.append('file', {
+        uri: imageUri,
+        name: 'recycle_waste.jpg', // Tên file
+        type: 'image/jpeg',        // Loại file
     });
 
+    // 2. Gọi API Upload (Multipart)
+    // Lưu ý: fetchWithAuth cần hỗ trợ upload hoặc dùng fetch thường nếu header khác biệt
+    // Ở đây ta dùng fetchWithAuth và để nó tự xử lý token, nhưng cần lưu ý Content-Type
+    
+    // Nếu fetchWithAuth của bạn tự động thêm 'Content-Type': 'application/json',
+    // thì khi upload file cần ghi đè hoặc dùng fetch riêng.
+    // Dưới đây là cách an toàn nhất dùng fetchWithAuth tuỳ biến:
+    
+    const response = await fetchWithAuth(`${API_BASE_URL}/recycle/identify`, {
+        method: 'POST',
+        // Không set Content-Type thủ công để browser/engine tự set multipart/form-data boundary
+        headers: {
+            // 'Content-Type': 'multipart/form-data', // Đừng uncomment dòng này, để tự động
+        },
+        body: formData,
+    }, true); // Tham số thứ 3 là isFileUpload (nếu utils/apiHelper có hỗ trợ) 
+              // Hoặc bạn có thể dùng fetch trực tiếp kèm token lấy từ AsyncStorage
+
     if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi tìm kiếm' }));
-        throw new Error(errorDetail.message || 'Không thể tìm kiếm hướng dẫn.');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Lỗi nhận diện hình ảnh.');
     }
 
+    // 3. Trả về kết quả JSON từ Server
+    // Server cần trả về format: { label: "...", type: "...", guideline: "..." }
     return response.json();
 };
 
+/**
+ * Xác nhận đã phân loại đúng để nhận điểm
+ * POST /api/recycle/confirm
+ */
 export const confirmRecycleAction = async (wasteType) => {
     const response = await fetchWithAuth(`${API_BASE_URL}/recycle/confirm`, {
         method: 'POST',
