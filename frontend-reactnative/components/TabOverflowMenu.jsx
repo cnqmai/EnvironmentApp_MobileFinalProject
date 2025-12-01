@@ -1,22 +1,52 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter, useSegments, useLocalSearchParams, useFocusEffect } from "expo-router";
 import Modal from "react-native-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { getUnreadCount } from "../src/services/notificationService";
 
 // (Component MenuItem được định nghĩa ở dưới)
 
 const TabOverflowMenu = (props) => {
   const [isModalVisible, setModalVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
-  const segments = useSegments(); 
+  const segments = useSegments();
+  const params = useLocalSearchParams(); 
 
   const inAuthScreen =
     segments[0] === "(tabs)" &&
     (segments[1] === "login" || segments[1] === "register");
 
+  // Fetch unread count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  }, []);
+
+  // Load unread count khi mở modal hoặc khi có refreshStamp
+  useEffect(() => {
+    if (isModalVisible) {
+      fetchUnreadCount();
+    }
+  }, [isModalVisible, fetchUnreadCount]);
+
+  // Refresh khi có params.refreshStamp (từ notifications screen)
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+    }, [params.refreshStamp, fetchUnreadCount])
+  );
+
   const toggleModal = () => {
     setModalVisible(!isModalVisible);
+    if (!isModalVisible) {
+      fetchUnreadCount(); // Refresh count khi mở modal
+    }
   };
 
   const navigateAndClose = (path) => {
@@ -61,6 +91,12 @@ const TabOverflowMenu = (props) => {
                 text="Báo cáo" 
                 onPress={() => navigateAndClose("/reports")}
               />
+              <MenuItem
+                icon="bell"
+                text="Thông báo"
+                badgeCount={unreadCount}
+                onPress={() => navigateAndClose("/(tabs)/notifications")}
+              />
             </>
           )}
 
@@ -84,9 +120,16 @@ const TabOverflowMenu = (props) => {
   );
 };
 
-const MenuItem = ({ icon, text, onPress }) => (
+const MenuItem = ({ icon, text, onPress, badgeCount }) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-    <MaterialCommunityIcons name={icon} size={24} color="#333" />
+    <View style={styles.menuItemIconContainer}>
+      <MaterialCommunityIcons name={icon} size={24} color="#333" />
+      {badgeCount > 0 && (
+        <View style={styles.menuBadge}>
+          <Text style={styles.menuBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      )}
+    </View>
     <Text style={styles.menuItemText}>{text}</Text>
   </TouchableOpacity>
 );
@@ -126,6 +169,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 8,
+  },
+  menuItemIconContainer: {
+    position: 'relative',
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: '#FF6347',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  menuBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   menuItemText: {
     marginLeft: 16,

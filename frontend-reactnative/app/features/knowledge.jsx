@@ -14,6 +14,7 @@ const KnowledgeScreen = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedType, setSelectedType] = useState(null); // Filter theo loại: ARTICLE, VIDEO, INFOGRAPHIC
 
   const categories = [
     { id: 'PHAN_LOAI', label: 'Phân\nloại', icon: 'recycle', color: '#E3F2FD', textCol: '#1565C0' },
@@ -22,7 +23,7 @@ const KnowledgeScreen = () => {
     { id: 'GIAM_RAC', label: 'Giảm\nrác', icon: 'delete-outline', color: '#FFF3E0', textCol: '#EF6C00' },
   ];
 
-  // Gọi API mỗi khi category hoặc searchText thay đổi
+  // Gọi API mỗi khi category, type hoặc searchText thay đổi
   useEffect(() => {
     // Sử dụng debounce đơn giản với timeout để tránh gọi API quá nhiều khi gõ
     const delayDebounceFn = setTimeout(() => {
@@ -30,13 +31,13 @@ const KnowledgeScreen = () => {
     }, 500); // Đợi 500ms sau khi ngừng gõ
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchText, selectedCategory]);
+}, [searchText, selectedCategory, selectedType]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Gọi API với cả search text và category
-      const data = await getAllKnowledge(selectedCategory, null, searchText);
+      // Gọi API với cả search text, category và type
+      const data = await getAllKnowledge(selectedCategory, selectedType, searchText);
       setArticles(data);
     } catch (error) {
       console.error("Lỗi tải bài viết:", error);
@@ -115,6 +116,37 @@ const KnowledgeScreen = () => {
           })}
         </View>
 
+        {/* Type Filter */}
+        <View style={styles.typeFilterContainer}>
+          <TouchableOpacity 
+            style={[styles.typeFilterBtn, !selectedType && styles.typeFilterBtnActive]}
+            onPress={() => setSelectedType(null)}
+          >
+            <Text style={[styles.typeFilterText, !selectedType && styles.typeFilterTextActive]}>Tất cả</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.typeFilterBtn, selectedType === 'ARTICLE' && styles.typeFilterBtnActive]}
+            onPress={() => setSelectedType(selectedType === 'ARTICLE' ? null : 'ARTICLE')}
+          >
+            <MaterialCommunityIcons name="text" size={16} color={selectedType === 'ARTICLE' ? '#007AFF' : '#666'} />
+            <Text style={[styles.typeFilterText, selectedType === 'ARTICLE' && styles.typeFilterTextActive]}>Bài viết</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.typeFilterBtn, selectedType === 'VIDEO' && styles.typeFilterBtnActive]}
+            onPress={() => setSelectedType(selectedType === 'VIDEO' ? null : 'VIDEO')}
+          >
+            <MaterialCommunityIcons name="video" size={16} color={selectedType === 'VIDEO' ? '#FF5722' : '#666'} />
+            <Text style={[styles.typeFilterText, selectedType === 'VIDEO' && styles.typeFilterTextActive]}>Video</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.typeFilterBtn, selectedType === 'INFOGRAPHIC' && styles.typeFilterBtnActive]}
+            onPress={() => setSelectedType(selectedType === 'INFOGRAPHIC' ? null : 'INFOGRAPHIC')}
+          >
+            <MaterialCommunityIcons name="image-multiple" size={16} color={selectedType === 'INFOGRAPHIC' ? '#9C27B0' : '#666'} />
+            <Text style={[styles.typeFilterText, selectedType === 'INFOGRAPHIC' && styles.typeFilterTextActive]}>Infographic</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* List Header */}
         <View style={styles.featuredHeader}>
            <Text style={styles.sectionTitle}>
@@ -141,6 +173,7 @@ const KnowledgeScreen = () => {
                         <Text style={styles.tag}>{item.category || 'Chung'}</Text>
                         <View style={{flex: 1}}/>
                         {item.type === 'VIDEO' && <MaterialCommunityIcons name="video" size={16} color="#FF5722" />}
+                        {item.type === 'INFOGRAPHIC' && <MaterialCommunityIcons name="image-multiple" size={16} color="#9C27B0" />}
                     </View>
                     <Text style={styles.articleTitle} numberOfLines={2}>{item.title}</Text>
                     <View style={styles.metaRow}>
@@ -187,6 +220,40 @@ const styles = StyleSheet.create({
   catText: { fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
 
   featuredHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  
+  // Type Filter
+  typeFilterContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    marginBottom: 12,
+    gap: 8,
+    paddingHorizontal: 4
+  },
+  typeFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 6
+  },
+  typeFilterBtnActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#007AFF',
+    borderWidth: 2
+  },
+  typeFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666'
+  },
+  typeFilterTextActive: {
+    color: '#007AFF',
+    fontWeight: '700'
+  },
 
   listContainer: { gap: 16 },
   articleCard: { flexDirection: 'row', padding: 12, backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#F0F0F0', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3 },

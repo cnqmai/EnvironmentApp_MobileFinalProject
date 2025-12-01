@@ -84,6 +84,18 @@ const ArticleDetailScreen = () => {
                     }}
                 />
             </View>
+        ) : article.type === 'INFOGRAPHIC' ? (
+            <View style={styles.infographicContainer}>
+                <Image 
+                    source={{ uri: article.thumbnailUrl || article.imageUrl || 'https://via.placeholder.com/400x600' }} 
+                    style={styles.infographicImage}
+                    resizeMode="contain"
+                />
+                <View style={styles.infographicBadge}>
+                    <MaterialCommunityIcons name="image-multiple" size={20} color="#FFFFFF" />
+                    <Text style={styles.infographicBadgeText}>Infographic</Text>
+                </View>
+            </View>
         ) : (
             <Image 
                 source={{ uri: article.thumbnailUrl || 'https://via.placeholder.com/400x250' }} 
@@ -103,6 +115,11 @@ const ArticleDetailScreen = () => {
                 {article.type === 'VIDEO' && (
                     <View style={[styles.categoryBadge, {backgroundColor: '#FFEBEE', marginLeft: 8}]}>
                         <Text style={[styles.categoryText, {color: '#D32F2F'}]}>VIDEO</Text>
+                    </View>
+                )}
+                {article.type === 'INFOGRAPHIC' && (
+                    <View style={[styles.categoryBadge, {backgroundColor: '#F3E5F5', marginLeft: 8}]}>
+                        <Text style={[styles.categoryText, {color: '#7B1FA2'}]}>INFOGRAPHIC</Text>
                     </View>
                 )}
                 <View style={{flex:1}} />
@@ -129,6 +146,18 @@ const ArticleDetailScreen = () => {
             </View>
 
             <View style={styles.divider} />
+            
+            {/* Hiển thị infographic lớn trong content nếu là loại INFOGRAPHIC */}
+            {article.type === 'INFOGRAPHIC' && article.thumbnailUrl && (
+                <View style={styles.infographicContentContainer}>
+                    <Image 
+                        source={{ uri: article.thumbnailUrl || article.imageUrl }} 
+                        style={styles.infographicContentImage}
+                        resizeMode="contain"
+                    />
+                </View>
+            )}
+            
             <Text style={styles.textContent}>{article.content}</Text>
         </View>
       </ScrollView>
@@ -155,6 +184,38 @@ const styles = StyleSheet.create({
     marginTop: 20 // Đẩy xuống một chút để tránh header
   },
   coverImage: { width: '100%', height: '100%', resizeMode: 'cover', opacity: 0.9 },
+  
+  // Infographic Section
+  infographicContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative'
+  },
+  infographicImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain'
+  },
+  infographicBadge: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(156, 39, 176, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6
+  },
+  infographicBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700'
+  },
   
   // Custom Header Back Button
   safeHeader: {
@@ -194,6 +255,23 @@ const styles = StyleSheet.create({
   viewCount: { fontSize: 12, color: '#757575', marginLeft: 4 },
 
   divider: { height: 1, backgroundColor: '#EEEEEE', marginBottom: 20 },
+  
+  // Infographic in content
+  infographicContentContainer: {
+    width: '100%',
+    marginBottom: 20,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center'
+  },
+  infographicContentImage: {
+    width: '100%',
+    minHeight: 300,
+    maxHeight: 800,
+    borderRadius: 8
+  },
+  
   textContent: { fontSize: 16, lineHeight: 26, color: '#424242', textAlign: 'justify' }
 });
 

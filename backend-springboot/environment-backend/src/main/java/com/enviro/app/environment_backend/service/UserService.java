@@ -33,11 +33,17 @@ import com.enviro.app.environment_backend.model.Report;
 import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
+import com.enviro.app.environment_backend.repository.CommentRepository;
+import com.enviro.app.environment_backend.repository.GroupMemberRepository;
+import com.enviro.app.environment_backend.repository.LikeRepository;
+import com.enviro.app.environment_backend.repository.NotificationRepository;
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
 import com.enviro.app.environment_backend.repository.PostRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
 import com.enviro.app.environment_backend.repository.UserBadgeRepository;
+import com.enviro.app.environment_backend.repository.UserQuizScoreRepository;
+import com.enviro.app.environment_backend.repository.UserRewardRepository;
 import com.enviro.app.environment_backend.repository.UserRepository;
 
 @Service
@@ -50,6 +56,12 @@ public class UserService {
     private final UserBadgeRepository userBadgeRepository;
     private final ChatbotHistoryRepository chatbotHistoryRepository;
     private final PostRepository postRepository;
+    private final UserQuizScoreRepository userQuizScoreRepository;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final NotificationRepository notificationRepository;
+    private final UserRewardRepository userRewardRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
 
@@ -65,6 +77,12 @@ public class UserService {
                   UserBadgeRepository userBadgeRepository, 
                   ChatbotHistoryRepository chatbotHistoryRepository,
                   PostRepository postRepository,
+                  UserQuizScoreRepository userQuizScoreRepository,
+                  CommentRepository commentRepository,
+                  LikeRepository likeRepository,
+                  GroupMemberRepository groupMemberRepository,
+                  NotificationRepository notificationRepository,
+                  UserRewardRepository userRewardRepository,
                   PasswordEncoder passwordEncoder,
                   NotificationService notificationService) { 
     this.userRepository = userRepository;
@@ -74,6 +92,12 @@ public class UserService {
     this.userBadgeRepository = userBadgeRepository;
     this.chatbotHistoryRepository = chatbotHistoryRepository;
     this.postRepository = postRepository;
+    this.userQuizScoreRepository = userQuizScoreRepository;
+    this.commentRepository = commentRepository;
+    this.likeRepository = likeRepository;
+    this.groupMemberRepository = groupMemberRepository;
+    this.notificationRepository = notificationRepository;
+    this.userRewardRepository = userRewardRepository;
     this.passwordEncoder = passwordEncoder;
     this.notificationService = notificationService;
 }
@@ -335,13 +359,25 @@ public class UserService {
         
         // 3. Xóa dữ liệu liên quan: QUAN TRỌNG!
         // Xóa các bản ghi liên quan đến user trước (CASCADE DELETE)
+        // Thứ tự xóa: Xóa dữ liệu phụ thuộc trước, sau đó mới xóa dữ liệu chính
         
-        // * Giả định các Repository có phương thức deleteBy... (Nếu không, phải dùng Query trong Repository)
+        // Xóa comments và likes của user trước (vì chúng phụ thuộc vào posts)
+        commentRepository.deleteByUser(user);
+        likeRepository.deleteByUser(user);
+        
+        // Xóa posts của user (sau khi đã xóa comments và likes)
+        postRepository.deleteByUserId(userId);
+        
+        // Xóa các dữ liệu khác
         reportRepository.deleteByUser(user);
         savedLocationRepository.deleteByUserId(userId);
         notificationSettingsRepository.deleteByUser(user);
+        notificationRepository.deleteByUser(user);
         userBadgeRepository.deleteByUser(user);
+        userQuizScoreRepository.deleteByUser(user);
+        userRewardRepository.deleteByUser(user);
         chatbotHistoryRepository.deleteByUser(user);
+        groupMemberRepository.deleteByUser(user);
         
         // 4. Xóa bản ghi User cuối cùng
         userRepository.delete(user);

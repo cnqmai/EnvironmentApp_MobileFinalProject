@@ -141,21 +141,6 @@ const CreateEventScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Ảnh sự kiện</Text>
-            <TouchableOpacity
-              style={styles.imageUploadButton}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name="camera-plus"
-                size={32}
-                color="#007AFF"
-              />
-              <Text style={styles.uploadButtonText}>Thêm ảnh sự kiện</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>
               Địa điểm <Text style={styles.required}>*</Text>
             </Text>
@@ -409,24 +394,6 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "right",
     marginTop: 4,
-  },
-
-  imageUploadButton: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#007AFF",
-    borderStyle: "dashed",
-    paddingVertical: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  uploadButtonText: {
-    ...typography.body,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#007AFF",
   },
 
   inputWithIcon: {

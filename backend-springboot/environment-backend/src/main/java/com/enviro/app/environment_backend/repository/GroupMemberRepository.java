@@ -20,5 +20,10 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
     boolean existsByUserAndGroup(User user, CommunityGroup group);
     
     Optional<GroupMember> findByUserAndGroup(User user, CommunityGroup group);
+    
+    /**
+     * Xóa tất cả group members của user
+     */
+    void deleteByUser(User user);
 }
 

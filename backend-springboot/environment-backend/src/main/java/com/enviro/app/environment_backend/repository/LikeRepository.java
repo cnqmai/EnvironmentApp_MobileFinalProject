@@ -26,5 +26,10 @@ public interface LikeRepository extends JpaRepository<Like, LikeId> {
      * Đếm số lượng likes của một post
      */
     long countByPost(Post post);
+    
+    /**
+     * Xóa tất cả likes của user
+     */
+    void deleteByUser(User user);
 }
 

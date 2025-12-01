@@ -34,5 +34,10 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
      */
     @Query("SELECT n FROM Notification n WHERE n.user.id = :userId ORDER BY n.createdAt DESC")
     List<Notification> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId);
+    
+    /**
+     * Xóa tất cả notifications của user
+     */
+    void deleteByUser(User user);
 }
 

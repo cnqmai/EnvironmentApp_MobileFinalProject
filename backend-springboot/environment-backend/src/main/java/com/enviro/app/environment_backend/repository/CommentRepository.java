@@ -2,6 +2,7 @@ package com.enviro.app.environment_backend.repository;
 
 import com.enviro.app.environment_backend.model.Comment;
 import com.enviro.app.environment_backend.model.Post;
+import com.enviro.app.environment_backend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -20,4 +21,9 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
      * [BỔ SUNG SỬA LỖI] Đếm số lượng comments của một post
      */
     long countByPost(Post post);
+    
+    /**
+     * Xóa tất cả comments của user
+     */
+    void deleteByUser(User user);
 }

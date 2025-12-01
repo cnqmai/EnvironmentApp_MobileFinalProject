@@ -3,6 +3,20 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import typography from "../../styles/typography";
 
 const CommunityCard = ({ community, onPress }) => {
+  // Lấy dữ liệu từ API response
+  const memberCount = community.memberCount || 0;
+  const recycledWeight = community.recycledWasteKg || 0;
+  const isMember = community.isMember || false;
+  const campaigns = community.totalReports || 0; // Tạm thời dùng totalReports, có thể thay bằng campaigns count nếu có API
+  
+  // Format số lượng
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'k';
+    }
+    return num.toString();
+  };
+
   return (
     <TouchableOpacity
       style={styles.communityCard}
@@ -18,33 +32,31 @@ const CommunityCard = ({ community, onPress }) => {
           />
         </View>
         <View style={styles.communityHeaderContent}>
-          <Text style={styles.communityName}>{community.name}</Text>
+          <Text style={styles.communityName}>{community.name || 'Cộng đồng'}</Text>
           <Text style={styles.communityMembers}>
-            {community.members} thành viên
+            {memberCount.toLocaleString('vi-VN')} thành viên
           </Text>
         </View>
       </View>
 
       <View style={styles.communityStats}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{community.campaigns}</Text>
+          <Text style={styles.statValue}>{campaigns}</Text>
           <Text style={styles.statLabel}>Chiến dịch</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{community.recycledWeight}kg</Text>
+          <Text style={styles.statValue}>
+            {recycledWeight >= 1000 
+              ? (recycledWeight / 1000).toFixed(1) + 't' 
+              : recycledWeight.toFixed(1) + 'kg'}
+          </Text>
           <Text style={styles.statLabel}>Rác tái chế</Text>
         </View>
       </View>
 
-      {community.joined ? (
+      {isMember ? (
         <View style={styles.communityActions}>
-          {community.following && (
-            <View style={styles.followingBadge}>
-              <MaterialCommunityIcons name="bell" size={12} color="#007AFF" />
-              <Text style={styles.followingText}>Đang theo dõi</Text>
-            </View>
-          )}
           <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
         </View>
       ) : (
