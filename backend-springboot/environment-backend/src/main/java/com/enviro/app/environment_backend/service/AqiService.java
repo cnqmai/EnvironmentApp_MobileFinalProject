@@ -14,6 +14,9 @@ import java.net.URI;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays; 
+import java.util.Collections; 
+import java.util.List; 
 import java.util.Map;
 
 @Service
@@ -130,9 +133,10 @@ public class AqiService {
     }
 
     /**
-     * [MỚI] API Geocoding để tìm tọa độ từ địa chỉ (Khắc phục lỗi Scheduler)
+     * [MỚI] API Geocoding để tìm tọa độ từ địa chỉ
      */
     public GeocodingResponse geocodeAddress(String address) {
+        // Hàm này gọi getCoordinatesFromAddress(address)
         return getCoordinatesFromAddress(address);
     }
     
@@ -165,6 +169,19 @@ public class AqiService {
         return result;
     }
 
+    /**
+    * [MỚI] Lấy danh sách gợi ý địa chỉ (Geocoding) cho tính năng Autocomplete.
+    */
+    public List<GeocodingResponse> getSearchSuggestions(String query, int limit) {
+        // LÔI CŨ: gọi hàm 1 tham số với 2 đối số
+        // FIX LỖI: Gọi hàm Geocoding với 2 tham số (query và limit)
+        List<GeocodingResponse> results = callGeocodingApi(query, limit); 
+        if (results == null) {
+            return Collections.emptyList();
+        }
+        return results;
+    }
+
     // =======================================================
     // --- CÁC HÀM PRIVATE HELPER ---
     // =======================================================
@@ -188,13 +205,16 @@ public class AqiService {
         if (aqi >= 0) return "Không khí tốt: Thoải mái hoạt động ngoài trời.";
         return "Không có dữ liệu.";
     }
-
-    private GeocodingResponse callGeocodingApi(String address) {
+    
+    /**
+     * [MỚI - 2 THAM SỐ] Hàm gọi API Geocoding chung, trả về List<GeocodingResponse>.
+     */
+    private List<GeocodingResponse> callGeocodingApi(String address, int limit) {
         String directGeoUrl = "http://api.openweathermap.org/geo/1.0/direct";
         try {
             URI uri = UriComponentsBuilder.fromHttpUrl(directGeoUrl)
                     .queryParam("q", address)
-                    .queryParam("limit", 1)
+                    .queryParam("limit", limit)
                     .queryParam("appid", apiKey)
                     .build()
                     .toUri();
@@ -202,14 +222,26 @@ public class AqiService {
             ResponseEntity<GeocodingResponse[]> responseEntity = restTemplate.getForEntity(uri, GeocodingResponse[].class);
             GeocodingResponse[] responses = responseEntity.getBody();
 
-            if (responses != null && responses.length > 0) {
-                return responses[0];
+            if (responses != null) {
+                // Chuyển array thành List
+                return Arrays.asList(responses); 
             }
         } catch (Exception e) {
-            // Bỏ qua lỗi để tiếp tục vòng lặp retry
+            System.err.println("Lỗi gọi API Geocoding với Limit: " + e.getMessage());
         }
-        return null;
+        return Collections.emptyList();
     }
+
+
+    /**
+     * [CŨ - 1 THAM SỐ] Hàm gọi API Geocoding chung, trả về 1 kết quả (dùng cho getCoordinatesFromAddress).
+     */
+    private GeocodingResponse callGeocodingApi(String address) {
+        // Chỉ gọi hàm 2 tham số với limit = 1
+        List<GeocodingResponse> results = callGeocodingApi(address, 1);
+        return results.isEmpty() ? null : results.get(0);
+    }
+
 
     private String getCityNameFromGps(double lat, double lon) {
         try {

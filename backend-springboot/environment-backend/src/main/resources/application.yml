@@ -1,5 +1,7 @@
 server:
   port: 8080
+  error:
+    include-message: always
   servlet:
     context-path: /
 
@@ -117,5 +119,4 @@ logging:
 
 # --- Gemini Configuration ---
 gemini:
-  api-key: "AIzaSyAtXwVcMg-h08LOcE17sK8gDINtHBMxHmY" 
-  # Hãy thay thế "YOUR_GEMINI_API_KEY_HERE" bằng mã khóa thực tế của bạn
+  api-key: "AIzaSyDDtPZQ-utdy3iwOuZY2DTHjNZu3bmg4wA" 

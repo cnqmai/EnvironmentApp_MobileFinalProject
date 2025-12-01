@@ -71,9 +71,9 @@ public class NotificationScheduler {
     }
     
     // ====================================================================
-    // FR-6.2: Nhắc nhở lịch thu gom rác (Chạy lúc 7:00 sáng và 10:00 tối mỗi ngày)
+    // FR-6.2: Nhắc nhở lịch thu gom rác (Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày)
     // ====================================================================
-    @Scheduled(cron = "0 0 7,22 * * ?") 
+    @Scheduled(cron = "0 0 8,9,13,14,22 * * ?")
     public void scheduleCollectionReminder() {
         List<User> users = userRepository.findAll(); 
         
@@ -95,9 +95,9 @@ public class NotificationScheduler {
     }
     
     // ====================================================================
-    // FR-6.1: Thông báo chiến dịch môi trường (Chạy 9:00 sáng Thứ 7 và Chủ Nhật)
+    // FR-6.1: Thông báo chiến dịch môi trường (Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày)
     // ====================================================================
-    @Scheduled(cron = "0 0 9 ? * SAT,SUN") 
+    @Scheduled(cron = "0 0 8,9,13,14,22 * * ?")
     public void scheduleCampaignNotification() {
         List<User> users = userRepository.findAll();
         

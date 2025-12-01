@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/environmental-data") // Đổi base path để chứa nhiều loại dữ liệu
+@RequestMapping({"/api/environmental-data", "/environmental-data"}) 
 public class EnvironmentDataController {
 
     private final NoiseService noiseService;
@@ -58,5 +58,18 @@ public class EnvironmentDataController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(coords);
+    }
+
+    // API MỚI: SEARCH ADDRESS (Tìm kiếm gợi ý)
+    @GetMapping("/search-address")
+    // Giả định service này nằm trong AqiService (hoặc một service Geocoding khác)
+    public ResponseEntity<Object> searchAddress(@RequestParam String query, @RequestParam(required = false, defaultValue = "5") int limit) {
+        // DÙNG aqiService TẠM THỜI nếu bạn chưa có Geocoding Service riêng
+        Object results = aqiService.getSearchSuggestions(query, limit); 
+        
+        if (results == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(results);
     }
 }

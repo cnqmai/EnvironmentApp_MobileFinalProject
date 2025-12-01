@@ -399,3 +399,94 @@ INSERT INTO waste_categories (name, description, icon_url) VALUES
 ('Rác thải xây dựng', 'Vật liệu xây dựng thải bỏ như gạch, xi măng', NULL),
 ('Rác thải y tế', 'Rác thải từ bệnh viện, phòng khám', NULL),
 ('Rác thải khác', 'Các loại rác thải không thuộc các danh mục trên', NULL);
+
+-- Cập nhật trường collection_point_type, disposal_guideline, và recycling_guideline cho 10 loại rác
+-- -- 1. Rác thải nhựa (PLASTIC)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'PLASTIC',
+--     disposal_guideline = 'Làm sạch chai/hộp nhựa, tháo nhãn mác (nếu có). Gom riêng và giao cho các điểm thu gom tái chế.',
+--     recycling_guideline = 'Tái chế được 99% (PET, HDPE, PVC...). Có thể chuyển thành hạt nhựa, sợi tổng hợp hoặc vật liệu xây dựng.',
+--     updated_at = NOW()
+-- WHERE id = 1;
+
+-- -- 2. Rác thải điện tử (ELECTRONIC)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'ELECTRONIC',
+--     disposal_guideline = 'Tuyệt đối không được vứt vào thùng rác sinh hoạt. Thu gom và mang đến các điểm tiếp nhận chính thức (UBND Phường, MM Mega Market...) để xử lý đúng quy trình.',
+--     recycling_guideline = 'Các linh kiện chứa kim loại quý (vàng, bạc, đồng) và vật liệu có thể tái sử dụng. Cần được tháo dỡ bởi các đơn vị chuyên môn để tránh rò rỉ chất độc.',
+--     updated_at = NOW()
+-- WHERE id = 2;
+
+-- -- 3. Rác thải hữu cơ (ORGANIC)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'ORGANIC',
+--     disposal_guideline = 'Tách riêng khỏi các loại rác khác. Có thể dùng làm phân bón tại nhà hoặc chuyển đến các điểm thu gom hữu cơ chuyên biệt.',
+--     recycling_guideline = 'Tái chế bằng phương pháp ủ phân (composting) để tạo ra phân bón hữu cơ chất lượng cao cho cây trồng.',
+--     updated_at = NOW()
+-- WHERE id = 3;
+
+-- -- 4. Rác thải kim loại (METAL)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'METAL',
+--     disposal_guideline = 'Làm sạch, loại bỏ dầu mỡ (nếu có). Ép dẹt lon, hộp để tiết kiệm không gian. Thu gom riêng để giao cho cơ sở phế liệu.',
+--     recycling_guideline = 'Tái chế 100% không giới hạn số lần. Kim loại được nung chảy và đúc thành sản phẩm mới, giúp tiết kiệm năng lượng đáng kể.',
+--     updated_at = NOW()
+-- WHERE id = 4;
+
+-- -- 5. Rác thải thủy tinh (GLASS)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'GLASS',
+--     disposal_guideline = 'Rửa sạch, loại bỏ nắp nhựa/kim loại. Nếu vỡ, bọc kỹ bằng giấy báo hoặc vải dày và dán nhãn "THỦY TINH VỠ" để đảm bảo an toàn cho người thu gom.',
+--     recycling_guideline = 'Tái chế bằng cách nghiền nát và nấu chảy để tạo ra chai lọ, gạch lát hoặc sợi thủy tinh mới. Nên phân loại theo màu sắc (trong suốt, xanh, nâu).',
+--     updated_at = NOW()
+-- WHERE id = 5;
+
+-- -- 6. Rác thải giấy (PAPER)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'PAPER',
+--     disposal_guideline = 'Thu gom giấy, bìa cứng khô ráo, không dính dầu mỡ/thức ăn. Ép phẳng hộp carton. Không bao gồm giấy vệ sinh, giấy ăn đã qua sử dụng.',
+--     recycling_guideline = 'Tái chế bằng cách nghiền thành bột giấy và ép thành giấy, hộp carton, hoặc vật liệu cách nhiệt mới. Giấy có thể tái chế nhiều lần.',
+--     updated_at = NOW()
+-- WHERE id = 6;
+
+-- -- 7. Rác thải nguy hại (HAZARDOUS)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'HAZARDOUS',
+--     disposal_guideline = 'Không bao giờ vứt vào thùng rác thông thường. Đóng gói kín và mang đến các điểm thu gom rác nguy hại (Trạm TT Quận, Môi trường Đô thị) để xử lý chuyên biệt.',
+--     recycling_guideline = 'Ít khả năng tái chế trực tiếp. Chủ yếu là xử lý an toàn (đốt, chôn lấp) để trung hòa hóa chất và ngăn chất độc hại ngấm vào môi trường.',
+--     updated_at = NOW()
+-- WHERE id = 7;
+
+-- -- 8. Rác thải xây dựng (CONSTRUCTION)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'CONSTRUCTION',
+--     disposal_guideline = 'Cần liên hệ với các đơn vị dịch vụ thu gom rác xây dựng chuyên nghiệp. Không được đổ ở nơi công cộng hoặc trộn lẫn với rác sinh hoạt.',
+--     recycling_guideline = 'Có thể tái chế thành cốt liệu xây dựng (sỏi, cát nhân tạo) để dùng làm nền đường, vật liệu san lấp.',
+--     updated_at = NOW()
+-- WHERE id = 8;
+
+-- -- 9. Rác thải y tế (MEDICAL)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'MEDICAL',
+--     disposal_guideline = 'Đóng gói kim tiêm, băng gạc, thuốc hết hạn vào hộp/túi riêng biệt (có dán nhãn). Giao cho các bệnh viện hoặc đơn vị xử lý rác y tế chuyên biệt.',
+--     recycling_guideline = 'Các vật liệu sắc nhọn, lây nhiễm phải được xử lý bằng phương pháp tiệt trùng hoặc đốt ở nhiệt độ cao. Ít vật liệu được tái chế trực tiếp để đảm bảo an toàn.',
+--     updated_at = NOW()
+-- WHERE id = 9;
+
+-- -- 10. Rác thải khác (OTHER)
+-- UPDATE waste_categories
+-- SET
+--     collection_point_type = 'OTHER',
+--     disposal_guideline = 'Rác thải không thể tái chế hoặc không thuộc các danh mục trên (như vải vụn, đồ sứ, tã lót). Vứt vào thùng rác sinh hoạt thông thường.',
+--     recycling_guideline = 'Khả năng tái chế thấp. Đồ cũ còn dùng được có thể tặng hoặc bán. Phần còn lại được đưa đến bãi chôn lấp hoặc nhà máy đốt rác.',
+--     updated_at = NOW()
+-- WHERE id = 10;

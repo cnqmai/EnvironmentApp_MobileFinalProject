@@ -101,26 +101,27 @@ public class SecurityConfig {
                 .requestMatchers(mvc.pattern("/api/aqi/**")).permitAll()
                 .requestMatchers(mvc.pattern("/aqi/**")).permitAll()
 
-                // >>> 3. THÊM DÒNG NÀY: CHO PHÉP TRUY CẬP ẢNH UPLOAD <<<
+                // >>> 3. Cho phép truy cập ảnh upload <<<
                 .requestMatchers(mvc.pattern("/uploads/**")).permitAll()
 
                 .requestMatchers("/api/aqi/**").permitAll() 
-                .requestMatchers("/api/environmental-data/**").permitAll()
+                
+                .requestMatchers("/environmental-data/**").permitAll()
+                .requestMatchers("/api/environmental-data/**").permitAll() 
+                
                 .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/aqi/check-alert")).permitAll()
                 
-                // --- 3. THÊM MỚI: Cho phép API CATEGORIES (Public) ---
+                // --- 4. Cho phép API CATEGORIES (Public) ---
                 .requestMatchers(mvc.pattern("/api/categories/**")).permitAll()
                 .requestMatchers(mvc.pattern("/categories/**")).permitAll()
                 
-                // ======================================================
-                
-                // 4. Cho phép trang lỗi
+                // 5. Cho phép trang lỗi
                 .requestMatchers(mvc.pattern("/error")).permitAll()
                 
-                // 5. Cho phép OPTIONS (CORS)
+                // 6. Cho phép OPTIONS (CORS)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
-                // 6. Các request còn lại bắt buộc đăng nhập
+                // 7. Các request còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
             
