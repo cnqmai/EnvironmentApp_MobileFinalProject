@@ -4,12 +4,10 @@ import com.enviro.app.environment_backend.dto.BadgeResponse;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.service.BadgeService;
 import com.enviro.app.environment_backend.service.UserService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -25,24 +23,16 @@ public class BadgeController {
         this.userService = userService;
     }
 
-    private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userEmail = authentication.getName();
-        return userService.findByEmail(userEmail)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Người dùng không tìm thấy."));
-    }
-
+    // 1. Lấy danh sách tất cả huy hiệu có trong hệ thống
     @GetMapping
     public ResponseEntity<List<BadgeResponse>> getAllBadges() {
-        User user = getCurrentUser();
-        List<BadgeResponse> badges = badgeService.getAllBadges(user);
-        return ResponseEntity.ok(badges);
+        return ResponseEntity.ok(badgeService.getAllBadges());
     }
 
+    // 2. Lấy danh sách huy hiệu của user đang đăng nhập
     @GetMapping("/me")
     public ResponseEntity<List<BadgeResponse>> getMyBadges() {
-        User user = getCurrentUser();
-        List<BadgeResponse> badges = badgeService.getUserBadges(user);
-        return ResponseEntity.ok(badges);
+        User currentUser = userService.getCurrentUser();
+        return ResponseEntity.ok(badgeService.getUserBadges(currentUser.getId()));
     }
 }

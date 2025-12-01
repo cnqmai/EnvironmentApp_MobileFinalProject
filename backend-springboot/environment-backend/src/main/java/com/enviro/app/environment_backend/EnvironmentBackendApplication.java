@@ -7,32 +7,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
-import io.github.cdimascio.dotenv.Dotenv;
 
 @SpringBootApplication
 @EnableScheduling
 public class EnvironmentBackendApplication {
 
     public static void main(String[] args) {
-        Dotenv dotenv = Dotenv.load(); // Load file .env
-        if (dotenv.get("GOOGLE_CLIENT_ID") != null) {
-            System.setProperty("GOOGLE_CLIENT_ID", dotenv.get("GOOGLE_CLIENT_ID"));
-        }
-        if (dotenv.get("GOOGLE_CLIENT_SECRET") != null) {
-            System.setProperty("GOOGLE_CLIENT_SECRET", dotenv.get("GOOGLE_CLIENT_SECRET"));
-        }
-        if (dotenv.get("FACEBOOK_APP_ID") != null) {
-            System.setProperty("FACEBOOK_APP_ID", dotenv.get("FACEBOOK_APP_ID"));
-        }
-        if (dotenv.get("FACEBOOK_APP_SECRET") != null) {
-            System.setProperty("FACEBOOK_APP_SECRET", dotenv.get("FACEBOOK_APP_SECRET"));
-        }
-        if (dotenv.get("MAIL_USERNAME") != null) {
-            System.setProperty("MAIL_USERNAME", dotenv.get("MAIL_USERNAME"));
-        }
-        if (dotenv.get("MAIL_PASSWORD") != null) {
-            System.setProperty("MAIL_PASSWORD", dotenv.get("MAIL_PASSWORD"));
-        }
+        // Đã loại bỏ đoạn code load .env thủ công.
+        // Spring Boot sẽ tự động nhận các biến môi trường (GOOGLE_CLIENT_ID, v.v.)
+        // nếu bạn đã cấu hình chúng trong IDE hoặc Hệ điều hành.
         SpringApplication.run(EnvironmentBackendApplication.class, args);
     }
 

@@ -35,7 +35,7 @@ public class NotificationService {
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationSettingsRepository settingsRepository,
                                BadgeService badgeService,
-                                UserRepository userRepository) {
+                               UserRepository userRepository) {
         this.notificationRepository = notificationRepository;
         this.settingsRepository = settingsRepository;
         this.badgeService = badgeService;
@@ -43,7 +43,7 @@ public class NotificationService {
     }
 
     /**
-     * Lấy tất cả notifications của user (Giữ nguyên)
+     * Lấy tất cả notifications của user
      */
     public List<NotificationResponse> getUserNotifications(User user) {
         List<Notification> notifications = notificationRepository.findByUserOrderByCreatedAtDesc(user);
@@ -53,7 +53,7 @@ public class NotificationService {
     }
 
     /**
-     * Lấy notifications chưa đọc của user (Giữ nguyên)
+     * Lấy notifications chưa đọc của user
      */
     public List<NotificationResponse> getUnreadNotifications(User user) {
         List<Notification> notifications = notificationRepository.findByUserAndStatusOrderByCreatedAtDesc(
@@ -64,14 +64,14 @@ public class NotificationService {
     }
 
     /**
-     * Đếm số notifications chưa đọc (Giữ nguyên)
+     * Đếm số notifications chưa đọc
      */
     public long getUnreadCount(User user) {
         return notificationRepository.countByUserAndStatus(user, NotificationStatus.UNREAD);
     }
 
     /**
-     * Đánh dấu 1 notification là đã đọc (FIX BADGE UPDATE)
+     * Đánh dấu 1 notification là đã đọc
      */
     @Transactional
     public NotificationResponse markAsRead(UUID notificationId, User user) {
@@ -91,35 +91,33 @@ public class NotificationService {
         notification.setStatus(NotificationStatus.READ);
         Notification saved = notificationRepository.save(notification);
         
-        // --- QUAN TRỌNG: CẬP NHẬT BADGE COUNT TỔNG ---
-        // Giảm số lượng chưa đọc đi 1 đơn vị
+        // Cập nhật Badge: Giảm 1
         badgeService.decrementNotificationCount(user, 1); 
         
         return mapToNotificationResponse(saved);
     }
 
     /**
-     * Đánh dấu tất cả notifications của user là đã đọc (FIX BADGE UPDATE)
+     * Đánh dấu tất cả notifications của user là đã đọc
      */
     @Transactional
     public void markAllAsRead(User user) {
         List<Notification> unreadNotifications = notificationRepository.findByUserAndStatusOrderByCreatedAtDesc(
                 user, NotificationStatus.UNREAD);
         
-        long countToDecrement = unreadNotifications.size(); // Số lượng sẽ giảm
+        long countToDecrement = unreadNotifications.size();
 
         unreadNotifications.forEach(n -> n.setStatus(NotificationStatus.READ));
         notificationRepository.saveAll(unreadNotifications);
 
-        // --- QUAN TRỌNG: CẬP NHẬT BADGE COUNT TỔNG ---
+        // Cập nhật Badge: Giảm tổng số lượng vừa đọc
         if (countToDecrement > 0) {
-            // Giảm tổng số badge đi số lượng thông báo vừa đọc
             badgeService.decrementNotificationCount(user, (int) countToDecrement); 
         }
     }
 
     /**
-     * Tạo notification mới (dùng cho internal services) (Giữ nguyên)
+     * Tạo notification mới (dùng cho internal services)
      */
     @Transactional
     public Notification createNotification(User user, String title, String message, 
@@ -133,24 +131,23 @@ public class NotificationService {
                 .relatedId(relatedId)
                 .build();
 
-        // Thêm logic cập nhật badge khi có thông báo mới (tăng thêm 1)
+        // Cập nhật Badge: Tăng 1
         badgeService.incrementNotificationCount(user, 1);
         
         return notificationRepository.save(notification);
     }
 
     /**
-     * Lấy hoặc tạo notification settings cho user (FIX DETACHED ENTITY)
+     * Lấy hoặc tạo notification settings cho user
      */
     @Transactional
     public NotificationSettings getOrCreateSettings(User detachedUser) {
         return settingsRepository.findByUser(detachedUser)
                 .orElseGet(() -> {
-                    // FIX: Tìm lại User bằng ID để đảm bảo đối tượng là Managed
+                    // Tìm lại User Managed để tránh lỗi Detached Entity
                     User managedUser = userRepository.findById(detachedUser.getId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Managed User not found during settings creation."));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Managed User not found."));
 
-                    // Cấu hình mặc định (Mọi thứ BẬT)
                     NotificationSettings defaultSettings = NotificationSettings.builder()
                             .user(managedUser) 
                             .aqiAlertEnabled(true)
@@ -167,20 +164,14 @@ public class NotificationService {
     }
 
     /**
-     * Cập nhật notification settings (FR-2.2.2) 
-     * LOGIC MỚI: Chấp nhận mọi cờ boolean gửi lên.
+     * [FIXED] Đổi tên thành updateSettings và nhận tham số User để khớp với NotificationController
      */
     @Transactional
-    public NotificationSettingsResponse updateNotificationSettings(UUID userId, NotificationSettingsRequest request) { 
-        // Lấy User Managed Entity (Đảm bảo transaction)
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
-
+    public NotificationSettingsResponse updateSettings(User user, NotificationSettingsRequest request) { 
         // Sử dụng getOrCreateSettings để đảm bảo cài đặt luôn tồn tại và lấy ra settings cần update
         NotificationSettings settings = getOrCreateSettings(user);
         
         // --- CHẤP NHẬN TẤT CẢ CÁC CỜ BOOLEAN TỪ REQUEST ---
-        
         if (request.getAqiAlertEnabled() != null) {
             settings.setAqiAlertEnabled(request.getAqiAlertEnabled());
         }

@@ -1,3 +1,4 @@
+// File: .../model/QuizQuestion.java
 package com.enviro.app.environment_backend.model;
 
 import jakarta.persistence.*;
@@ -53,5 +54,18 @@ public class QuizQuestion {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-}
 
+    /**
+     * Helper method: Chuyển đổi đáp án chữ cái sang index (0-3)
+     */
+    public Integer getCorrectOptionIndex() {
+        if (correctAnswer == null) return -1;
+        switch (correctAnswer.trim().toUpperCase()) {
+            case "A": return 0;
+            case "B": return 1;
+            case "C": return 2;
+            case "D": return 3;
+            default: return -1;
+        }
+    }
+}

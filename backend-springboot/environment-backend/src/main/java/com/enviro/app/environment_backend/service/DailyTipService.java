@@ -1,69 +1,57 @@
 package com.enviro.app.environment_backend.service;
 
-import com.enviro.app.environment_backend.dto.DailyTipResponse;
 import com.enviro.app.environment_backend.model.DailyTip;
+import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.DailyTipRepository;
-import org.springframework.http.HttpStatus;
+import com.enviro.app.environment_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class DailyTipService {
 
-    private final DailyTipRepository repository;
+    private final DailyTipRepository dailyTipRepository;
+    private final UserRepository userRepository;
 
-    public DailyTipService(DailyTipRepository repository) {
-        this.repository = repository;
+    public DailyTipService(DailyTipRepository dailyTipRepository, UserRepository userRepository) {
+        this.dailyTipRepository = dailyTipRepository;
+        this.userRepository = userRepository;
     }
 
-    public DailyTipResponse getTodayTip() {
-        LocalDate today = LocalDate.now();
-        Optional<DailyTip> tip = repository.findByDisplayDateAndIsActiveTrue(today);
-        
-        if (tip.isPresent()) {
-            return mapToResponse(tip.get());
-        }
-
-        // Nếu không có tip cho hôm nay, trả về tip mới nhất
-        List<DailyTip> tips = repository.findByIsActiveTrueOrderByCreatedAtDesc();
-        if (tips.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không có gợi ý nào");
-        }
-        
-        return mapToResponse(tips.get(0));
+    public DailyTip getTodayTip() {
+        List<DailyTip> tips = dailyTipRepository.findAll();
+        if (tips.isEmpty()) return null;
+        int dayOfYear = LocalDate.now().getDayOfYear();
+        return tips.get(dayOfYear % tips.size());
     }
 
-    public List<DailyTipResponse> getAllTips() {
-        List<DailyTip> tips = repository.findByIsActiveTrueOrderByCreatedAtDesc();
-        return tips.stream()
-                .map(this::mapToResponse)
+    public List<DailyTip> getAllTips() {
+        return dailyTipRepository.findAll();
+    }
+    
+    // [FIX] Thêm phương thức tìm theo category
+    public List<DailyTip> getTipsByCategory(String category) {
+        // Giả sử logic lọc thủ công nếu Repository chưa có method
+        return dailyTipRepository.findAll().stream()
+                .filter(t -> category.equalsIgnoreCase(t.getCategory()))
                 .collect(Collectors.toList());
     }
 
-    public List<DailyTipResponse> getTipsByCategory(String category) {
-        List<DailyTip> tips = repository.findByCategoryAndIsActiveTrueOrderByCreatedAtDesc(category);
-        return tips.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
+    @Transactional
+    public void markTipAsCompleted(UUID userId, UUID tipId) { // [FIX] UUID
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        DailyTip tip = dailyTipRepository.findById(tipId)
+                .orElseThrow(() -> new RuntimeException("Tip not found"));
 
-    private DailyTipResponse mapToResponse(DailyTip tip) {
-        return DailyTipResponse.builder()
-                .id(tip.getId())
-                .title(tip.getTitle())
-                .description(tip.getDescription())
-                .category(tip.getCategory())
-                .iconUrl(tip.getIconUrl())
-                .actionText(tip.getActionText())
-                .pointsReward(tip.getPointsReward())
-                .displayDate(tip.getDisplayDate())
-                .createdAt(tip.getCreatedAt())
-                .build();
+        int rewardPoints = 10;
+        user.setPoints(user.getPoints() + rewardPoints);
+        userRepository.save(user);
     }
 }
-
