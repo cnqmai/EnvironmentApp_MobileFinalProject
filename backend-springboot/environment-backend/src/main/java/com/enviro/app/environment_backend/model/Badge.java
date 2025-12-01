@@ -32,6 +32,10 @@ public class Badge {
     @Column(name = "required_points", nullable = false)
     private Integer requiredPoints;
 
+    // [FIX] Thêm trường criteria để sửa lỗi BadgeService
+    @Column(columnDefinition = "TEXT")
+    private String criteria;
+
     // Liên kết với UserBadge (một-nhiều)
     @OneToMany(mappedBy = "badge", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserBadge> userBadges;

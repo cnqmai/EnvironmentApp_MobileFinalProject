@@ -1,69 +1,72 @@
 package com.enviro.app.environment_backend.service;
 
-import com.enviro.app.environment_backend.dto.DailyTipResponse;
 import com.enviro.app.environment_backend.model.DailyTip;
+import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.DailyTipRepository;
+import com.enviro.app.environment_backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 public class DailyTipService {
 
-    private final DailyTipRepository repository;
+    private final DailyTipRepository dailyTipRepository;
+    private final UserRepository userRepository;
+    private final BadgeService badgeService; 
 
-    public DailyTipService(DailyTipRepository repository) {
-        this.repository = repository;
+    public DailyTipService(DailyTipRepository dailyTipRepository, 
+                           UserRepository userRepository,
+                           BadgeService badgeService) {
+        this.dailyTipRepository = dailyTipRepository;
+        this.userRepository = userRepository;
+        this.badgeService = badgeService;
     }
 
-    public DailyTipResponse getTodayTip() {
-        LocalDate today = LocalDate.now();
-        Optional<DailyTip> tip = repository.findByDisplayDateAndIsActiveTrue(today);
-        
-        if (tip.isPresent()) {
-            return mapToResponse(tip.get());
-        }
+    public List<DailyTip> getAllTips() {
+        return dailyTipRepository.findByIsActiveTrueOrderByCreatedAtDesc();
+    }
 
-        // Nếu không có tip cho hôm nay, trả về tip mới nhất
-        List<DailyTip> tips = repository.findByIsActiveTrueOrderByCreatedAtDesc();
+    public List<DailyTip> getTipsByCategory(String category) {
+        return dailyTipRepository.findByCategoryAndIsActiveTrueOrderByCreatedAtDesc(category);
+    }
+    
+    public DailyTip getTodayTip() {
+         return dailyTipRepository.findByDisplayDateAndIsActiveTrue(LocalDate.now())
+                 .orElse(getRandomTip()); // Nếu không có tip set cho hôm nay, lấy random
+    }
+
+    // --- PHƯƠNG THỨC MỚI ---
+    public DailyTip getRandomTip() {
+        List<DailyTip> tips = dailyTipRepository.findByIsActiveTrueOrderByCreatedAtDesc();
         if (tips.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không có gợi ý nào");
+            return null;
         }
+        // Chọn ngẫu nhiên 1 tip trong danh sách
+        int randomIndex = (int) (Math.random() * tips.size());
+        return tips.get(randomIndex);
+    }
+
+    @Transactional
+    public void markTipAsCompleted(UUID userId, UUID tipId) { // Lưu ý: tipId là UUID
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         
-        return mapToResponse(tips.get(0));
-    }
+        DailyTip tip = dailyTipRepository.findById(tipId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tip not found"));
 
-    public List<DailyTipResponse> getAllTips() {
-        List<DailyTip> tips = repository.findByIsActiveTrueOrderByCreatedAtDesc();
-        return tips.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
+        // Cộng điểm
+        int points = tip.getPointsReward() != null ? tip.getPointsReward() : 10;
+        user.setPoints(user.getPoints() + points);
+        userRepository.save(user);
 
-    public List<DailyTipResponse> getTipsByCategory(String category) {
-        List<DailyTip> tips = repository.findByCategoryAndIsActiveTrueOrderByCreatedAtDesc(category);
-        return tips.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    private DailyTipResponse mapToResponse(DailyTip tip) {
-        return DailyTipResponse.builder()
-                .id(tip.getId())
-                .title(tip.getTitle())
-                .description(tip.getDescription())
-                .category(tip.getCategory())
-                .iconUrl(tip.getIconUrl())
-                .actionText(tip.getActionText())
-                .pointsReward(tip.getPointsReward())
-                .displayDate(tip.getDisplayDate())
-                .createdAt(tip.getCreatedAt())
-                .build();
+        // Check huy hiệu
+        badgeService.checkAndAssignBadges(user);
     }
 }
-

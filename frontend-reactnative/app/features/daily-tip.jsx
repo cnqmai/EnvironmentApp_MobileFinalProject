@@ -1,127 +1,274 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Image, 
+  Modal, 
+  Animated 
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
+
+import { getRandomTip, completeTip } from '../../src/services/dailyTipService'; 
+
+const COMPLETED_TIPS_STORAGE_KEY = 'COMPLETED_DAILY_TIPS_V2'; // Đổi key mới để tránh conflict dữ liệu cũ
 
 const DailyTipScreen = () => {
-  const [isDone, setIsDone] = useState(false);
+  const router = useRouter();
+  const [tips, setTips] = useState([]); 
+  const [loading, setLoading] = useState(true);
+  
+  // State lưu các ID đã hoàn thành
+  const [completedTips, setCompletedTips] = useState(new Set());
 
-  const handleDone = () => {
-    setIsDone(!isDone);
-    // Có thể gọi API cộng điểm ở đây
+  // --- Animation States ---
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState(10);
+  const scaleValue = useRef(new Animated.Value(0)).current;
+  const opacityValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const initData = async () => {
+        setLoading(true);
+        await checkAndLoadDailyStatus(); // [1] Kiểm tra ngày để reset hoặc load
+        await loadTips();
+        setLoading(false);
+    };
+    initData();
+  }, []);
+
+  // Hàm lấy ngày hiện tại định dạng YYYY-MM-DD
+  const getTodayString = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  // [LOGIC MỚI] Kiểm tra và Reset mỗi ngày
+  const checkAndLoadDailyStatus = async () => {
+    try {
+      const jsonValue = await AsyncStorage.getItem(COMPLETED_TIPS_STORAGE_KEY);
+      const today = getTodayString();
+
+      if (jsonValue != null) {
+        const data = JSON.parse(jsonValue);
+        
+        // Kiểm tra xem dữ liệu có phải của hôm nay không
+        if (data.date === today) {
+            // Nếu đúng hôm nay -> Load danh sách đã làm
+            setCompletedTips(new Set(data.ids));
+        } else {
+            // Nếu là ngày cũ -> Reset (ngày mới bắt đầu!)
+            console.log("Ngày mới! Reset trạng thái Daily Tips.");
+            await AsyncStorage.removeItem(COMPLETED_TIPS_STORAGE_KEY);
+            setCompletedTips(new Set());
+        }
+      }
+    } catch(e) {
+      console.error("Lỗi đọc trạng thái:", e);
+    }
+  };
+
+  const loadTips = async () => {
+    try {
+        const [t1, t2] = await Promise.all([
+            getRandomTip().catch(() => null),
+            getRandomTip().catch(() => null)
+        ]);
+        
+        const rawTips = [t1, t2].filter(Boolean);
+        const uniqueTips = Array.from(new Map(rawTips.map(item => [item.id, item])).values());
+        setTips(uniqueTips); 
+    } catch (e) {
+        console.error("Lỗi tải tips:", e);
+    }
+  };
+
+  const triggerSuccessAnimation = (points) => {
+    setEarnedPoints(points);
+    setShowSuccessModal(true);
+    scaleValue.setValue(0);
+    opacityValue.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(scaleValue, { toValue: 1, friction: 5, useNativeDriver: true }),
+      Animated.timing(opacityValue, { toValue: 1, duration: 300, useNativeDriver: true })
+    ]).start();
+
+    setTimeout(() => {
+        Animated.timing(opacityValue, { toValue: 0, duration: 300, useNativeDriver: true })
+        .start(() => setShowSuccessModal(false));
+    }, 2000);
+  };
+
+  const handleDone = async (item) => {
+    try {
+        await completeTip(item.id);
+        
+        // [UPDATE] Lưu kèm ngày hiện tại
+        setCompletedTips(prev => {
+            const newSet = new Set(prev);
+            newSet.add(item.id);
+            
+            const storageData = {
+                date: getTodayString(), // Lưu ngày hiện tại
+                ids: Array.from(newSet)
+            };
+            
+            AsyncStorage.setItem(COMPLETED_TIPS_STORAGE_KEY, JSON.stringify(storageData));
+            return newSet;
+        });
+
+        triggerSuccessAnimation(item.pointsReward || 10);
+    } catch (e) {
+        alert("Lỗi kết nối hoặc bạn đã nhận điểm rồi.");
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    const isCompleted = completedTips.has(item.id);
+
+    return (
+      <View style={[styles.card, isCompleted && styles.cardCompleted]}> 
+          <Image 
+              source={{ uri: item.iconUrl || 'https://via.placeholder.com/300x150.png?text=Environment+Tip' }} 
+              style={[styles.image, isCompleted && styles.imageCompleted]} 
+              resizeMode="cover"
+          />
+          <View style={styles.content}>
+              <Text style={[styles.title, isCompleted && styles.textCompleted]}>{item.title}</Text>
+              <Text style={[styles.desc, isCompleted && styles.textCompleted]} numberOfLines={3}>
+                  {item.description || "Hãy thực hiện hành động này để bảo vệ môi trường."}
+              </Text>
+              
+              {!isCompleted && (
+                <View style={styles.pointsTag}>
+                    <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
+                    <Text style={styles.pointsText}>+{item.pointsReward || 10} điểm</Text>
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={[styles.btn, isCompleted && styles.btnDisabled]} 
+                onPress={() => handleDone(item)}
+                disabled={isCompleted}
+              >
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    {isCompleted ? (
+                        <>
+                            <MaterialCommunityIcons name="check-circle" size={20} color="#4CAF50" style={{marginRight: 6}} />
+                            <Text style={[styles.btnText, {color: '#4CAF50'}]}>Hẹn gặp lại ngày mai!</Text>
+                        </>
+                    ) : (
+                        <Text style={styles.btnText}>Thực hiện ngay</Text>
+                    )}
+                  </View>
+              </TouchableOpacity>
+          </View>
+      </View>
+    );
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      
-      {/* Header Info */}
-      <View style={styles.headerCenter}>
-        <View style={styles.iconCircle}>
-           <MaterialCommunityIcons name="lightbulb-on" size={32} color="#FFD600" />
-        </View>
-        <Text style={styles.dateText}>Thứ Tư, 15 Tháng 10, 2025</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Main Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          {/* Tag */}
-          <View style={styles.tagContainer}>
-             <Text style={styles.tagText}>MUA SẮM</Text>
-          </View>
-        </View>
-
-        <Text style={styles.cardTitle}>Mang túi vải đi chợ</Text>
-        
-        <Text style={styles.cardDesc}>
-          Giảm sử dụng túi ni lông là cách đơn giản nhất để bảo vệ môi trường. 
-          Mỗi năm, hàng triệu túi ni lông bị vứt bỏ, gây ô nhiễm đất và đại dương.
-        </Text>
-
-        {/* Impact Section */}
-        <View style={styles.impactBox}>
-          <Text style={styles.impactLabel}>Tác động tích cực:</Text>
-          
-          <View style={styles.impactItem}>
-            <MaterialCommunityIcons name="leaf" size={20} color="#388E3C" />
-            <Text style={styles.impactText}>Giảm 1000 túi ni lông/năm</Text>
-          </View>
-          
-          <View style={styles.impactItem}>
-            <MaterialCommunityIcons name="piggy-bank" size={20} color="#388E3C" />
-            <Text style={styles.impactText}>Tiết kiệm chi phí mua túi</Text>
-          </View>
-          
-          <View style={styles.impactItem}>
-            <MaterialCommunityIcons name="waves" size={20} color="#388E3C" />
-            <Text style={styles.impactText}>Bảo vệ sinh vật biển</Text>
-          </View>
-        </View>
-
-        {/* Action Button */}
-        <TouchableOpacity 
-          style={[styles.actionBtn, isDone && styles.actionBtnDone]}
-          onPress={handleDone}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons 
-            name={isDone ? "check-circle" : "checkbox-blank-circle-outline"} 
-            size={24} 
-            color="#FFF" 
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.actionBtnText}>
-            {isDone ? "Đã thực hiện hôm nay" : "Đánh dấu đã làm"}
-          </Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Hành động mỗi ngày</Text>
+        <View style={{width: 40}} /> 
       </View>
 
-      {/* Footer / Other tips */}
-      <Text style={styles.sectionTitle}>Các mẹo khác</Text>
-      <View style={styles.otherTipCard}>
-        <View style={[styles.miniIcon, { backgroundColor: '#E3F2FD' }]}>
-           <MaterialCommunityIcons name="water-off" size={20} color="#1976D2" />
+      {loading ? (
+        <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#2E7D32" />
+            <Text style={{marginTop: 10, color: '#666'}}>Đang tải gợi ý...</Text>
         </View>
-        <View style={{flex: 1}}>
-           <Text style={styles.otherTipTitle}>Tắt vòi nước khi đánh răng</Text>
-           <Text style={styles.otherTipSub}>Tiết kiệm nước</Text>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
-      </View>
+      ) : (
+        <FlatList
+            data={tips}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            renderItem={renderItem}
+            contentContainerStyle={{padding: 16}}
+            ListEmptyComponent={
+                <View style={styles.centerContainer}>
+                    <MaterialCommunityIcons name="leaf" size={48} color="#ccc" />
+                    <Text style={{marginTop: 10, color: '#888'}}>Không có gợi ý nào lúc này.</Text>
+                </View>
+            }
+        />
+      )}
 
-    </ScrollView>
+      {/* Modal Chúc Mừng */}
+      <Modal
+        transparent={true}
+        visible={showSuccessModal}
+        animationType="none"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+            <Animated.View style={[
+                styles.successCard, 
+                { transform: [{ scale: scaleValue }], opacity: opacityValue }
+            ]}>
+                <MaterialCommunityIcons name="check-decagram" size={80} color="#4CAF50" />
+                <Text style={styles.successTitle}>Tuyệt vời!</Text>
+                <Text style={styles.successDesc}>Bạn vừa nhận được</Text>
+                <Text style={styles.pointsEarned}>+{earnedPoints} Điểm xanh</Text>
+            </Animated.View>
+        </View>
+      </Modal>
+
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0EFED' },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', elevation: 2, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  backButton: { padding: 8, borderRadius: 20, backgroundColor: '#f0f0f0' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   
-  headerCenter: { alignItems: 'center', marginBottom: 20 },
-  iconCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginBottom: 10, elevation: 2 },
-  dateText: { fontSize: 14, color: '#666', fontWeight: '500' },
-
-  card: { backgroundColor: '#FFF', borderRadius: 24, padding: 24, marginBottom: 30, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'flex-start', marginBottom: 16 },
-  tagContainer: { backgroundColor: '#E8F5E9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  tagText: { fontSize: 12, fontWeight: 'bold', color: '#2E7D32' },
+  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, elevation: 4, overflow: 'hidden' },
+  // [Style mới] Làm mờ thẻ khi đã hoàn thành
+  cardCompleted: { opacity: 0.8, backgroundColor: '#FAFAFA' },
   
-  cardTitle: { fontSize: 22, fontWeight: 'bold', color: '#111', marginBottom: 12 },
-  cardDesc: { fontSize: 16, color: '#444', lineHeight: 24, marginBottom: 24 },
+  image: { width: '100%', height: 160 },
+  imageCompleted: { opacity: 0.6 }, // Làm mờ ảnh
+  
+  content: { padding: 16 },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 6, color: '#2E7D32' },
+  desc: { fontSize: 14, color: '#555', marginBottom: 12, lineHeight: 22 },
+  textCompleted: { color: '#999' }, // Làm mờ chữ
+  
+  pointsTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF8E1', alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, marginBottom: 16 },
+  pointsText: { fontSize: 12, fontWeight: 'bold', color: '#F57F17', marginLeft: 4 },
+  
+  btn: { backgroundColor: '#2E7D32', paddingVertical: 12, borderRadius: 12, alignItems: 'center', elevation: 2 },
+  
+  // [Style mới] Nút khi đã xong: nền trong suốt, viền nhẹ
+  btnDisabled: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    elevation: 0,
+    marginTop: 5
+  },
+  
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
 
-  impactBox: { backgroundColor: '#F9F9F9', borderRadius: 16, padding: 16, marginBottom: 24 },
-  impactLabel: { fontSize: 14, fontWeight: 'bold', color: '#333', marginBottom: 12 },
-  impactItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  impactText: { marginLeft: 10, fontSize: 14, color: '#333' },
-
-  actionBtn: { backgroundColor: '#111', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 16 },
-  actionBtnDone: { backgroundColor: '#2E7D32' },
-  actionBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#111', marginBottom: 15 },
-  otherTipCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 16, borderRadius: 16, elevation: 1 },
-  miniIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  otherTipTitle: { fontSize: 16, fontWeight: '600', color: '#111' },
-  otherTipSub: { fontSize: 13, color: '#666' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  successCard: { backgroundColor: 'white', padding: 30, borderRadius: 25, alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, width: '80%' },
+  successTitle: { fontSize: 24, fontWeight: 'bold', color: '#2E7D32', marginTop: 15 },
+  successDesc: { fontSize: 16, color: '#555', marginTop: 5 },
+  pointsEarned: { fontSize: 32, fontWeight: 'bold', color: '#F9A825', marginTop: 10 }
 });
 
 export default DailyTipScreen;

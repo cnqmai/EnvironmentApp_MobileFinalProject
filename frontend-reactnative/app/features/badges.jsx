@@ -1,67 +1,85 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter, Stack } from "expo-router"; // THÊM Stack
+import { getAllBadges, getMyBadges } from "../../src/services/badgeService";
 
 const { width } = Dimensions.get("window");
 const GAP = 15;
-const CARD_WIDTH = (width - 40 - GAP) / 2; // 2 cột
+const CARD_WIDTH = (width - 40 - GAP) / 2;
 
 const BadgesScreen = () => {
-  const achieved = [
-    { title: "Chiến binh MH", desc: "Phân loại 100 lần", date: "15/09/2024", icon: "shield-star-outline" },
-    { title: "Nghệ sĩ TC", desc: "Chia sẻ 10 ý tưởng", date: "20/09/2024", icon: "palette-outline" },
-    { title: "Người truyền CF", desc: "Bài viết 100 like", date: "25/09/2024", icon: "bullhorn-outline" },
-  ];
+  const router = useRouter();
+  const [allBadges, setAllBadges] = useState([]);
+  const [myBadges, setMyBadges] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const notAchieved = [
-    { title: "Guru sống xanh", desc: "Phân loại 500 lần", progress: 0.2, icon: "trophy-outline" },
-    { title: "Lãnh đạo CD", desc: "Tạo & quản lý nhóm", progress: 0.0, icon: "crown-outline" },
-    { title: "Bậc thầy TC", desc: "Tái chế 1000kg", progress: 0.23, icon: "star-outline" },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [all, mine] = await Promise.all([getAllBadges(), getMyBadges()]);
+      setAllBadges(all || []);
+      setMyBadges(mine || []);
+    } catch (error) {
+      console.error("Lỗi tải badge:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const achievedIds = new Set(myBadges.map(b => b.id));
+  const achievedList = myBadges;
+  const lockedList = allBadges.filter(b => !achievedIds.has(b.id));
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* FIX: TẮT HEADER MẶC ĐỊNH */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Huy hiệu</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{position: 'absolute', left: 16}}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Bộ sưu tập Huy hiệu</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        {/* Section 1: Đã đạt */}
-        <Text style={styles.sectionTitle}>Huy hiệu đã đạt</Text>
+        <Text style={styles.sectionTitle}>Đã đạt được ({achievedList.length})</Text>
         <View style={styles.gridContainer}>
-          {achieved.map((b, i) => (
-            <View key={i} style={styles.badgeAchieved}>
-              <MaterialCommunityIcons name={b.icon} size={32} color="#333" style={{ marginBottom: 8 }} />
-              <Text style={styles.badgeTitle}>{b.title}</Text>
-              <Text style={styles.desc}>{b.desc}</Text>
-              <View style={styles.dateTag}>
-                <Text style={styles.dateText}>{b.date}</Text>
-              </View>
+          {achievedList.length > 0 ? achievedList.map((b) => (
+            <View key={b.id} style={styles.badgeAchieved}>
+              <MaterialCommunityIcons name="shield-star" size={32} color="#F9A825" style={{ marginBottom: 8 }} />
+              <Text style={styles.badgeTitle}>{b.name}</Text>
+              <Text style={styles.desc} numberOfLines={2}>{b.description}</Text>
             </View>
-          ))}
+          )) : (
+            <Text style={styles.emptyText}>Chưa có huy hiệu nào.</Text>
+          )}
         </View>
 
-        {/* Section 2: Chưa đạt */}
-        <Text style={styles.sectionTitle}>Huy hiệu chưa đạt</Text>
+        <Text style={styles.sectionTitle}>Chưa mở khóa ({lockedList.length})</Text>
         <View style={styles.gridContainer}>
-          {notAchieved.map((b, i) => (
-            <View key={i} style={styles.badgeLocked}>
+          {lockedList.map((b) => (
+            <View key={b.id} style={styles.badgeLocked}>
               <View style={styles.lockIcon}>
-                 <MaterialCommunityIcons name="lock-outline" size={16} color="#999" />
+                 <MaterialCommunityIcons name="lock" size={16} color="#BDBDBD" />
               </View>
-              
-              <MaterialCommunityIcons name={b.icon} size={32} color="#999" style={{ marginBottom: 8 }} />
-              <Text style={styles.badgeTitleLocked}>{b.title}</Text>
-              <Text style={styles.descLocked}>{b.desc}</Text>
-              
-              {/* Progress Bar */}
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${(b.progress ?? 0) * 100}%` }]} />
-              </View>
-              <Text style={styles.percentText}>{Math.round(b.progress * 100)}%</Text>
+              <MaterialCommunityIcons name="shield-outline" size={32} color="#BDBDBD" style={{ marginBottom: 8 }} />
+              <Text style={styles.badgeTitleLocked}>{b.name}</Text>
+              <Text style={styles.descLocked} numberOfLines={2}>{b.criteria || "Tích điểm để mở khóa"}</Text>
             </View>
           ))}
         </View>
@@ -73,65 +91,37 @@ const BadgesScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  header: { padding: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
-  scrollContent: { padding: 20 },
-
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, marginTop: 10, color: '#333' },
-
+  header: { padding: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', flexDirection: 'row', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: '#111' },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 15, marginTop: 10, color: '#2E7D32' },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-
-  // Achieved Styles
   badgeAchieved: {
     width: CARD_WIDTH,
-    backgroundColor: "#FFF9C4", // Vàng nhạt
+    backgroundColor: "#FFFDE7",
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#FBC02D", // Vàng đậm
-    marginBottom: 10,
+    borderColor: "#FFD54F",
+    marginBottom: 5,
   },
-  badgeTitle: { fontSize: 14, fontWeight: "bold", color: '#333', textAlign: 'center' },
-  desc: { fontSize: 12, color: '#555', marginVertical: 4, textAlign: 'center' },
-  dateTag: {
-    backgroundColor: "#FBC02D",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginTop: 8,
-  },
-  dateText: { fontSize: 10, fontWeight: 'bold', color: '#333' },
-
-  // Locked Styles
+  badgeTitle: { fontSize: 13, fontWeight: "bold", color: '#333', textAlign: 'center', marginBottom: 4 },
+  desc: { fontSize: 11, color: '#555', textAlign: 'center' },
   badgeLocked: {
     width: CARD_WIDTH,
-    backgroundColor: "#fff",
+    backgroundColor: "#F5F5F5",
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    marginBottom: 10,
-    position: 'relative'
+    marginBottom: 5,
   },
-  lockIcon: { position: 'absolute', top: 10, right: 10 },
-  badgeTitleLocked: { fontSize: 14, fontWeight: "bold", color: '#666', textAlign: 'center' },
-  descLocked: { fontSize: 12, color: '#999', marginVertical: 4, textAlign: 'center' },
-  
-  progressBar: {
-    height: 6,
-    width: "80%",
-    backgroundColor: "#E0E0E0",
-    borderRadius: 3,
-    marginTop: 8,
-  },
-  progressFill: {
-    height: 6,
-    backgroundColor: "#000",
-    borderRadius: 3,
-  },
-  percentText: { fontSize: 10, color: '#999', marginTop: 4 },
+  lockIcon: { position: 'absolute', top: 8, right: 8 },
+  badgeTitleLocked: { fontSize: 13, fontWeight: "bold", color: '#9E9E9E', textAlign: 'center', marginBottom: 4 },
+  descLocked: { fontSize: 11, color: '#9E9E9E', textAlign: 'center' },
+  emptyText: { fontStyle: 'italic', color: '#666', width: '100%', textAlign: 'center' }
 });
 
 export default BadgesScreen;

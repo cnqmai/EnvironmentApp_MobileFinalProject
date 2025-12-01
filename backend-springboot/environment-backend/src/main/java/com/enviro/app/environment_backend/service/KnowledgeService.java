@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class KnowledgeService {
@@ -21,11 +22,35 @@ public class KnowledgeService {
         this.repository = repository;
     }
 
-    public List<ArticleResponse> getAllArticles() {
-        List<KnowledgeArticle> articles = repository.findByIsPublishedTrueOrderByCreatedAtDesc();
-        return articles.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    /**
+     * Hàm xử lý logic lọc và tìm kiếm trung tâm
+     */
+    public List<ArticleResponse> getArticles(String category, ArticleType type, String search) {
+        List<KnowledgeArticle> articles;
+
+        // 1. Ưu tiên tìm kiếm theo từ khóa trước (nếu có)
+        if (search != null && !search.trim().isEmpty()) {
+            articles = repository.findByTitleContainingIgnoreCaseAndIsPublishedTrueOrderByCreatedAtDesc(search.trim());
+        } else {
+            // Nếu không tìm kiếm, lấy tất cả bài đã xuất bản
+            articles = repository.findByIsPublishedTrueOrderByCreatedAtDesc();
+        }
+
+        // 2. Lọc tiếp theo Category (nếu có) bằng Java Stream (để hỗ trợ kết hợp nhiều bộ lọc)
+        Stream<KnowledgeArticle> stream = articles.stream();
+
+        if (category != null && !category.trim().isEmpty()) {
+            stream = stream.filter(a -> category.equals(a.getCategory()));
+        }
+
+        // 3. Lọc tiếp theo Type (nếu có)
+        if (type != null) {
+            stream = stream.filter(a -> type.equals(a.getType()));
+        }
+
+        // 4. Map sang DTO và trả về list
+        return stream.map(this::mapToResponse)
+                     .collect(Collectors.toList());
     }
 
     public ArticleResponse getArticleById(UUID id) {
@@ -43,20 +68,6 @@ public class KnowledgeService {
         return mapToResponse(article);
     }
 
-    public List<ArticleResponse> getArticlesByCategory(String category) {
-        List<KnowledgeArticle> articles = repository.findByCategoryAndIsPublishedTrueOrderByCreatedAtDesc(category);
-        return articles.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    public List<ArticleResponse> getArticlesByType(ArticleType type) {
-        List<KnowledgeArticle> articles = repository.findByTypeAndIsPublishedTrueOrderByCreatedAtDesc(type);
-        return articles.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
     private ArticleResponse mapToResponse(KnowledgeArticle article) {
         return ArticleResponse.builder()
                 .id(article.getId())
@@ -72,4 +83,3 @@ public class KnowledgeService {
                 .build();
     }
 }
-

@@ -2,8 +2,7 @@ import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
 /**
- * Lấy tất cả badges (FR-9.1.2)
- * GET /api/badges
+ * Lấy tất cả badges
  */
 export const getAllBadges = async () => {
     const response = await fetchWithAuth(`${API_BASE_URL}/badges`, {
@@ -19,8 +18,7 @@ export const getAllBadges = async () => {
 };
 
 /**
- * Lấy badges của user hiện tại (FR-9.1.2)
- * GET /api/badges/me
+ * Lấy badges của user hiện tại
  */
 export const getMyBadges = async () => {
     const response = await fetchWithAuth(`${API_BASE_URL}/badges/me`, {
@@ -34,4 +32,3 @@ export const getMyBadges = async () => {
 
     return response.json();
 };
-

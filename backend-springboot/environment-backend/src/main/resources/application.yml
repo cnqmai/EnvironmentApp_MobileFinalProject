@@ -28,8 +28,9 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    # --- [QUAN TRỌNG] ĐIỀN EMAIL VÀ MẬT KHẨU ỨNG DỤNG VÀO ĐÂY ---
+    username: DIEN_EMAIL_CUA_BAN_VAO_DAY@gmail.com
+    password: DIEN_MAT_KHAU_UNG_DUNG_VAO_DAY
     properties:
       mail:
         smtp:
@@ -44,25 +45,41 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
+            # --- [QUAN TRỌNG] ĐIỀN GOOGLE CLIENT ID/SECRET ---
+            client-id: DIEN_GOOGLE_CLIENT_ID_VAO_DAY
+            client-secret: DIEN_GOOGLE_CLIENT_SECRET_VAO_DAY
             scope:
               - email
               - profile
 
           facebook:
-            client-id: ${FACEBOOK_APP_ID}
-            client-secret: ${FACEBOOK_APP_SECRET}
+            # --- [QUAN TRỌNG] ĐIỀN FACEBOOK APP ID/SECRET ---
+            client-id: DIEN_FACEBOOK_APP_ID_VAO_DAY
+            client-secret: DIEN_FACEBOOK_APP_SECRET_VAO_DAY
             scope:
               - email
               - public_profile
 
-# --- CẤU HÌNH CÁC BIẾN MÔI TRƯỜNG ---
+# --- CẤU HÌNH TÙY CHỈNH CỦA APP ---
 
-# Fix lỗi 1: Cho Service upload
+# Cấu hình thư mục upload (Giữ cả 2 để tránh lỗi null ở các Service khác nhau)
 file:
   upload:
     dir: uploads
+app:
+  upload:
+    dir: uploads
+  
+  security:
+    google:
+      # Danh sách Client ID cho Mobile App (Android/iOS/Expo)
+      client-ids: "756858259822-3vc9g8jdee93v1v4vajgo33ghao6rsib.apps.googleusercontent.com,756858259822-mvqtudhds35eq2b4h56qn16uefj615jo.apps.googleusercontent.com,756858259822-f887rof3qh7enulq6dkt5hv7d8r4lorj.apps.googleusercontent.com"
+      
+      # Client Secret cho Web Client (Dùng lại cái ở trên)
+      client-secret: DIEN_GOOGLE_CLIENT_SECRET_VAO_DAY
+      
+      # Link Callback (Ngrok) - Cần cập nhật mỗi khi chạy lại Ngrok
+      redirect-uri: "https://eructative-prodeportation-nikola.ngrok-free.dev/api/auth/callback/google"
 
 facebook:
   api:
@@ -80,22 +97,6 @@ aqi:
     base-url: https://api.openweathermap.org/data/2.5/air_pollution
     geocoding-url: https://api.openweathermap.org/geo/1.0/reverse
 
-# Cấu hình Upload file
-app:
-  upload:
-    dir: uploads
-
-  security:
-    google:
-      client-ids: "756858259822-3vc9g8jdee93v1v4vajgo33ghao6rsib.apps.googleusercontent.com,756858259822-mvqtudhds35eq2b4h56qn16uefj615jo.apps.googleusercontent.com,756858259822-f887rof3qh7enulq6dkt5hv7d8r4lorj.apps.googleusercontent.com"
-      
-      # [MỚI] Lấy trong Google Console -> Credentials -> Web Client -> Client Secret
-      client-secret: ${GOOGLE_CLIENT_SECRET}
-      
-      # [MỚI] Link Ngrok của bạn (Phải khớp 100% với code frontend và Google Console)
-      redirect-uri: "https://eructative-prodeportation-nikola.ngrok-free.dev/api/auth/callback/google"
-
-
 # Cấu hình Reset Password
 password:
   reset:
@@ -103,11 +104,10 @@ password:
       minutes: 15
       
   frontend:
-    # Link Deep Link mở App (thay link Tunnel của bạn vào đây)
+    # Link Deep Link mở App (thay link Tunnel của bạn vào đây nếu thay đổi)
     reset-password-url: "exp://ze8itke-cnqmai-8081.exp.direct/--/reset-password"
     
-    # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
-    # Trừ khi bạn cài ngrok cho cả Spring Boot
+    # URL Backend nội bộ
     backend-url: "http://192.168.100.190:8080"
 
 logging:
@@ -116,7 +116,6 @@ logging:
     org.springframework.web: DEBUG
     org.springframework.security: DEBUG
     com.enviro.app: DEBUG
-
 # --- Gemini Configuration ---
 gemini:
   api-key: "AIzaSyDDtPZQ-utdy3iwOuZY2DTHjNZu3bmg4wA" 

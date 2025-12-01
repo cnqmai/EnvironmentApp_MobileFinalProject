@@ -6,17 +6,11 @@ import com.enviro.app.environment_backend.model.UserQuizScore;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface UserQuizScoreRepository extends JpaRepository<UserQuizScore, UUID> {
-    
-    List<UserQuizScore> findByUserOrderByCompletedAtDesc(User user);
-    
+    // Tìm kiếm bản ghi điểm số đã tồn tại của user cho bài quiz cụ thể
     Optional<UserQuizScore> findByUserAndQuiz(User user, Quiz quiz);
-    
-    boolean existsByUserAndQuiz(User user, Quiz quiz);
 }
-

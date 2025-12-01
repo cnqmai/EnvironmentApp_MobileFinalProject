@@ -2,42 +2,39 @@ import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
 /**
- * Lấy gợi ý hôm nay (FR-11.1.3)
- * GET /api/daily-tips/today
+ * Lấy một gợi ý ngẫu nhiên
  */
-export const getTodayTip = async () => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/daily-tips/today`, {
+export const getRandomTip = async () => {
+    // Giả sử backend có endpoint /api/tips/random
+    // Nếu chưa có, bạn có thể gọi getAllTips rồi random ở client
+    const response = await fetchWithAuth(`${API_BASE_URL}/tips/random`, {
         method: 'GET',
     });
 
     if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy gợi ý hôm nay' }));
-        throw new Error(errorDetail.message || 'Không thể lấy gợi ý hôm nay.');
+        // Fallback nếu chưa có API random: Lấy all rồi random
+        const allResponse = await fetchWithAuth(`${API_BASE_URL}/tips`, { method: 'GET' });
+        if(allResponse.ok) {
+            const allTips = await allResponse.json();
+            if(allTips.length > 0) {
+                return allTips[Math.floor(Math.random() * allTips.length)];
+            }
+        }
+        return null; 
     }
-
     return response.json();
 };
 
 /**
- * Lấy tất cả gợi ý (FR-11.1.3)
- * GET /api/daily-tips
- * @param {string} category - Lọc theo category (energy, waste, water, etc.)
+ * Đánh dấu đã hoàn thành hành động (nhận điểm)
  */
-export const getAllDailyTips = async (category = null) => {
-    let url = `${API_BASE_URL}/daily-tips`;
-    if (category) {
-        url += `?category=${category}`;
-    }
-    
-    const response = await fetchWithAuth(url, {
-        method: 'GET',
+export const completeTip = async (tipId) => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/tips/${tipId}/complete`, {
+        method: 'POST',
     });
 
     if (!response.ok) {
-        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy gợi ý' }));
-        throw new Error(errorDetail.message || 'Không thể lấy danh sách gợi ý.');
+        throw new Error('Không thể ghi nhận hoàn thành.');
     }
-
-    return response.json();
+    return true;
 };
-

@@ -10,33 +10,24 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface UserBadgeRepository extends JpaRepository<UserBadge, UserBadgeId> {
     
-    /**
-     * Lấy tất cả badges của một user
-     */
+    // Tìm badge theo đối tượng User
     List<UserBadge> findByUserOrderByEarnedAtDesc(User user);
     
-    /**
-     * Kiểm tra xem user đã có badge chưa
-     */
+    // Kiểm tra tồn tại
     boolean existsByUserAndBadge(User user, Badge badge);
-    
-    /**
-     * Tìm UserBadge theo user và badge
-     */
-    Optional<UserBadge> findByUserAndBadge(User user, Badge badge);
-    
-    /**
-     * Lấy badges của user theo user_id
-     */
+
+    // [FIX] Thêm phương thức tìm theo userId và sắp xếp (Sửa lỗi BadgeService)
     @Query("SELECT ub FROM UserBadge ub WHERE ub.user.id = :userId ORDER BY ub.earnedAt DESC")
     List<UserBadge> findByUserIdOrderByEarnedAtDesc(@Param("userId") UUID userId);
 
+    // Tìm danh sách UserBadge theo userId
+    @Query("SELECT ub FROM UserBadge ub WHERE ub.user.id = :userId")
+    List<UserBadge> findByUserId(@Param("userId") UUID userId);
+
     void deleteByUser(User user);
 }
-

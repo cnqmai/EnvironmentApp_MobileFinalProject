@@ -7,6 +7,7 @@ import com.enviro.app.environment_backend.model.GroupMember;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.CommunityGroupRepository;
 import com.enviro.app.environment_backend.repository.GroupMemberRepository;
+import com.enviro.app.environment_backend.repository.UserRepository; // Import mới
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +23,18 @@ public class CommunityGroupService {
 
     private final CommunityGroupRepository groupRepository;
     private final GroupMemberRepository memberRepository;
+    private final UserRepository userRepository; // Inject User Repo
+    private final BadgeService badgeService;     // Inject Badge Service
 
+    // Cập nhật Constructor để inject thêm UserRepository và BadgeService
     public CommunityGroupService(CommunityGroupRepository groupRepository,
-                                GroupMemberRepository memberRepository) {
+                                GroupMemberRepository memberRepository,
+                                UserRepository userRepository,
+                                BadgeService badgeService) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
+        this.userRepository = userRepository;
+        this.badgeService = badgeService;
     }
 
     public List<CommunityGroupResponse> getAllGroups(User currentUser) {
@@ -78,6 +86,7 @@ public class CommunityGroupService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn đã tham gia nhóm này rồi");
         }
 
+        // 1. Thêm thành viên
         GroupMember member = GroupMember.builder()
                 .user(user)
                 .group(group)
@@ -87,6 +96,14 @@ public class CommunityGroupService {
 
         group.setMemberCount(group.getMemberCount() + 1);
         groupRepository.save(group);
+
+        // 2. [GAMIFICATION] Cộng điểm thưởng khi tham gia nhóm (Ví dụ: 50 điểm)
+        int pointsReward = 50;
+        user.setPoints(user.getPoints() + pointsReward);
+        User updatedUser = userRepository.save(user);
+
+        // 3. [GAMIFICATION] Kiểm tra thăng cấp Huy hiệu ngay lập tức
+        badgeService.checkAndAssignBadges(updatedUser);
 
         return mapToResponse(group, user);
     }
@@ -118,7 +135,6 @@ public class CommunityGroupService {
         Integer mockTotalReports = group.getMemberCount() * 3;
         Double mockRecycledWaste = group.getMemberCount() * 50.5;
         // --------------------------------------------------------
-
 
         return CommunityGroupResponse.builder()
                 .id(group.getId())

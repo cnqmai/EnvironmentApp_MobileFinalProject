@@ -2,9 +2,7 @@ import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
 /**
- * Lấy tất cả phần thưởng (FR-9.1.3)
- * GET /api/rewards
- * @param {string} type - Lọc theo loại (VOUCHER, TREE, MERCHANDISE, etc.)
+ * Lấy tất cả phần thưởng
  */
 export const getAllRewards = async (type = null) => {
     let url = `${API_BASE_URL}/rewards`;
@@ -25,9 +23,7 @@ export const getAllRewards = async (type = null) => {
 };
 
 /**
- * Đổi điểm lấy phần thưởng (FR-9.1.3)
- * POST /api/rewards/redeem
- * @param {string} rewardId - ID phần thưởng muốn đổi
+ * Đổi điểm lấy phần thưởng
  */
 export const redeemReward = async (rewardId) => {
     const response = await fetchWithAuth(`${API_BASE_URL}/rewards/redeem`, {
@@ -47,8 +43,7 @@ export const redeemReward = async (rewardId) => {
 };
 
 /**
- * Lấy phần thưởng đã đổi của user (FR-9.1.3)
- * GET /api/rewards/me
+ * Lấy phần thưởng đã đổi của user
  */
 export const getMyRewards = async () => {
     const response = await fetchWithAuth(`${API_BASE_URL}/rewards/me`, {
@@ -62,4 +57,3 @@ export const getMyRewards = async () => {
 
     return response.json();
 };
-

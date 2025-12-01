@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -17,7 +16,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "quiz_questions")
 public class QuizQuestion {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -31,18 +29,15 @@ public class QuizQuestion {
 
     @Column(name = "option_a", nullable = false)
     private String optionA;
-
     @Column(name = "option_b", nullable = false)
     private String optionB;
-
     @Column(name = "option_c")
     private String optionC;
-
     @Column(name = "option_d")
     private String optionD;
 
     @Column(name = "correct_answer", nullable = false, length = 1)
-    private String correctAnswer; // 'A', 'B', 'C', 'D'
+    private String correctAnswer; 
 
     @Column(columnDefinition = "TEXT")
     private String explanation;
@@ -53,5 +48,15 @@ public class QuizQuestion {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-}
 
+    public Integer getCorrectOptionIndex() {
+        if (correctAnswer == null) return -1;
+        switch (correctAnswer.trim().toUpperCase()) {
+            case "A": return 0;
+            case "B": return 1;
+            case "C": return 2;
+            case "D": return 3;
+            default: return -1;
+        }
+    }
+}
