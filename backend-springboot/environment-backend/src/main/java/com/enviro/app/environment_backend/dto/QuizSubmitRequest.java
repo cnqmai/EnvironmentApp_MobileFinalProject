@@ -1,10 +1,8 @@
-// File: .../dto/QuizSubmitRequest.java
 package com.enviro.app.environment_backend.dto;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-
 import java.util.Map;
 import java.util.UUID;
 
@@ -13,6 +11,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class QuizSubmitRequest {
     private UUID quizId;
-    private Map<UUID, Integer> answers; // questionId -> answer index (0=A, 1=B, 2=C, 3=D)
+    private Map<UUID, Integer> answers; // Key: questionId (UUID), Value: index đáp án (0,1,2,3)
     private Integer timeTakenSeconds;
 }

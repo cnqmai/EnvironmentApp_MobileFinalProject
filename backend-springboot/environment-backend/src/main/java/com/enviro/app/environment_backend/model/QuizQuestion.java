@@ -1,4 +1,3 @@
-// File: .../model/QuizQuestion.java
 package com.enviro.app.environment_backend.model;
 
 import jakarta.persistence.*;
@@ -7,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -18,7 +16,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "quiz_questions")
 public class QuizQuestion {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -32,18 +29,15 @@ public class QuizQuestion {
 
     @Column(name = "option_a", nullable = false)
     private String optionA;
-
     @Column(name = "option_b", nullable = false)
     private String optionB;
-
     @Column(name = "option_c")
     private String optionC;
-
     @Column(name = "option_d")
     private String optionD;
 
     @Column(name = "correct_answer", nullable = false, length = 1)
-    private String correctAnswer; // 'A', 'B', 'C', 'D'
+    private String correctAnswer; 
 
     @Column(columnDefinition = "TEXT")
     private String explanation;
@@ -55,9 +49,6 @@ public class QuizQuestion {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    /**
-     * Helper method: Chuyển đổi đáp án chữ cái sang index (0-3)
-     */
     public Integer getCorrectOptionIndex() {
         if (correctAnswer == null) return -1;
         switch (correctAnswer.trim().toUpperCase()) {

@@ -28,24 +28,21 @@ public class RewardService {
         this.userRepository = userRepository;
     }
 
-    public List<Reward> getAllRewards() {
-        return rewardRepository.findAll();
-    }
+    public List<Reward> getAllRewards() { return rewardRepository.findAll(); }
 
     public List<UserReward> getUserHistory(UUID userId) {
         return userRewardRepository.findByUserIdOrderByRedeemedAtDesc(userId);
     }
 
     @Transactional
-    public void redeemReward(UUID userId, UUID rewardId) { // [FIX] rewardId là UUID
+    public void redeemReward(UUID userId, UUID rewardId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        
         Reward reward = rewardRepository.findById(rewardId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reward not found"));
 
         if (user.getPoints() < reward.getPointsCost()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn không đủ điểm để đổi quà này.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn không đủ điểm.");
         }
 
         user.setPoints(user.getPoints() - reward.getPointsCost());
@@ -54,10 +51,8 @@ public class RewardService {
         UserReward history = new UserReward();
         history.setUser(user);
         history.setReward(reward);
-        // [FIX] Đảm bảo kiểu dữ liệu trong Entity UserReward là LocalDateTime
         history.setRedeemedAt(LocalDateTime.now());
         history.setStatus("PENDING");
-        
         userRewardRepository.save(history);
     }
 }

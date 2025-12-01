@@ -47,44 +47,25 @@ public class BadgeService {
         if (points >= 1000) assignBadge(user, "Thành phố Sạch");
     }
 
-    // [FIX] Đổi tên hàm checkAndAwardBadges cho khớp với ReportService gọi
-    @Transactional
-    public void checkAndAwardBadges(User user) {
-        checkAndAssignBadges(user);
-    }
-
     private void assignBadge(User user, String badgeName) {
         Optional<Badge> badgeOpt = badgeRepository.findByName(badgeName);
-        
         if (badgeOpt.isPresent()) {
             Badge badge = badgeOpt.get();
-            // [FIX] Sử dụng phương thức repository đã có
             boolean alreadyHas = userBadgeRepository.existsByUserAndBadge(user, badge);
-            
             if (!alreadyHas) {
                 UserBadge userBadge = new UserBadge();
-                // [FIX] Tạo ID đúng kiểu UUID
-                UserBadgeId id = new UserBadgeId(user.getId(), badge.getId());
-                userBadge.setId(id);
+                userBadge.setId(new UserBadgeId(user.getId(), badge.getId()));
                 userBadge.setUser(user);
                 userBadge.setBadge(badge);
-                // [FIX] Dùng setEarnedAt thay vì setAwardedAt (theo Entity)
                 userBadge.setEarnedAt(LocalDateTime.now());
-                
                 userBadgeRepository.save(userBadge);
-                System.out.println(">>> [BADGE] Assigned [" + badgeName + "] to user: " + user.getEmail());
             }
         }
     }
-
-    // [FIX] Thêm phương thức hỗ trợ NotificationService (giả lập logic hoặc để trống nếu chưa dùng)
-    public void incrementNotificationCount(User user, int count) {
-        // Logic cập nhật số lượng badge trên icon app (nếu có)
-    }
-
-    public void decrementNotificationCount(User user, int count) {
-        // Logic giảm số lượng badge
-    }
+    
+    // Placeholder cho NotificationService gọi để tránh lỗi biên dịch
+    public void incrementNotificationCount(User user, int count) {}
+    public void decrementNotificationCount(User user, int count) {}
 
     private BadgeResponse mapToResponse(Badge badge) {
         return BadgeResponse.builder()
@@ -92,8 +73,7 @@ public class BadgeService {
                 .name(badge.getName())
                 .description(badge.getDescription())
                 .iconUrl(badge.getIconUrl())
-                // [FIX] Kiểm tra nếu Badge entity không có criteria thì bỏ qua hoặc thêm vào model
-                // .criteria(badge.getCriteria()) 
+                .criteria(badge.getCriteria())
                 .build();
     }
 }

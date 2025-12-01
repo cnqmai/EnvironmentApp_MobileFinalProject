@@ -1,13 +1,18 @@
 import { API_BASE_URL } from '../constants/api';
 import { fetchWithAuth } from '../utils/apiHelper';
 
-export const getAllKnowledge = async (category = null) => {
-    let url = `${API_BASE_URL}/knowledge`;
-    if (category) {
-        url += `?category=${encodeURIComponent(category)}`;
-    }
-    
-    const response = await fetchWithAuth(url, { method: 'GET' });
-    if (!response.ok) return [];
-    return response.json();
+export const getQuizzes = async () => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/quizzes`, { method: 'GET' });
+    if (!res.ok) throw new Error('Failed to load quizzes');
+    return res.json();
+};
+
+export const submitQuiz = async (quizId, answers) => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/quizzes/${quizId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers })
+    });
+    if (!res.ok) throw new Error('Failed to submit quiz');
+    return res.json();
 };
