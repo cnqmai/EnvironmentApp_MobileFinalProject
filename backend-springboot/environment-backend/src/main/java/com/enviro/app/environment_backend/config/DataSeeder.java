@@ -1,10 +1,9 @@
 package com.enviro.app.environment_backend.config;
 
-import com.enviro.app.environment_backend.model.ArticleType;
-import com.enviro.app.environment_backend.model.KnowledgeArticle;
-import com.enviro.app.environment_backend.model.Reward;
-import com.enviro.app.environment_backend.model.RewardType;
+import com.enviro.app.environment_backend.model.*;
 import com.enviro.app.environment_backend.repository.KnowledgeArticleRepository;
+import com.enviro.app.environment_backend.repository.QuizQuestionRepository;
+import com.enviro.app.environment_backend.repository.QuizRepository;
 import com.enviro.app.environment_backend.repository.RewardRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -18,16 +17,24 @@ public class DataSeeder implements CommandLineRunner {
 
     private final KnowledgeArticleRepository knowledgeArticleRepository;
     private final RewardRepository rewardRepository;
+    private final QuizRepository quizRepository;
+    private final QuizQuestionRepository quizQuestionRepository;
 
-    public DataSeeder(KnowledgeArticleRepository knowledgeArticleRepository, RewardRepository rewardRepository) {
+    public DataSeeder(KnowledgeArticleRepository knowledgeArticleRepository, 
+                      RewardRepository rewardRepository,
+                      QuizRepository quizRepository,
+                      QuizQuestionRepository quizQuestionRepository) {
         this.knowledgeArticleRepository = knowledgeArticleRepository;
         this.rewardRepository = rewardRepository;
+        this.quizRepository = quizRepository;
+        this.quizQuestionRepository = quizQuestionRepository;
     }
 
     @Override
     public void run(String... args) throws Exception {
         seedKnowledgeArticles();
         seedRewards();
+        seedQuizzes();
     }
 
     private void seedKnowledgeArticles() {
@@ -106,13 +113,13 @@ public class DataSeeder implements CommandLineRunner {
                     .expiryDate(LocalDate.now().plusMonths(6))
                     .build(),
 
-                // 2. Túi vải (Sửa loại thành MERCHANDISE)
+                // 2. Túi vải
                 Reward.builder()
                     .name("Túi vải Canvas Môi trường")
                     .description("Túi tote vải canvas thời trang, bền đẹp. Hãy dùng túi này thay cho túi nilon khi đi siêu thị nhé!")
                     .pointsCost(300)
                     .imageUrl("https://img.freepik.com/premium-vector/eco-bag-cloth-bag-vector-illustration-isolated-white-background_106368-232.jpg")
-                    .type(RewardType.MERCHANDISE) // Quan trọng: Khớp với Enum Java
+                    .type(RewardType.MERCHANDISE)
                     .quantityAvailable(50)
                     .isActive(true)
                     .build(),
@@ -153,6 +160,86 @@ public class DataSeeder implements CommandLineRunner {
 
             rewardRepository.saveAll(rewards);
             System.out.println(">>> [DataSeeder] Đã nạp thành công 5 Quà tặng mẫu!");
+        }
+    }
+
+    private void seedQuizzes() {
+        if (quizRepository.count() == 0) {
+            System.out.println(">>> [DataSeeder] Đang khởi tạo dữ liệu QUIZ mẫu...");
+
+            // 1. Tạo Quiz
+            Quiz quiz = Quiz.builder()
+                    .title("Hiểu biết về Tái chế rác thải")
+                    .description("Kiểm tra kiến thức của bạn về quy trình tái chế.")
+                    .difficulty("EASY")
+                    .timeLimitMinutes(5)
+                    .isActive(true)
+                    .build();
+
+            // Lưu Quiz trước để có ID
+            quiz = quizRepository.save(quiz);
+
+            // 2. Tạo danh sách câu hỏi
+            List<QuizQuestion> questions = Arrays.asList(
+                QuizQuestion.builder()
+                    .quiz(quiz)
+                    .questionText("Loại rác nào sau đây CÓ THỂ tái chế?")
+                    .optionA("Túi nilon bẩn")
+                    .optionB("Vỏ hộp sữa giấy")
+                    .optionC("Khăn giấy đã qua sử dụng")
+                    .optionD("Mảnh sành sứ vỡ")
+                    .correctAnswer("B")
+                    .orderNumber(1)
+                    .build(),
+                
+                QuizQuestion.builder()
+                    .quiz(quiz)
+                    .questionText("Pin cũ nên được xử lý như thế nào?")
+                    .optionA("Vứt thùng rác thường")
+                    .optionB("Đốt cháy")
+                    .optionC("Chôn xuống đất")
+                    .optionD("Mang đến điểm thu gom nguy hại")
+                    .correctAnswer("D")
+                    .orderNumber(2)
+                    .build(),
+                
+                QuizQuestion.builder()
+                    .quiz(quiz)
+                    .questionText("Mã số 1 trên chai nhựa là gì?")
+                    .optionA("PET")
+                    .optionB("HDPE")
+                    .optionC("PVC")
+                    .optionD("LDPE")
+                    .correctAnswer("A")
+                    .orderNumber(3)
+                    .build(),
+
+                QuizQuestion.builder()
+                    .quiz(quiz)
+                    .questionText("Xử lý rác hữu cơ tốt nhất?")
+                    .optionA("Vứt sông")
+                    .optionB("Ủ phân (Compost)")
+                    .optionC("Đốt")
+                    .optionD("Gói nilon")
+                    .correctAnswer("B")
+                    .orderNumber(4)
+                    .build(),
+
+                QuizQuestion.builder()
+                    .quiz(quiz)
+                    .questionText("Thời gian chai nhựa phân hủy?")
+                    .optionA("10 năm")
+                    .optionB("50 năm")
+                    .optionC("100 năm")
+                    .optionD("450 - 1000 năm")
+                    .correctAnswer("D")
+                    .orderNumber(5)
+                    .build()
+            );
+
+            // Lưu các câu hỏi
+            quizQuestionRepository.saveAll(questions);
+            System.out.println(">>> [DataSeeder] Đã nạp thành công Quiz và 5 Câu hỏi!");
         }
     }
 }
