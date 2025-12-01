@@ -17,7 +17,8 @@ import typography from "../../styles/typography";
 import { fetchCommunityDetails, toggleJoinCommunity } from '../../src/services/communityService';
 import { getMyReports } from '../../src/services/reportService'; 
 // CẬP NHẬT: Import service xuất báo cáo mới
-import { exportCommunityReport } from '../../src/services/reportService'; 
+import { exportCommunityReport } from '../../src/services/reportService';
+import { getCommunityDashboard } from '../../src/services/userService'; 
 import { useFocusEffect } from "expo-router";
 
 // ĐÃ XÓA HÀM MOCK exportReportToPDF
@@ -32,6 +33,7 @@ const CommunityDetailScreen = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false); // State cho nút Export
+  const [communityStats, setCommunityStats] = useState({ totalViolationReports: 0, recycledWasteCount: 0 }); // FR-12.1.2
 
   // --- LOGIC LẤY DỮ LIỆU ---
   const loadCommunityDetails = useCallback(async () => {
@@ -39,8 +41,20 @@ const CommunityDetailScreen = () => {
 
       setLoading(true);
       try {
-          const data = await fetchCommunityDetails(id); 
-          setCommunity(data);
+          // Fetch cả thông tin nhóm và thống kê cộng đồng tổng thể
+          const [communityData, dashboardData] = await Promise.all([
+              fetchCommunityDetails(id).catch(() => null),
+              getCommunityDashboard().catch(() => ({ totalViolationReports: 0, recycledWasteCount: 0 }))
+          ]);
+          
+          if (communityData) {
+              setCommunity(communityData);
+          } else {
+              Alert.alert("Lỗi", "Không thể tải thông tin cộng đồng.");
+              setCommunity(null);
+          }
+          
+          setCommunityStats(dashboardData);
       } catch (e) {
           console.error("Lỗi tải chi tiết nhóm:", e.response?.data || e.message);
           Alert.alert("Lỗi", "Không thể tải thông tin cộng đồng.");
@@ -145,8 +159,9 @@ const CommunityDetailScreen = () => {
     imageUrl 
   } = community;
 
-  const formattedRecycledWaste = recycledWasteKg ? Math.round(recycledWasteKg).toLocaleString('vi-VN') : '0';
-  const formattedTotalReports = totalReports ? totalReports.toLocaleString('vi-VN') : '0';
+  // FR-12.1.2: Sử dụng dữ liệu từ community dashboard (tổng thể) thay vì từ community (nhóm cụ thể)
+  const formattedRecycledWaste = communityStats.recycledWasteCount ? communityStats.recycledWasteCount.toLocaleString('vi-VN') : '0';
+  const formattedTotalReports = communityStats.totalViolationReports ? communityStats.totalViolationReports.toLocaleString('vi-VN') : '0';
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -281,7 +296,7 @@ const CommunityDetailScreen = () => {
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {formattedRecycledWaste}kg
+                  {formattedRecycledWaste}
                 </Text>
                 <Text style={styles.statLabel}>Lượng rác{"\n"}tái chế</Text>
               </View>
@@ -295,17 +310,17 @@ const CommunityDetailScreen = () => {
                 color="#0A0A0A"
               />
               <Text style={styles.smallCardValue}>
-                {formattedTotalReports} báo cáo{"\n"}đã gửi
+                {formattedTotalReports} báo cáo{"\n"}vi phạm
               </Text>
             </View>
             <View style={styles.smallCard}>
               <MaterialCommunityIcons
-                name="account-group"
+                name="recycle"
                 size={28}
-                color="#0A0A0A"
+                color="#4CAF50"
               />
               <Text style={styles.smallCardValue}>
-                2345 người{"\n"}tham gia
+                {formattedRecycledWaste} bài viết{"\n"}tái chế
               </Text>
             </View>
           </View>

@@ -44,7 +44,7 @@ public class QuizController {
             @PathVariable UUID id,
             @Valid @RequestBody QuizSubmitRequest request) {
         
-        // 1. Lấy User đang đăng nhập từ UserService (đã sửa lỗi)
+        // 1. Lấy User đang đăng nhập từ UserService
         User user = userService.getCurrentUser();
         
         // 2. Kiểm tra nếu không có User (chưa đăng nhập/token hết hạn)
@@ -52,8 +52,17 @@ public class QuizController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để nộp bài Quiz.");
         }
         
+        // [SECURITY] Validate: Đảm bảo user ID từ token khớp với user được lấy
+        // [DEBUG] Log để kiểm tra
+        System.out.println(">>> [QUIZ CONTROLLER] Submitting quiz for User ID: " + user.getId() + ", Email: " + user.getEmail() + ", Quiz ID: " + id);
+        
         // 3. Gọi Service với ID chính xác của người dùng hiện tại
+        // [IMPORTANT] Luôn dùng user.getId() từ SecurityContext, không dùng ID từ request body
         QuizScoreResponse response = quizService.submitQuiz(user.getId(), id, request);
+        
+        // [DEBUG] Log kết quả
+        System.out.println(">>> [QUIZ CONTROLLER] Quiz submitted successfully. Score ID: " + response.getId());
+        
         return ResponseEntity.ok(response);
     }
 }

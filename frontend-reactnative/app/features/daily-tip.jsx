@@ -15,14 +15,17 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router'; 
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
-import { getRandomTip, completeTip } from '../../src/services/dailyTipService'; 
+import { getRandomTip, completeTip } from '../../src/services/dailyTipService';
+import { getMyProfile } from '../../src/services/userService';
 
-const COMPLETED_TIPS_STORAGE_KEY = 'COMPLETED_DAILY_TIPS_V2'; // Đổi key mới để tránh conflict dữ liệu cũ
+// Helper: Tạo key lưu trạng thái Daily Tips theo user ID và ngày
+const getCompletedTipsKey = (userId) => `COMPLETED_DAILY_TIPS_${userId}_DAILY`;
 
 const DailyTipScreen = () => {
   const router = useRouter();
   const [tips, setTips] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null); // User ID hiện tại
   
   // State lưu các ID đã hoàn thành
   const [completedTips, setCompletedTips] = useState(new Set());
@@ -36,40 +39,88 @@ const DailyTipScreen = () => {
   useEffect(() => {
     const initData = async () => {
         setLoading(true);
-        await checkAndLoadDailyStatus(); // [1] Kiểm tra ngày để reset hoặc load
+        // Lấy user ID trước
+        await loadCurrentUser();
         await loadTips();
         setLoading(false);
     };
     initData();
   }, []);
 
+  // Load user ID hiện tại
+  const loadCurrentUser = async () => {
+    try {
+      const profile = await getMyProfile();
+      if (profile && profile.id) {
+        setCurrentUserId(profile.id);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy thông tin user:", error);
+      // Nếu không lấy được user, vẫn cho phép xem tips (nhưng không lưu trạng thái)
+    }
+  };
+
+  // Load trạng thái khi có user ID
+  useEffect(() => {
+    if (currentUserId) {
+      checkAndLoadDailyStatus();
+    } else {
+      setCompletedTips(new Set());
+    }
+  }, [currentUserId]);
+
   // Hàm lấy ngày hiện tại định dạng YYYY-MM-DD
   const getTodayString = () => {
     return new Date().toISOString().split('T')[0];
   };
 
-  // [LOGIC MỚI] Kiểm tra và Reset mỗi ngày
+  // [LOGIC MỚI] Kiểm tra và Reset mỗi ngày theo user ID
   const checkAndLoadDailyStatus = async () => {
+    if (!currentUserId) {
+      // Nếu chưa có user ID, không load trạng thái
+      setCompletedTips(new Set());
+      // Xóa key cũ (không có user ID) nếu có
+      try {
+        await AsyncStorage.removeItem('COMPLETED_DAILY_TIPS_V2');
+        await AsyncStorage.removeItem('COMPLETED_DAILY_TIPS');
+      } catch (e) {
+        // Ignore
+      }
+      return;
+    }
+
     try {
-      const jsonValue = await AsyncStorage.getItem(COMPLETED_TIPS_STORAGE_KEY);
+      // Xóa key cũ (không có user ID) nếu có
+      try {
+        await AsyncStorage.removeItem('COMPLETED_DAILY_TIPS_V2');
+        await AsyncStorage.removeItem('COMPLETED_DAILY_TIPS');
+      } catch (e) {
+        // Ignore
+      }
+
+      const storageKey = getCompletedTipsKey(currentUserId);
+      const jsonValue = await AsyncStorage.getItem(storageKey);
       const today = getTodayString();
 
       if (jsonValue != null) {
         const data = JSON.parse(jsonValue);
         
-        // Kiểm tra xem dữ liệu có phải của hôm nay không
-        if (data.date === today) {
-            // Nếu đúng hôm nay -> Load danh sách đã làm
+        // Kiểm tra xem dữ liệu có phải của hôm nay và đúng user không
+        if (data.date === today && data.userId === currentUserId) {
+            // Nếu đúng hôm nay và đúng user -> Load danh sách đã làm
             setCompletedTips(new Set(data.ids));
         } else {
-            // Nếu là ngày cũ -> Reset (ngày mới bắt đầu!)
-            console.log("Ngày mới! Reset trạng thái Daily Tips.");
-            await AsyncStorage.removeItem(COMPLETED_TIPS_STORAGE_KEY);
+            // Nếu là ngày cũ hoặc user khác -> Reset (ngày mới bắt đầu!)
+            console.log("Ngày mới hoặc user khác! Reset trạng thái Daily Tips.");
+            await AsyncStorage.removeItem(storageKey);
             setCompletedTips(new Set());
         }
+      } else {
+        setCompletedTips(new Set());
       }
     } catch(e) {
       console.error("Lỗi đọc trạng thái:", e);
+      setCompletedTips(new Set());
     }
   };
 
@@ -109,19 +160,23 @@ const DailyTipScreen = () => {
     try {
         await completeTip(item.id);
         
-        // [UPDATE] Lưu kèm ngày hiện tại
-        setCompletedTips(prev => {
-            const newSet = new Set(prev);
-            newSet.add(item.id);
-            
-            const storageData = {
-                date: getTodayString(), // Lưu ngày hiện tại
-                ids: Array.from(newSet)
-            };
-            
-            AsyncStorage.setItem(COMPLETED_TIPS_STORAGE_KEY, JSON.stringify(storageData));
-            return newSet;
-        });
+        // [UPDATE] Lưu kèm ngày hiện tại và user ID
+        if (currentUserId) {
+          setCompletedTips(prev => {
+              const newSet = new Set(prev);
+              newSet.add(item.id);
+              
+              const storageKey = getCompletedTipsKey(currentUserId);
+              const storageData = {
+                  userId: currentUserId,
+                  date: getTodayString(), // Lưu ngày hiện tại
+                  ids: Array.from(newSet)
+              };
+              
+              AsyncStorage.setItem(storageKey, JSON.stringify(storageData));
+              return newSet;
+          });
+        }
 
         triggerSuccessAnimation(item.pointsReward || 10);
     } catch (e) {

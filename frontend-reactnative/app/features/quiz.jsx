@@ -3,13 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // [1] Import Storage
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_BASE_URL } from '../../src/constants/api';
-import { fetchWithAuth } from '../../src/utils/apiHelper';
+import { getQuizzes, getQuizById, submitQuiz } from '../../src/services/quizService';
+import { getMyProfile } from '../../src/services/userService';
 
-// Key lưu trạng thái Quiz theo ngày
-const COMPLETED_QUIZZES_KEY = 'COMPLETED_QUIZZES_DAILY';
+// Helper: Tạo key lưu trạng thái Quiz theo user ID và ngày
+const getCompletedQuizzesKey = (userId) => `COMPLETED_QUIZZES_${userId}_DAILY`;
 
 export default function QuizScreen() {
 	const router = useRouter();
@@ -23,52 +23,100 @@ export default function QuizScreen() {
 	// Game States
 	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 	const [userAnswers, setUserAnswers] = useState({}); 
-	const [scoreResult, setScoreResult] = useState(null); 
+	const [scoreResult, setScoreResult] = useState(null);
+	const [timeRemaining, setTimeRemaining] = useState(null); // Thời gian còn lại (giây)
+	const [startTime, setStartTime] = useState(null); // Thời gian bắt đầu làm bài
+	const [currentUserId, setCurrentUserId] = useState(null); // User ID hiện tại
+	const timerRef = useRef(null); 
 
 	useEffect(() => {
 		const initData = async () => {
 			setLoading(true);
-			await checkAndLoadQuizStatus(); // Load trạng thái trước
+			// Lấy user ID trước
+			await loadCurrentUser();
 			await fetchQuizzes(); 			// Load danh sách sau
 			setLoading(false);
 		};
 		initData();
 	}, []);
 
+	// Load trạng thái khi có user ID
+	useEffect(() => {
+		if (currentUserId) {
+			checkAndLoadQuizStatus();
+		} else {
+			setCompletedQuizzes(new Set());
+		}
+	}, [currentUserId]);
+
+	// Load user ID hiện tại
+	const loadCurrentUser = async () => {
+		try {
+			const profile = await getMyProfile();
+			if (profile && profile.id) {
+				setCurrentUserId(profile.id);
+			}
+		} catch (error) {
+			console.error("Lỗi lấy thông tin user:", error);
+			// Nếu không lấy được user, vẫn cho phép làm quiz (nhưng không lưu trạng thái)
+		}
+	};
+
 	// Helper: Lấy ngày YYYY-MM-DD
 	const getTodayString = () => new Date().toISOString().split('T')[0];
 
-	// [3] Logic Kiểm tra & Reset trạng thái theo ngày
+	// [3] Logic Kiểm tra & Reset trạng thái theo ngày và user ID
 	const checkAndLoadQuizStatus = async () => {
+		if (!currentUserId) {
+			// Nếu chưa có user ID, không load trạng thái
+			setCompletedQuizzes(new Set());
+			// Xóa key cũ (không có user ID) nếu có
+			try {
+				await AsyncStorage.removeItem('COMPLETED_QUIZZES_DAILY');
+			} catch (e) {
+				// Ignore
+			}
+			return;
+		}
+
 		try {
-			const jsonValue = await AsyncStorage.getItem(COMPLETED_QUIZZES_KEY);
+			// Xóa key cũ (không có user ID) nếu có
+			try {
+				await AsyncStorage.removeItem('COMPLETED_QUIZZES_DAILY');
+			} catch (e) {
+				// Ignore
+			}
+
+			const storageKey = getCompletedQuizzesKey(currentUserId);
+			const jsonValue = await AsyncStorage.getItem(storageKey);
 			const today = getTodayString();
 
 			if (jsonValue != null) {
 				const data = JSON.parse(jsonValue);
-				// Nếu đúng là dữ liệu của hôm nay -> Load lên
-				if (data.date === today) {
+				// Nếu đúng là dữ liệu của hôm nay và đúng user -> Load lên
+				if (data.date === today && data.userId === currentUserId) {
 					setCompletedQuizzes(new Set(data.ids));
 				} else {
-					// Ngày mới -> Reset (Xóa storage cũ)
-					await AsyncStorage.removeItem(COMPLETED_QUIZZES_KEY);
+					// Ngày mới hoặc user khác -> Reset (Xóa storage cũ)
+					await AsyncStorage.removeItem(storageKey);
 					setCompletedQuizzes(new Set());
 				}
+			} else {
+				setCompletedQuizzes(new Set());
 			}
 		} catch(e) {
 			console.error("Lỗi đọc trạng thái Quiz:", e);
+			setCompletedQuizzes(new Set());
 		}
 	};
 
 	const fetchQuizzes = async () => {
 		try {
-			const response = await fetchWithAuth(`${API_BASE_URL}/quizzes`, { method: 'GET' });
-			if (response.ok) {
-				const data = await response.json();
-				setQuizzes(data);
-			}
+			const data = await getQuizzes();
+			setQuizzes(data);
 		} catch (error) {
-			console.error(error);
+			console.error("Lỗi tải danh sách quiz:", error);
+			Alert.alert("Lỗi", "Không thể tải danh sách bài kiểm tra.");
 		}
 	};
 
@@ -81,64 +129,106 @@ export default function QuizScreen() {
 
 		setLoading(true);
 		try {
-			const response = await fetchWithAuth(`${API_BASE_URL}/quizzes/${quizId}`, { method: 'GET' });
-			if (response.ok) {
-				const data = await response.json();
-				setCurrentQuiz(data);
-				setCurrentQuestionIndex(0);
-				setUserAnswers({});
-				setScoreResult(null);
+			const data = await getQuizById(quizId);
+			setCurrentQuiz(data);
+			setCurrentQuestionIndex(0);
+			setUserAnswers({});
+			setScoreResult(null);
+			setStartTime(Date.now());
+			
+			// Khởi động timer nếu có time limit
+			if (data.timeLimitMinutes) {
+				const totalSeconds = data.timeLimitMinutes * 60;
+				setTimeRemaining(totalSeconds);
+				startTimer(totalSeconds);
+			} else {
+				setTimeRemaining(null);
 			}
 		} catch (error) {
+			console.error("Lỗi tải quiz:", error);
 			Alert.alert("Lỗi", "Không thể tải bài kiểm tra.");
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	// Timer function
+	const startTimer = (initialSeconds) => {
+		if (timerRef.current) {
+			clearInterval(timerRef.current);
+		}
+		
+		timerRef.current = setInterval(() => {
+			setTimeRemaining((prev) => {
+				if (prev <= 1) {
+					clearInterval(timerRef.current);
+					// Tự động nộp bài khi hết thời gian
+					handleSubmit(true);
+					return 0;
+				}
+				return prev - 1;
+			});
+		}, 1000);
+	};
+
+	// Cleanup timer khi component unmount hoặc quiz kết thúc
+	useEffect(() => {
+		return () => {
+			if (timerRef.current) {
+				clearInterval(timerRef.current);
+			}
+		};
+	}, []);
+
 	const handleSelectOption = (questionId, optionIndex) => {
 		setUserAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
 	};
 
-	const handleSubmit = async () => {
+	const handleSubmit = async (isTimeUp = false) => {
 		if (!currentQuiz) return;
 		
+		// Dừng timer
+		if (timerRef.current) {
+			clearInterval(timerRef.current);
+			timerRef.current = null;
+		}
+
+		// Tính thời gian đã làm
+		const timeTakenSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+
+		if (isTimeUp) {
+			Alert.alert("Hết thời gian!", "Thời gian làm bài đã hết. Hệ thống sẽ tự động nộp bài của bạn.");
+		}
+
 		setLoading(true);
 		try {
-			const payload = {
-				answers: userAnswers,
-				timeTakenSeconds: 300 
-			};
+			const result = await submitQuiz(currentQuiz.id, userAnswers, timeTakenSeconds);
+			setScoreResult(result);
 
-			const response = await fetchWithAuth(`${API_BASE_URL}/quizzes/${currentQuiz.id}/submit`, {
-				method: 'POST',
-				body: JSON.stringify(payload)
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				setScoreResult(result);
-
-				// [4] Lưu trạng thái hoàn thành vào bộ nhớ
+			// Lưu trạng thái hoàn thành vào bộ nhớ (theo user ID)
+			if (currentUserId) {
 				setCompletedQuizzes(prev => {
 					const newSet = new Set(prev);
 					newSet.add(currentQuiz.id);
 					
+					const storageKey = getCompletedQuizzesKey(currentUserId);
 					const storageData = {
+						userId: currentUserId,
 						date: getTodayString(),
 						ids: Array.from(newSet)
 					};
-					AsyncStorage.setItem(COMPLETED_QUIZZES_KEY, JSON.stringify(storageData));
+					AsyncStorage.setItem(storageKey, JSON.stringify(storageData));
 					return newSet;
 				});
-
-			} else {
-				Alert.alert("Lỗi", "Nộp bài thất bại.");
 			}
+
 		} catch (error) {
-			console.error(error);
+			console.error("Lỗi nộp bài:", error);
+			Alert.alert("Lỗi", error.message || "Nộp bài thất bại. Vui lòng thử lại.");
 		} finally {
 			setLoading(false);
+			setTimeRemaining(null);
+			setStartTime(null);
 		}
 	};
 
@@ -210,23 +300,55 @@ export default function QuizScreen() {
 
 	// --- RENDER: MÀN HÌNH KẾT QUẢ ---
 	if (scoreResult) {
+		const percentage = scoreResult.percentage || 0;
+		const isExcellent = percentage >= 80;
+		const isGood = percentage >= 60;
+		
 		return (
 			<SafeAreaView style={styles.container}>
 				<Stack.Screen options={{ headerShown: false }} />
-				<View style={styles.resultContainer}>
-					<MaterialCommunityIcons name="trophy" size={80} color="#FFD700" />
-					<Text style={styles.resultTitle}>Kết quả</Text>
+				<ScrollView contentContainerStyle={styles.resultContainer}>
+					<View style={[styles.resultIconContainer, isExcellent && styles.resultIconExcellent, isGood && !isExcellent && styles.resultIconGood]}>
+						<MaterialCommunityIcons 
+							name={isExcellent ? "trophy" : isGood ? "medal" : "school"} 
+							size={80} 
+							color={isExcellent ? "#FFD700" : isGood ? "#4CAF50" : "#9E9E9E"} 
+						/>
+					</View>
+					<Text style={styles.resultTitle}>Kết quả bài kiểm tra</Text>
 					<Text style={styles.resultScore}>{scoreResult.correctCount} / {scoreResult.totalQuestions}</Text>
 					<Text style={styles.resultText}>Câu trả lời đúng</Text>
 					
+					<View style={styles.percentageContainer}>
+						<Text style={styles.percentageText}>{percentage.toFixed(0)}%</Text>
+					</View>
+					
 					<View style={styles.pointsBadge}>
+						<MaterialCommunityIcons name="star" size={20} color="#F57F17" />
 						<Text style={styles.pointsText}>+{scoreResult.pointsEarned} Điểm xanh</Text>
 					</View>
 
-					<TouchableOpacity style={styles.btnPrimary} onPress={() => setCurrentQuiz(null)}>
+					{scoreResult.timeTakenSeconds && (
+						<View style={styles.timeInfo}>
+							<MaterialCommunityIcons name="clock-outline" size={16} color="#666" />
+							<Text style={styles.timeText}>
+								Thời gian: {Math.floor(scoreResult.timeTakenSeconds / 60)} phút {scoreResult.timeTakenSeconds % 60} giây
+							</Text>
+						</View>
+					)}
+
+					<TouchableOpacity 
+						style={styles.btnPrimary} 
+						onPress={() => {
+							setScoreResult(null);
+							setCurrentQuiz(null);
+							setTimeRemaining(null);
+							setStartTime(null);
+						}}
+					>
 						<Text style={styles.btnText}>Quay lại danh sách</Text>
 					</TouchableOpacity>
-				</View>
+				</ScrollView>
 			</SafeAreaView>
 		);
 	}
@@ -243,7 +365,15 @@ export default function QuizScreen() {
 	}
 
 	const question = currentQuiz.questions[currentQuestionIndex];
-	const isLastQuestion = currentQuiz.questions.length - 1;
+	const isLastQuestion = currentQuestionIndex === currentQuiz.questions.length - 1;
+
+	// Format thời gian còn lại
+	const formatTime = (seconds) => {
+		if (seconds === null) return null;
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	};
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -251,13 +381,41 @@ export default function QuizScreen() {
 			
 			{/* Header Progress */}
 			<View style={styles.gameHeader}>
-				<TouchableOpacity onPress={() => setCurrentQuiz(null)}>
+				<TouchableOpacity onPress={() => {
+					Alert.alert(
+						"Xác nhận",
+						"Bạn có chắc muốn thoát? Tiến trình làm bài sẽ không được lưu.",
+						[
+							{ text: "Hủy", style: "cancel" },
+							{ 
+								text: "Thoát", 
+								style: "destructive",
+								onPress: () => {
+									if (timerRef.current) clearInterval(timerRef.current);
+									setCurrentQuiz(null);
+									setTimeRemaining(null);
+									setStartTime(null);
+								}
+							}
+						]
+					);
+				}}>
 					<MaterialCommunityIcons name="close" size={24} color="#333" />
 				</TouchableOpacity>
 				<View style={styles.progressBar}>
 					<View style={[styles.progressFill, { width: `${((currentQuestionIndex + 1) / currentQuiz.questions.length) * 100}%` }]} />
 				</View>
-				<Text style={styles.progressText}>{currentQuestionIndex + 1}/{currentQuiz.questions.length}</Text>
+				<View style={styles.headerRight}>
+					{timeRemaining !== null && (
+						<View style={[styles.timerBadge, timeRemaining <= 60 && styles.timerBadgeWarning]}>
+							<MaterialCommunityIcons name="clock-outline" size={14} color={timeRemaining <= 60 ? "#D32F2F" : "#666"} />
+							<Text style={[styles.timerText, timeRemaining <= 60 && styles.timerTextWarning]}>
+								{formatTime(timeRemaining)}
+							</Text>
+						</View>
+					)}
+					<Text style={styles.progressText}>{currentQuestionIndex + 1}/{currentQuiz.questions.length}</Text>
+				</View>
 			</View>
 
 			<ScrollView contentContainerStyle={{padding: 20}}>
@@ -283,16 +441,31 @@ export default function QuizScreen() {
 			</ScrollView>
 
 			<View style={styles.footer}>
+				{currentQuestionIndex > 0 && (
+					<TouchableOpacity 
+						style={styles.btnBack} 
+						onPress={() => setCurrentQuestionIndex(prev => prev - 1)}
+					>
+						<MaterialCommunityIcons name="chevron-left" size={20} color="#666" />
+						<Text style={styles.btnBackText}>Câu trước</Text>
+					</TouchableOpacity>
+				)}
 				{isLastQuestion ? (
-					<TouchableOpacity style={styles.btnSubmit} onPress={handleSubmit}>
+					<TouchableOpacity 
+						style={[styles.btnSubmit, !userAnswers[question.id] && styles.btnSubmitDisabled]} 
+						onPress={() => handleSubmit(false)}
+						disabled={!userAnswers[question.id]}
+					>
 						<Text style={styles.btnText}>Nộp bài</Text>
 					</TouchableOpacity>
 				) : (
 					<TouchableOpacity 
-						style={styles.btnNext} 
+						style={[styles.btnNext, !userAnswers[question.id] && styles.btnNextDisabled]} 
 						onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
+						disabled={!userAnswers[question.id]}
 					>
 						<Text style={styles.btnText}>Câu tiếp theo</Text>
+						<MaterialCommunityIcons name="chevron-right" size={20} color="#fff" />
 					</TouchableOpacity>
 				)}
 			</View>
@@ -343,11 +516,82 @@ const styles = StyleSheet.create({
 	btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
 	// Result UI
-	resultContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+	resultContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, minHeight: '100%' },
+	resultIconContainer: { 
+		width: 120, 
+		height: 120, 
+		borderRadius: 60, 
+		backgroundColor: '#FFF8E1', 
+		justifyContent: 'center', 
+		alignItems: 'center',
+		marginBottom: 20
+	},
+	resultIconExcellent: { backgroundColor: '#FFF8E1' },
+	resultIconGood: { backgroundColor: '#E8F5E9' },
 	resultTitle: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 10 },
 	resultScore: { fontSize: 48, fontWeight: 'bold', color: '#2E7D32', marginVertical: 10 },
-	resultText: { fontSize: 16, color: '#666' },
-	pointsBadge: { backgroundColor: '#FFF8E1', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginVertical: 20 },
+	resultText: { fontSize: 16, color: '#666', marginBottom: 10 },
+	percentageContainer: {
+		backgroundColor: '#E3F2FD',
+		paddingHorizontal: 24,
+		paddingVertical: 12,
+		borderRadius: 20,
+		marginVertical: 10
+	},
+	percentageText: { fontSize: 32, fontWeight: 'bold', color: '#1976D2' },
+	pointsBadge: { 
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFF8E1', 
+		paddingHorizontal: 20, 
+		paddingVertical: 12, 
+		borderRadius: 20, 
+		marginVertical: 20,
+		gap: 8
+	},
 	pointsText: { color: '#F57F17', fontWeight: 'bold', fontSize: 18 },
-	btnPrimary: { backgroundColor: '#2E7D32', paddingHorizontal: 40, paddingVertical: 15, borderRadius: 30 }
+	timeInfo: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginBottom: 20
+	},
+	timeText: { fontSize: 14, color: '#666' },
+	btnPrimary: { backgroundColor: '#2E7D32', paddingHorizontal: 40, paddingVertical: 15, borderRadius: 30, width: '100%', alignItems: 'center' },
+	
+	// Timer styles
+	headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	timerBadge: { 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		backgroundColor: '#F5F5F5', 
+		paddingHorizontal: 10, 
+		paddingVertical: 4, 
+		borderRadius: 12,
+		gap: 4
+	},
+	timerBadgeWarning: { backgroundColor: '#FFEBEE' },
+	timerText: { fontSize: 12, fontWeight: 'bold', color: '#666' },
+	timerTextWarning: { color: '#D32F2F' },
+	
+	// Button styles
+	btnBack: { 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		paddingVertical: 15, 
+		paddingHorizontal: 20,
+		marginRight: 10
+	},
+	btnBackText: { color: '#666', fontWeight: '600', fontSize: 16, marginLeft: 4 },
+	btnNext: { 
+		flex: 1, 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		justifyContent: 'center',
+		backgroundColor: '#1976D2', 
+		padding: 15, 
+		borderRadius: 12
+	},
+	btnNextDisabled: { backgroundColor: '#BDBDBD', opacity: 0.6 },
+	btnSubmitDisabled: { backgroundColor: '#BDBDBD', opacity: 0.6 }
 });

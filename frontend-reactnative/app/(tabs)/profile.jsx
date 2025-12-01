@@ -14,7 +14,7 @@ const ProfileScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, currentPoints: 0 }); 
+  const [stats, setStats] = useState({ reportsCount: 0, questionsCount: 0, currentPoints: 0, classificationsCount: 0 }); 
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
@@ -56,7 +56,8 @@ const ProfileScreen = () => {
         setStats({
           reportsCount: statistics.totalReports || 0,
           questionsCount: statistics.totalChatMessages || 0,
-          currentPoints: statistics.currentPoints || 0
+          currentPoints: statistics.currentPoints || 0,
+          classificationsCount: statistics.wasteClassificationsCount || 0
         });
       }
 
@@ -120,7 +121,7 @@ const ProfileScreen = () => {
             <Text style={styles.loginPromptTitle}>Đăng nhập để trải nghiệm đầy đủ</Text>
              <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => router.push("/login")}
+              onPress={handleLogout}
               activeOpacity={0.8}
             >
               <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
@@ -221,10 +222,19 @@ const ProfileScreen = () => {
               <Text style={styles.linkText}>Xem lịch sử &rarr;</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.statCard} activeOpacity={0.7} onPress={() => router.push('/chat/chat-history')}>
+            <TouchableOpacity style={styles.statCard} activeOpacity={0.7} onPress={() => router.push('/chat/chatbot')}>
               <MaterialCommunityIcons name="message-text-outline" size={32} color="#0A0A0A" />
               <Text style={styles.statText}>{stats.questionsCount} câu hỏi</Text>
               <Text style={styles.linkText}>Lịch sử chat &rarr;</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* CARD THỐNG KÊ PHÂN LOẠI RÁC */}
+          <View style={styles.statsRow}>
+            <TouchableOpacity style={styles.statCard} activeOpacity={0.7} onPress={() => router.push('/(tabs)/recycle')}>
+              <MaterialCommunityIcons name="recycle" size={32} color="#4CAF50" />
+              <Text style={styles.statText}>{stats.classificationsCount} lần phân loại</Text>
+              <Text style={styles.linkText}>Phân loại rác &rarr;</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

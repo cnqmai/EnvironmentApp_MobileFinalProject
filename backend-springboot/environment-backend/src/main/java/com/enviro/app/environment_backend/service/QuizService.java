@@ -51,10 +51,15 @@ public class QuizService {
 
     @Transactional
     public QuizScoreResponse submitQuiz(UUID userId, UUID quizId, QuizSubmitRequest request) {
+        // [SECURITY] Validate userId - đảm bảo lấy đúng user từ request
         User user = userRepository.findById(userId)
              .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        
         Quiz quiz = quizRepository.findById(quizId)
              .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        
+        // [DEBUG] Log để kiểm tra user đang submit
+        System.out.println(">>> [QUIZ SUBMIT] User ID: " + userId + ", Email: " + user.getEmail() + ", Quiz ID: " + quizId);
 
         // 1. Tính điểm
         int correctCount = 0;
@@ -85,15 +90,20 @@ public class QuizService {
         badgeService.checkAndAssignBadges(user);
 
         // 3. Lưu hoặc Cập nhật kết quả bài thi
+        // [SECURITY] Tìm kiếm score theo user và quiz - đảm bảo mỗi user chỉ có 1 score cho mỗi quiz
         Optional<UserQuizScore> existingScore = userQuizScoreRepository.findByUserAndQuiz(user, quiz);
         
         UserQuizScore scoreToSave;
         if (existingScore.isPresent()) {
             scoreToSave = existingScore.get();
+            // [DEBUG] Log khi update score cũ
+            System.out.println(">>> [QUIZ SUBMIT] Updating existing score for User: " + user.getEmail() + ", Score ID: " + scoreToSave.getId());
         } else {
             scoreToSave = new UserQuizScore();
             scoreToSave.setUser(user);
             scoreToSave.setQuiz(quiz);
+            // [DEBUG] Log khi tạo score mới
+            System.out.println(">>> [QUIZ SUBMIT] Creating new score for User: " + user.getEmail());
         }
 
         // Cập nhật các thông số

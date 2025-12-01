@@ -1,5 +1,6 @@
 package com.enviro.app.environment_backend.controller;
 
+import com.enviro.app.environment_backend.dto.CommunityDashboardResponse;
 import com.enviro.app.environment_backend.dto.DeleteAccountRequest;
 import com.enviro.app.environment_backend.dto.NotificationSettingsRequest;
 import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
@@ -138,5 +139,15 @@ public class UserController {
         userService.save(updatedUser); 
         
         return ResponseEntity.ok().build();
+    }
+    
+    /**
+     * FR-12.1.2: API lấy thống kê dashboard cộng đồng
+     * GET /api/users/community/dashboard
+     */
+    @GetMapping("/community/dashboard")
+    public ResponseEntity<CommunityDashboardResponse> getCommunityDashboard() {
+        CommunityDashboardResponse dashboard = userService.getCommunityDashboard();
+        return ResponseEntity.ok(dashboard);
     }
 }

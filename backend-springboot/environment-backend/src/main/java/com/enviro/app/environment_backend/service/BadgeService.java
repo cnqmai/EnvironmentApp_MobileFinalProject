@@ -53,10 +53,14 @@ public class BadgeService {
         int currentPoints = user.getPoints();
         user.setPoints(currentPoints + pointsToEarn);
         
-        // 2. Kiểm tra và gán huy hiệu
+        // 2. Tăng số lần phân loại rác (FR-12.1.1)
+        int currentClassificationCount = user.getClassificationCount();
+        user.setClassificationCount(currentClassificationCount + 1);
+        
+        // 3. Kiểm tra và gán huy hiệu
         checkAndAssignBadges(user);
         
-        // 3. Trả về user đã cập nhật
+        // 4. Trả về user đã cập nhật
         return user;
     }
     

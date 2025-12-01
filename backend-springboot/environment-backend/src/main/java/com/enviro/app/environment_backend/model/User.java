@@ -37,6 +37,9 @@ public class User {
     @Column(columnDefinition = "integer default 0")
     private int points;
     
+    @Column(name = "classification_count", columnDefinition = "integer default 0")
+    private int classificationCount = 0;
+    
     private String gender;
 
     @Column(name = "date_of_birth")

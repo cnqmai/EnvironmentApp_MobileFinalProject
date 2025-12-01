@@ -206,3 +206,20 @@ export const updateNotificationSettings = async (settingsData) => {
 
     return response.json();
 };
+
+/**
+ * Lấy thống kê dashboard cộng đồng (FR-12.1.2)
+ * GET /api/users/community/dashboard
+ */
+export const getCommunityDashboard = async () => {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/community/dashboard`, {
+        method: 'GET',
+    });
+
+    if (!response.ok) {
+        const errorDetail = await response.json().catch(() => ({ message: 'Lỗi lấy thống kê cộng đồng' }));
+        throw new Error(errorDetail.message || 'Không thể lấy thống kê cộng đồng.');
+    }
+
+    return response.json();
+};

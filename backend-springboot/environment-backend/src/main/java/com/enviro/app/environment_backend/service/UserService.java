@@ -26,6 +26,7 @@ import com.enviro.app.environment_backend.dto.NotificationSettingsResponse;
 import com.enviro.app.environment_backend.dto.PrivacySettingsRequest;
 import com.enviro.app.environment_backend.dto.PrivacySettingsResponse;
 import com.enviro.app.environment_backend.dto.UpdateProfileRequest;
+import com.enviro.app.environment_backend.dto.CommunityDashboardResponse;
 import com.enviro.app.environment_backend.dto.UserStatisticsResponse;
 import com.enviro.app.environment_backend.model.NotificationSettings;
 import com.enviro.app.environment_backend.model.Report;
@@ -33,6 +34,7 @@ import com.enviro.app.environment_backend.model.ReportStatus;
 import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.ChatbotHistoryRepository;
 import com.enviro.app.environment_backend.repository.NotificationSettingsRepository;
+import com.enviro.app.environment_backend.repository.PostRepository;
 import com.enviro.app.environment_backend.repository.ReportRepository;
 import com.enviro.app.environment_backend.repository.SavedLocationRepository;
 import com.enviro.app.environment_backend.repository.UserBadgeRepository;
@@ -47,6 +49,7 @@ public class UserService {
     private final NotificationSettingsRepository notificationSettingsRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final ChatbotHistoryRepository chatbotHistoryRepository;
+    private final PostRepository postRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
 
@@ -61,6 +64,7 @@ public class UserService {
                   NotificationSettingsRepository notificationSettingsRepository,
                   UserBadgeRepository userBadgeRepository, 
                   ChatbotHistoryRepository chatbotHistoryRepository,
+                  PostRepository postRepository,
                   PasswordEncoder passwordEncoder,
                   NotificationService notificationService) { 
     this.userRepository = userRepository;
@@ -69,6 +73,7 @@ public class UserService {
     this.notificationSettingsRepository = notificationSettingsRepository;
     this.userBadgeRepository = userBadgeRepository;
     this.chatbotHistoryRepository = chatbotHistoryRepository;
+    this.postRepository = postRepository;
     this.passwordEncoder = passwordEncoder;
     this.notificationService = notificationService;
 }
@@ -174,9 +179,9 @@ public class UserService {
         long savedLocationsCount = savedLocationRepository.countByUserId(userId);
         
         List<Report> userReports = reportRepository.findByUserOrderByCreatedAtDesc(user);
-        long wasteClassificationsCount = userReports.stream()
-                .filter(r -> r.getWasteCategory() != null)
-                .count();
+        
+        // FR-12.1.1: Số lần phân loại rác = số lần dùng recycle search/camera (đã được log)
+        long wasteClassificationsCount = user.getClassificationCount();
         
         long totalMediaUploaded = userReports.stream()
                 .mapToLong(r -> r.getReportMedia() != null ? r.getReportMedia().size() : 0)
@@ -345,13 +350,49 @@ public class UserService {
     // --- PHƯƠNG THỨC MỚI ĐỂ SỬA LỖI ---
     /**
      * Lấy User hiện tại đang đăng nhập từ Security Context.
+     * [SECURITY] Đảm bảo mỗi request chỉ lấy đúng user từ JWT token của request đó.
      */
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            System.out.println(">>> [SECURITY] getCurrentUser: No authentication found");
             return null;
         }
         String email = authentication.getName();
-        return userRepository.findByEmail(email).orElse(null);
+        
+        // [SECURITY] Validate email không được null hoặc rỗng
+        if (email == null || email.trim().isEmpty()) {
+            System.out.println(">>> [SECURITY] getCurrentUser: Email is null or empty");
+            return null;
+        }
+        
+        User user = userRepository.findByEmail(email).orElse(null);
+        
+        // [DEBUG] Log để kiểm tra user được lấy
+        if (user != null) {
+            System.out.println(">>> [SECURITY] getCurrentUser: Found user - ID: " + user.getId() + ", Email: " + user.getEmail());
+        } else {
+            System.out.println(">>> [SECURITY] getCurrentUser: User not found for email: " + email);
+        }
+        
+        return user;
+    }
+    
+    /**
+     * FR-12.1.2: Lấy thống kê dashboard cộng đồng
+     * - Tổng số báo cáo vi phạm của tất cả người dùng
+     * - Lượng rác tái chế được (tổng số post có chứa "tái chế")
+     */
+    public CommunityDashboardResponse getCommunityDashboard() {
+        // Tổng số báo cáo vi phạm của tất cả người dùng
+        long totalViolationReports = reportRepository.count();
+        
+        // Lượng rác tái chế được: đếm posts có chứa "tái chế" trong nội dung
+        long recycledWasteCount = postRepository.countByContentContaining("tái chế");
+        
+        return CommunityDashboardResponse.builder()
+                .totalViolationReports(totalViolationReports)
+                .recycledWasteCount(recycledWasteCount)
+                .build();
     }
 }

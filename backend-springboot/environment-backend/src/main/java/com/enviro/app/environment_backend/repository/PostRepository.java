@@ -22,5 +22,11 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
      */
     @Query("SELECT p FROM Post p WHERE p.user.id = :userId ORDER BY p.createdAt DESC")
     List<Post> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId);
+    
+    /**
+     * Đếm số lượng posts có chứa "tái chế" trong nội dung (FR-12.1.2)
+     */
+    @Query("SELECT COUNT(p) FROM Post p WHERE LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    long countByContentContaining(@Param("keyword") String keyword);
 }
 

@@ -45,6 +45,7 @@ CREATE TABLE users (
     avatar_url TEXT,
     default_location VARCHAR(255),
     points INT DEFAULT 0,
+    classification_count INT DEFAULT 0,
     gender VARCHAR(10),
     date_of_birth DATE,
     phone_number VARCHAR(20),
@@ -144,8 +145,10 @@ CREATE TABLE user_quiz_scores (
     total_questions INT NOT NULL,
     percentage DECIMAL(5, 2) NOT NULL,
     time_taken_seconds INT,
-    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    -- Bỏ UNIQUE để cho phép làm lại nhiều lần
+    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- [SECURITY] Unique constraint đảm bảo mỗi user chỉ có 1 score cho mỗi quiz
+    -- Nếu muốn cho phép làm lại, có thể xóa constraint này và cập nhật logic
+    UNIQUE(user_id, quiz_id)
 );
 
 -- --- 7. Bảng Phần thưởng (Rewards) ---
