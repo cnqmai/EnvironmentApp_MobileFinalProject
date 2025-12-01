@@ -120,7 +120,7 @@ public class NotificationScheduler {
     }
 
     // ====================================================================
-    // FR-2.2.1 & FR-2.2.2: Cảnh báo AQI (Chạy mỗi 1 tiếng)
+    // FR-2.2.1: Cảnh báo AQI (Logic tính toán chính xác hơn)
     // ====================================================================
     @Scheduled(fixedRate = 3600000) 
     public void scheduleAqiAlerts() {
@@ -129,57 +129,82 @@ public class NotificationScheduler {
         for (User user : users) {
             NotificationSettings settings = getOrCreateSettings(user);
             
-            // BỎ QUA nếu người dùng tắt cảnh báo AQI HOẶC không có vị trí mặc định
             if (!settings.getAqiAlertEnabled() || user.getDefaultLocation() == null || user.getDefaultLocation().isEmpty()) {
                 continue;
             }
 
             try {
-                // 2. TÌM VỊ TRÍ TỪ ĐỊA CHỈ MẶC ĐỊNH CỦA USER
                 String defaultAddress = user.getDefaultLocation();
-                
                 GeocodingResponse geoResponse = aqiService.geocodeAddress(defaultAddress);
 
-                if (geoResponse == null) {
-                    System.err.println("Không thể geocode địa chỉ mặc định: " + defaultAddress + " cho user: " + user.getEmail());
-                    continue; 
-                }
+                if (geoResponse == null) continue; 
                 
                 double lat = geoResponse.getLat(); 
                 double lon = geoResponse.getLon(); 
                 
-                // 3. Gọi API OWM thô
                 String url = String.format("%s?lat=%f&lon=%f&appid=%s", apiUrl, lat, lon, apiKey);
                 String response = restTemplate.getForObject(url, String.class);
 
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode root = mapper.readTree(response);
-                int owmAqi = root.path("list").get(0).path("main").path("aqi").asInt(); // Thang 1-5
-
-                // Quy đổi AQI OWM (thang 1-5) sang AQI USA TỐI ĐA (0-500) để so sánh
-                int maxUsaAqiForCategory = OWM_TO_USA_AQI_MAX.getOrDefault(owmAqi, 500);
                 
-                // 4. KIỂM TRA NGƯỠNG CÁ NHÂN (FR-2.2.2)
+                // --- SỬA ĐỔI: Lấy nồng độ PM2.5 thay vì index aqi ---
+                double pm25 = root.path("list").get(0).path("components").path("pm2_5").asDouble();
+                
+                // Tính toán AQI chuẩn Mỹ (US AQI) từ nồng độ PM2.5
+                int realAqi = calculateUSAAQI(pm25);
+                
+                // Lấy ngưỡng người dùng cài đặt
                 int userThreshold = settings.getAqiThreshold();
                 
-                // Kiểm tra: Nếu AQI OWM (max range) vượt quá ngưỡng tùy chỉnh của người dùng
-                if (maxUsaAqiForCategory > userThreshold) {
-                    
-                    String statusText = AQI_STATUS_MAP.getOrDefault(owmAqi, "KHÔNG RÕ");
+                // So sánh chính xác
+                if (realAqi > userThreshold) {
+                    String statusText = getAqiStatusText(realAqi);
                     
                     notificationService.createNotification(
                         user,
-                        "🚨 CẢNH BÁO AQI VƯỢT NGƯỠNG!",
-                        String.format("Chất lượng không khí tại %s đang ở mức %s (%d). Đã vượt ngưỡng cảnh báo của bạn (%d).", defaultAddress, statusText, maxUsaAqiForCategory, userThreshold),
+                        "🚨 CẢNH BÁO AQI: " + realAqi,
+                        String.format("Tại %s, chỉ số AQI là %d (%s), vượt ngưỡng an toàn của bạn (%d).", 
+                                      defaultAddress, realAqi, statusText, userThreshold),
                         NotificationType.AQI_ALERT,
                         null
                     );
-                    System.out.println(">>> [Scheduler] Đã gửi cảnh báo AQI cho user: " + user.getEmail() + " tại " + defaultAddress);
+                    System.out.println(">>> [Scheduler] Alert sent: AQI " + realAqi + " > " + userThreshold + " for " + user.getEmail());
+                } else {
+                    System.out.println(">>> [Scheduler] Safe: AQI " + realAqi + " <= " + userThreshold + " for " + user.getEmail());
                 }
 
             } catch (Exception e) {
-                System.err.println("Lỗi check AQI cho user " + user.getEmail() + ": " + e.getMessage());
+                System.err.println("Error checking AQI for " + user.getEmail() + ": " + e.getMessage());
             }
         }
+    }
+
+    // Hàm tiện ích: Chuyển đổi trạng thái AQI sang text
+    private String getAqiStatusText(int aqi) {
+        if (aqi <= 50) return "Tốt";
+        if (aqi <= 100) return "Trung bình";
+        if (aqi <= 150) return "Kém cho nhóm nhạy cảm";
+        if (aqi <= 200) return "Xấu";
+        if (aqi <= 300) return "Rất xấu";
+        return "Nguy hiểm";
+    }
+
+    // Hàm tính toán AQI chuẩn Mỹ từ nồng độ PM2.5 (ug/m3)
+    // Công thức Linear Interpolation (EPA Standard)
+    private int calculateUSAAQI(double pm25) {
+        double c = Math.floor(10 * pm25) / 10;
+        if (c <= 12.0) return linear(50, 0, 12.0, 0, c);
+        if (c <= 35.4) return linear(100, 51, 35.4, 12.1, c);
+        if (c <= 55.4) return linear(150, 101, 55.4, 35.5, c);
+        if (c <= 150.4) return linear(200, 151, 150.4, 55.5, c);
+        if (c <= 250.4) return linear(300, 201, 250.4, 150.5, c);
+        if (c <= 350.4) return linear(400, 301, 350.4, 250.5, c);
+        if (c <= 500.4) return linear(500, 401, 500.4, 350.5, c);
+        return 500; // Ngoài thang đo
+    }
+
+    private int linear(int aqihigh, int aqilow, double conchigh, double conclow, double conc) {
+        return (int) Math.round(((conc - conclow) / (conchigh - conclow)) * (aqihigh - aqilow) + aqilow);
     }
 }

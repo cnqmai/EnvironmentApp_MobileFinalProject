@@ -94,9 +94,17 @@ const NotificationsScreen = () => {
     const date = new Date(dateString);
     const diffMinutes = Math.floor((now - date) / 60000);
     
+    // Dưới 1 phút
     if (diffMinutes < 1) return "Vừa xong";
+    
+    // Dưới 60 phút -> Hiển thị số phút
+    if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+    
+    // Trên 1 giờ -> Tính giờ
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) return `${diffHours} giờ trước`;
+    
+    // Trên 1 ngày -> Tính ngày
     return `${Math.floor(diffHours / 24)} ngày trước`;
   };
 
