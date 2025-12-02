@@ -452,17 +452,17 @@ export default function QuizScreen() {
 				)}
 				{isLastQuestion ? (
 					<TouchableOpacity 
-						style={[styles.btnSubmit, !userAnswers[question.id] && styles.btnSubmitDisabled]} 
+						style={[styles.btnSubmit, userAnswers[question.id] === undefined && styles.btnSubmitDisabled]} 
 						onPress={() => handleSubmit(false)}
-						disabled={!userAnswers[question.id]}
+						disabled={userAnswers[question.id] === undefined}
 					>
 						<Text style={styles.btnText}>Nộp bài</Text>
 					</TouchableOpacity>
 				) : (
 					<TouchableOpacity 
-						style={[styles.btnNext, !userAnswers[question.id] && styles.btnNextDisabled]} 
+						style={[styles.btnNext, userAnswers[question.id] === undefined && styles.btnNextDisabled]} 
 						onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
-						disabled={!userAnswers[question.id]}
+						disabled={userAnswers[question.id] === undefined}
 					>
 						<Text style={styles.btnText}>Câu tiếp theo</Text>
 						<MaterialCommunityIcons name="chevron-right" size={20} color="#fff" />

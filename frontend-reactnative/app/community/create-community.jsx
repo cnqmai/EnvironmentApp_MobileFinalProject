@@ -15,7 +15,7 @@ import {
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import typography from "../../styles/typography";
-import { createGroup } from '../../src/services/communityService';
+import { createGroup } from '../../src/services/groupService';
 import { getPrivacySettings } from '../../src/services/userService'; 
 import * as Location from 'expo-location'; 
 import * as ImagePicker from 'expo-image-picker'; // IMPORT CẦN THIẾT

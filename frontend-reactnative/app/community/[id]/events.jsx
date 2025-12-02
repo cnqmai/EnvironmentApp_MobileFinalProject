@@ -7,14 +7,15 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator, 
-  RefreshControl, 
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import EventCard from "../../../components/community/EventCard";
 import typography from "../../../styles/typography";
 // CẬP NHẬT IMPORT: Sử dụng fetchAllEvents (đã được sửa trong file service trước)
-import { fetchAllEvents } from "../../../src/services/campaignService"; 
+import { fetchAllEvents, registerForCampaign } from "../../../src/services/campaignService"; 
 
 // Helper function để format ngày giờ từ OffsetDateTime (giả định)
 const formatDateTime = (offsetDateTime) => {
@@ -89,6 +90,25 @@ const CommunityEventsScreen = () => {
     fetchEvents();
   };
   // --- KẾT THÚC LOGIC FETCH ---
+
+  // --- LOGIC ĐĂNG KÝ SỰ KIỆN ---
+  const handleRegister = async (eventId) => {
+    try {
+      await registerForCampaign(eventId);
+      Alert.alert(
+        "Thành công! 🎉",
+        "Bạn đã đăng ký tham gia chiến dịch thành công và nhận được 100 điểm thưởng!"
+      );
+      // Refresh danh sách để cập nhật số lượng người tham gia
+      fetchEvents();
+    } catch (error) {
+      console.error("Lỗi đăng ký chiến dịch:", error.message);
+      Alert.alert(
+        "Lỗi đăng ký",
+        error.message || "Không thể đăng ký tham gia chiến dịch. Vui lòng thử lại sau."
+      );
+    }
+  };
 
   const filterOptions = [
     { value: "all", label: "Tất cả", icon: "calendar" },
@@ -189,6 +209,7 @@ const CommunityEventsScreen = () => {
               event={event}
               showStatus={true}
               onPress={() => router.push(`/community/${id}/events/${event.id}`)}
+              onRegister={handleRegister}
             />
           ))
         )}

@@ -109,7 +109,7 @@ password:
     
     # Giữ nguyên IP LAN cho Backend (Vì điện thoại bạn vẫn cần gọi về máy tính để kích hoạt /open-app)
     # Trừ khi bạn cài ngrok cho cả Spring Boot
-    backend-url: "http://192.168.100.190:8080"
+    backend-url: "http://172.20.10.3:8080"
 
 logging:
   level:
@@ -120,4 +120,4 @@ logging:
 
 # --- Gemini Configuration ---
 gemini:
-  api-key: "AIzaSyByLsjIull7KIwRb-mkXpakm52C1kyYUeo" 
+  api-key: "AIzaSyD_5XfYoX5OBCiqeOuVH8e6ho7CmcSBwGM" 

@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import typography from "../../styles/typography";
 
-const EventCard = ({ event, onPress, showStatus = false }) => {
+const EventCard = ({ event, onPress, showStatus = false, onRegister }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "upcoming":
@@ -142,7 +142,16 @@ const EventCard = ({ event, onPress, showStatus = false }) => {
         </View>
 
         {eventStatus === "upcoming" && (
-          <TouchableOpacity style={styles.joinButton} activeOpacity={0.7}>
+          <TouchableOpacity 
+            style={styles.joinButton} 
+            activeOpacity={0.7}
+            onPress={(e) => {
+              e.stopPropagation(); // Ngăn chặn trigger onPress của card
+              if (onRegister) {
+                onRegister(event.id);
+              }
+            }}
+          >
             <Text style={styles.joinButtonText}>Đăng ký</Text>
           </TouchableOpacity>
         )}

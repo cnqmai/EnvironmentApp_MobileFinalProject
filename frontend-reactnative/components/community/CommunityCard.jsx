@@ -7,7 +7,7 @@ const CommunityCard = ({ community, onPress }) => {
   const memberCount = community.memberCount || 0;
   const recycledWeight = community.recycledWasteKg || 0;
   const isMember = community.isMember || false;
-  const campaigns = community.totalReports || 0; // Tạm thời dùng totalReports, có thể thay bằng campaigns count nếu có API
+  const totalReports = community.totalReports || 0; // Tổng số báo cáo vi phạm
   
   // Format số lượng
   const formatNumber = (num) => {
@@ -41,8 +41,8 @@ const CommunityCard = ({ community, onPress }) => {
 
       <View style={styles.communityStats}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{campaigns}</Text>
-          <Text style={styles.statLabel}>Chiến dịch</Text>
+          <Text style={styles.statValue}>{totalReports.toLocaleString('vi-VN')}</Text>
+          <Text style={styles.statLabel}>Báo cáo vi phạm</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>

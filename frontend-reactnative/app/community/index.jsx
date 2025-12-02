@@ -17,7 +17,7 @@ import EventCard from "../../components/community/EventCard";
 import ForumPostCard from "../../components/community/ForumPostCard";
 import typography from "../../styles/typography";
 import { fetchCommunityFeed, fetchDiscoverCommunities, fetchMyCommunities, toggleLikePost } from '../../src/services/communityService'; 
-import { fetchAllEvents } from '../../src/services/campaignService';
+import { fetchAllEvents, registerForCampaign } from '../../src/services/campaignService';
 
 const CommunityScreen = () => {
   const router = useRouter();
@@ -73,6 +73,25 @@ const CommunityScreen = () => {
     fetchData();
   };
   
+  // --- HÀM ĐĂNG KÝ SỰ KIỆN ---
+  const handleEventRegister = async (eventId) => {
+    try {
+      await registerForCampaign(eventId);
+      Alert.alert(
+        "Thành công! 🎉",
+        "Bạn đã đăng ký tham gia chiến dịch thành công và nhận được 100 điểm thưởng!"
+      );
+      // Refresh danh sách để cập nhật số lượng người tham gia
+      fetchData();
+    } catch (error) {
+      console.error("Lỗi đăng ký chiến dịch:", error.message);
+      Alert.alert(
+        "Lỗi đăng ký",
+        error.message || "Không thể đăng ký tham gia chiến dịch. Vui lòng thử lại sau."
+      );
+    }
+  };
+
   // --- HÀM XỬ LÝ LIKE (giữ nguyên) ---
   const handleLikeToggle = async (postId) => {
     const originalPost = posts.find(p => p.id === postId);
@@ -165,6 +184,7 @@ const CommunityScreen = () => {
               onPress={() =>
                 router.push(`/community/${event.communityId}/events/${event.id}`) 
               }
+              onRegister={handleEventRegister}
             />
           ))
       )}

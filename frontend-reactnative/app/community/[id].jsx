@@ -18,7 +18,6 @@ import { fetchCommunityDetails, toggleJoinCommunity } from '../../src/services/c
 import { getMyReports } from '../../src/services/reportService'; 
 // CẬP NHẬT: Import service xuất báo cáo mới
 import { exportCommunityReport } from '../../src/services/reportService';
-import { getCommunityDashboard } from '../../src/services/userService'; 
 import { useFocusEffect } from "expo-router";
 
 // ĐÃ XÓA HÀM MOCK exportReportToPDF
@@ -33,7 +32,6 @@ const CommunityDetailScreen = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false); // State cho nút Export
-  const [communityStats, setCommunityStats] = useState({ totalViolationReports: 0, recycledWasteCount: 0 }); // FR-12.1.2
 
   // --- LOGIC LẤY DỮ LIỆU ---
   const loadCommunityDetails = useCallback(async () => {
@@ -41,11 +39,8 @@ const CommunityDetailScreen = () => {
 
       setLoading(true);
       try {
-          // Fetch cả thông tin nhóm và thống kê cộng đồng tổng thể
-          const [communityData, dashboardData] = await Promise.all([
-              fetchCommunityDetails(id).catch(() => null),
-              getCommunityDashboard().catch(() => ({ totalViolationReports: 0, recycledWasteCount: 0 }))
-          ]);
+          // Fetch thông tin nhóm (đã bao gồm thống kê của nhóm cụ thể)
+          const communityData = await fetchCommunityDetails(id).catch(() => null);
           
           if (communityData) {
               setCommunity(communityData);
@@ -53,8 +48,6 @@ const CommunityDetailScreen = () => {
               Alert.alert("Lỗi", "Không thể tải thông tin cộng đồng.");
               setCommunity(null);
           }
-          
-          setCommunityStats(dashboardData);
       } catch (e) {
           console.error("Lỗi tải chi tiết nhóm:", e.response?.data || e.message);
           Alert.alert("Lỗi", "Không thể tải thông tin cộng đồng.");
@@ -64,7 +57,11 @@ const CommunityDetailScreen = () => {
       }
   }, [id]);
 
-  useFocusEffect(loadCommunityDetails);
+  useFocusEffect(
+    useCallback(() => {
+      loadCommunityDetails();
+    }, [loadCommunityDetails])
+  );
 
   // --- FR-12.1.3: LOGIC XUẤT BÁO CÁO PDF ---
   const handleExportReport = async () => {
@@ -154,14 +151,17 @@ const CommunityDetailScreen = () => {
   // Lấy dữ liệu động mới từ API response
   const { 
     areaName, 
-    totalReports, 
-    recycledWasteKg, 
+    totalReports = 0, 
+    recycledWasteKg = 0,
     imageUrl 
   } = community;
 
-  // FR-12.1.2: Sử dụng dữ liệu từ community dashboard (tổng thể) thay vì từ community (nhóm cụ thể)
-  const formattedRecycledWaste = communityStats.recycledWasteCount ? communityStats.recycledWasteCount.toLocaleString('vi-VN') : '0';
-  const formattedTotalReports = communityStats.totalViolationReports ? communityStats.totalViolationReports.toLocaleString('vi-VN') : '0';
+  // FR-12.1.2: Sử dụng dữ liệu từ community (nhóm cụ thể) - đã được tính toán thực tế từ backend
+  // Lượng rác tái chế = số bài viết * 10 (kg)
+  const formattedRecycledWaste = recycledWasteKg >= 1000 
+    ? (recycledWasteKg / 1000).toFixed(1) + 't' 
+    : recycledWasteKg.toLocaleString('vi-VN') + 'kg';
+  const formattedTotalReports = totalReports ? totalReports.toLocaleString('vi-VN') : '0';
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -291,8 +291,8 @@ const CommunityDetailScreen = () => {
                 <Text style={styles.statLabel}>Thành viên</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>12</Text>
-                <Text style={styles.statLabel}>Chiến dịch</Text>
+                <Text style={styles.statValue}>{formattedTotalReports}</Text>
+                <Text style={styles.statLabel}>Báo cáo vi phạm</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
@@ -320,17 +320,8 @@ const CommunityDetailScreen = () => {
                 color="#4CAF50"
               />
               <Text style={styles.smallCardValue}>
-                {formattedRecycledWaste} bài viết{"\n"}tái chế
+                {formattedRecycledWaste} rác{"\n"}tái chế
               </Text>
-            </View>
-          </View>
-          {/* Chart Section - Mock UI */}
-          <View style={styles.chartSection}>
-            <View style={styles.chartHeader}>
-              <Text style={styles.chartTitle}>Hoạt động cộng đồng</Text>
-            </View>
-            <View style={styles.chartContainer}>
-                            <Text style={styles.chartLegendText}>Lượng rác tái chế (Tháng 9, 2025)</Text>
             </View>
           </View>
         </View>
@@ -656,42 +647,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0A0A0A",
     textAlign: "center",
-  },
-
-  chartSection: {
-    backgroundColor: "#FFFFFF",
-    marginBottom: 0,
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    marginTop: 15,
-  },
-  chartHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  chartTitle: {
-    ...typography.h3,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0A0A0A",
-  },
-  chartContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  chartLegendText: {
-    ...typography.small,
-    fontSize: 13,
-    color: '#999',
-    marginTop: 10,
   },
 
   badgeSection: {

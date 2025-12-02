@@ -294,7 +294,6 @@ const styles = StyleSheet.create({
   // [Style mới] Làm mờ thẻ khi đã hoàn thành
   cardCompleted: { opacity: 0.8, backgroundColor: '#FAFAFA' },
   
-  image: { width: '100%', height: 160 },
   imageCompleted: { opacity: 0.6 }, // Làm mờ ảnh
   
   content: { padding: 16 },

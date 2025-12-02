@@ -436,14 +436,15 @@ public class UserService {
     /**
      * FR-12.1.2: Lấy thống kê dashboard cộng đồng
      * - Tổng số báo cáo vi phạm của tất cả người dùng
-     * - Lượng rác tái chế được (tổng số post có chứa "tái chế")
+     * - Lượng rác tái chế được = số lượng bài viết * 10 (kg)
      */
     public CommunityDashboardResponse getCommunityDashboard() {
         // Tổng số báo cáo vi phạm của tất cả người dùng
         long totalViolationReports = reportRepository.count();
         
-        // Lượng rác tái chế được: đếm posts có chứa "tái chế" trong nội dung
-        long recycledWasteCount = postRepository.countByContentContaining("tái chế");
+        // Lượng rác tái chế được: số lượng bài viết * 10 (kg)
+        long totalPosts = postRepository.count();
+        long recycledWasteCount = totalPosts * 10;
         
         return CommunityDashboardResponse.builder()
                 .totalViolationReports(totalViolationReports)

@@ -33,8 +33,8 @@ const AQIDetailScreen = () => {
   const [loadingChart, setLoadingChart] = useState(true);
 
   const location = {
-    name: locationName || "Unknown",
-    city: locationCity || "Unknown",
+    name: locationName || "",
+    city: locationCity || "",
   };
 
   const isSensitive = isSensitiveGroup === "true" || isSensitiveGroup === true;
@@ -196,7 +196,7 @@ const AQIDetailScreen = () => {
           <View style={styles.summaryHeader}>
             <View style={styles.summaryLocationContainer}>
               <Text style={styles.summaryLocationText}>
-                {location.name}, {location.city}
+                {[location.name, location.city].filter(Boolean).join(", ") || "Vị trí hiện tại"}
               </Text>
               {isSensitive && (
                 <Text style={styles.summarySensitiveText}>
@@ -214,7 +214,7 @@ const AQIDetailScreen = () => {
                 <Text style={styles.summaryAqiLabel}>AQI</Text>
               </View>
               <Text style={[styles.summaryStatusText, { color }]}>
-                {status || "Unknown"}
+                {status || ""}
               </Text>
             </View>
           </View>

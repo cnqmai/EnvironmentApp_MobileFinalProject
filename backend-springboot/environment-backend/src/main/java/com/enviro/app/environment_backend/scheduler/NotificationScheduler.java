@@ -71,9 +71,59 @@ public class NotificationScheduler {
     }
     
     // ====================================================================
-    // FR-6.2: Nhắc nhở lịch thu gom rác (Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày)
+    // [TESTING] Scheduled task để test thông báo ngay lập tức
+    // Chạy mỗi 5 phút - CÓ THỂ COMMENT LẠI SAU KHI TEST XONG
     // ====================================================================
-    @Scheduled(cron = "0 0 8,9,13,14,22 * * ?")
+    // @Scheduled(fixedRate = 300000) // 5 phút = 300000ms
+    // public void testNotifications() {
+    //     System.out.println(">>> [TEST] Bắt đầu test thông báo...");
+    //     List<User> users = userRepository.findAll();
+    //     
+    //     for (User user : users) {
+    //         NotificationSettings settings = getOrCreateSettings(user);
+    //         
+    //         // Test FR-6.1: Chiến dịch
+    //         if (settings.getCampaignNotificationsEnabled()) {
+    //             notificationService.createNotification(
+    //                 user,
+    //                 "📢 [TEST] Chiến dịch Môi trường",
+    //                 "Đây là thông báo test cho chiến dịch môi trường địa phương.",
+    //                 NotificationType.CAMPAIGN,
+    //                 null
+    //             );
+    //         }
+    //         
+    //         // Test FR-6.2: Nhắc nhở thu gom
+    //         if (settings.getCollectionReminderEnabled()) {
+    //             notificationService.createNotification(
+    //                 user,
+    //                 "📅 [TEST] Nhắc nhở thu gom",
+    //                 "Đây là thông báo test cho nhắc nhở lịch thu gom rác tái chế.",
+    //                 NotificationType.COLLECTION_REMINDER,
+    //                 null
+    //             );
+    //         }
+    //         
+    //         // Test FR-6.3: Cảnh báo thời tiết
+    //         if (settings.getWeatherAlertEnabled()) {
+    //             notificationService.createNotification(
+    //                 user,
+    //                 "🌦️ [TEST] Cảnh báo thời tiết",
+    //                 "Đây là thông báo test cho cảnh báo thời tiết ảnh hưởng đến chất lượng không khí.",
+    //                 NotificationType.WEATHER_ALERT,
+    //                 null
+    //             );
+    //         }
+    //     }
+    //     System.out.println(">>> [TEST] Hoàn tất test thông báo.");
+    // }
+    
+    // ====================================================================
+    // FR-6.2: Nhắc nhở lịch thu gom rác
+    // [TESTING] Chạy mỗi 5 phút để test - ĐỔI LẠI CRON SAU KHI TEST XONG
+    // ====================================================================
+    @Scheduled(fixedRate = 300000) // 5 phút = 300000ms
+    // @Scheduled(cron = "0 0 8,9,13,14,22 * * ?") // [PRODUCTION] Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày
     public void scheduleCollectionReminder() {
         List<User> users = userRepository.findAll(); 
         
@@ -95,9 +145,11 @@ public class NotificationScheduler {
     }
     
     // ====================================================================
-    // FR-6.1: Thông báo chiến dịch môi trường (Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày)
+    // FR-6.1: Thông báo chiến dịch môi trường
+    // [TESTING] Chạy mỗi 5 phút để test - ĐỔI LẠI CRON SAU KHI TEST XONG
     // ====================================================================
-    @Scheduled(cron = "0 0 8,9,13,14,22 * * ?")
+    @Scheduled(fixedRate = 300000) // 5 phút = 300000ms
+    // @Scheduled(cron = "0 0 8,9,13,14,22 * * ?") // [PRODUCTION] Chạy lúc 8h, 9h, 13h, 14h, 22h mỗi ngày
     public void scheduleCampaignNotification() {
         List<User> users = userRepository.findAll();
         
@@ -120,9 +172,87 @@ public class NotificationScheduler {
     }
 
     // ====================================================================
+    // FR-6.3: Cảnh báo thời tiết ảnh hưởng đến chất lượng không khí
+    // [TESTING] Chạy mỗi 5 phút để test - ĐỔI LẠI CRON SAU KHI TEST XONG
+    // ====================================================================
+    @Scheduled(fixedRate = 300000) // 5 phút = 300000ms
+    // @Scheduled(cron = "0 0 6,12,18,0 * * ?") // [PRODUCTION] Chạy mỗi 6 giờ (lúc 6h, 12h, 18h, 0h mỗi ngày)
+    public void scheduleWeatherAlerts() {
+        List<User> users = userRepository.findAll();
+        
+        for (User user : users) {
+            NotificationSettings settings = getOrCreateSettings(user);
+            
+            if (!settings.getWeatherAlertEnabled() || user.getDefaultLocation() == null || user.getDefaultLocation().isEmpty()) {
+                continue;
+            }
+
+            try {
+                String defaultAddress = user.getDefaultLocation();
+                GeocodingResponse geoResponse = aqiService.geocodeAddress(defaultAddress);
+
+                if (geoResponse == null) continue; 
+                
+                double lat = geoResponse.getLat(); 
+                double lon = geoResponse.getLon(); 
+                
+                // Lấy dữ liệu thời tiết từ OpenWeatherMap API
+                String weatherUrl = String.format("%s?lat=%f&lon=%f&appid=%s", apiUrl, lat, lon, apiKey);
+                String weatherResponse = restTemplate.getForObject(weatherUrl, String.class);
+
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode root = mapper.readTree(weatherResponse);
+                
+                // Lấy thông tin thời tiết
+                JsonNode weatherData = root.path("list").get(0);
+                JsonNode main = weatherData.path("main");
+                JsonNode weather = weatherData.path("weather").get(0);
+                
+                double humidity = main.path("humidity").asDouble();
+                double pressure = main.path("pressure").asDouble();
+                String weatherMain = weather.path("main").asText();
+                String weatherDescription = weather.path("description").asText();
+                
+                // Kiểm tra điều kiện thời tiết ảnh hưởng đến chất lượng không khí
+                boolean shouldAlert = false;
+                String alertMessage = "";
+                
+                // Điều kiện: Độ ẩm cao (>80%) hoặc áp suất thấp (<1000 hPa) hoặc có sương mù/smog
+                if (humidity > 80) {
+                    shouldAlert = true;
+                    alertMessage = String.format("Độ ẩm cao (%d%%) tại %s có thể làm tăng nồng độ bụi mịn trong không khí. Hãy hạn chế ra ngoài nếu bạn thuộc nhóm nhạy cảm.", 
+                                                 (int)humidity, defaultAddress);
+                } else if (pressure < 1000) {
+                    shouldAlert = true;
+                    alertMessage = String.format("Áp suất không khí thấp (%.1f hPa) tại %s có thể khiến chất lượng không khí kém hơn. Hãy chú ý sức khỏe.", 
+                                                 pressure, defaultAddress);
+                } else if (weatherMain.equals("Fog") || weatherMain.equals("Mist") || weatherDescription.contains("haze") || weatherDescription.contains("smog")) {
+                    shouldAlert = true;
+                    alertMessage = String.format("Có %s tại %s. Điều kiện này có thể ảnh hưởng đến chất lượng không khí. Hãy đeo khẩu trang khi ra ngoài.", 
+                                                 weatherDescription, defaultAddress);
+                }
+                
+                if (shouldAlert) {
+                    notificationService.createNotification(
+                        user,
+                        "🌦️ Cảnh báo thời tiết",
+                        alertMessage,
+                        NotificationType.WEATHER_ALERT,
+                        null
+                    );
+                    System.out.println(">>> [Scheduler] Weather alert sent for " + user.getEmail() + " at " + defaultAddress);
+                }
+
+            } catch (Exception e) {
+                System.err.println("Error checking weather for " + user.getEmail() + ": " + e.getMessage());
+            }
+        }
+    }
+
+    // ====================================================================
     // FR-2.2.1: Cảnh báo AQI (Logic tính toán chính xác hơn)
     // ====================================================================
-    @Scheduled(fixedRate = 3600000) 
+    @Scheduled(fixedRate = 300000) 
     public void scheduleAqiAlerts() {
         List<User> users = userRepository.findAll();
         

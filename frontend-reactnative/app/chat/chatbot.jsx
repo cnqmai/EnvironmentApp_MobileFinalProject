@@ -8,11 +8,13 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
-  Alert
+  Alert,
+  ScrollView
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, Avatar, IconButton, Searchbar } from "react-native-paper";
 import { useRouter, useFocusEffect } from "expo-router"; // Dùng useFocusEffect để reload khi quay lại
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import typography from "../../styles/typography";
 
 // Import Services (Đảm bảo bạn đã cập nhật chatbotService.js như hướng dẫn trước)
@@ -21,6 +23,116 @@ import { getToken } from "../../src/utils/apiHelper";
 
 // Hàm tạo ID tạm thời (nếu không cài expo-crypto)
 const generateTempId = () => Math.random().toString(36).substr(2, 9) + "-" + Date.now();
+
+// Hàm xác định mùa/sự kiện hiện tại
+const getCurrentSeasonAndEvents = () => {
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1-12
+  const day = now.getDate();
+  
+  let season = "";
+  let events = [];
+  
+  // Xác định mùa
+  if (month >= 3 && month <= 5) {
+    season = "Xuân";
+  } else if (month >= 6 && month <= 8) {
+    season = "Hè";
+  } else if (month >= 9 && month <= 11) {
+    season = "Thu";
+  } else {
+    season = "Đông";
+  }
+  
+  // Xác định sự kiện đặc biệt
+  if (month === 1 && day === 1) {
+    events.push({ name: "Năm mới", icon: "🎉" });
+  }
+  if (month === 2 && day === 14) {
+    events.push({ name: "Valentine", icon: "💝" });
+  }
+  if (month === 3 && day >= 20 && day <= 22) {
+    events.push({ name: "Ngày Nước Thế giới", icon: "💧" });
+  }
+  if (month === 4 && day === 22) {
+    events.push({ name: "Ngày Trái Đất", icon: "🌍" });
+  }
+  if (month === 5 && day === 5) {
+    events.push({ name: "Ngày Môi trường Thế giới", icon: "🌱" });
+  }
+  if (month === 6 && day === 5) {
+    events.push({ name: "Ngày Môi trường Thế giới", icon: "🌍" });
+  }
+  if (month === 9 && day >= 15 && day <= 17) {
+    events.push({ name: "Tuần lễ Xanh", icon: "🌿" });
+  }
+  if (month === 10 && day === 31) {
+    events.push({ name: "Halloween", icon: "🎃" });
+  }
+  if (month === 12 && day === 25) {
+    events.push({ name: "Giáng sinh", icon: "🎄" });
+  }
+  
+  return { season, events, month };
+};
+
+// Dữ liệu gợi ý hành động theo mùa/sự kiện
+const getSeasonalActions = (season, month, events) => {
+  const allActions = {
+    Xuân: [
+      { icon: "🌸", title: "Trồng cây xanh", description: "Mùa xuân là thời điểm lý tưởng để trồng cây, tạo không gian xanh cho ngôi nhà" },
+      { icon: "🧹", title: "Dọn dẹp nhà cửa", description: "Tận dụng ánh sáng tự nhiên, mở cửa sổ thay vì dùng đèn điện" },
+      { icon: "🚶", title: "Đi bộ nhiều hơn", description: "Thời tiết mát mẻ, hãy đi bộ thay vì đi xe để giảm khí thải" },
+      { icon: "🌱", title: "Bắt đầu vườn rau", description: "Trồng rau sạch tại nhà, vừa tiết kiệm vừa bảo vệ môi trường" },
+    ],
+    Hè: [
+      { icon: "💧", title: "Tiết kiệm nước", description: "Mùa hè nóng bức, hãy tái sử dụng nước và tưới cây vào sáng sớm" },
+      { icon: "🌞", title: "Sử dụng năng lượng mặt trời", description: "Phơi quần áo ngoài trời, tắt điều hòa khi không cần thiết" },
+      { icon: "🍉", title: "Ăn trái cây theo mùa", description: "Chọn trái cây địa phương, giảm vận chuyển và đóng gói" },
+      { icon: "🏊", title: "Bảo vệ nguồn nước", description: "Không xả rác xuống biển, sông hồ khi đi du lịch" },
+    ],
+    Thu: [
+      { icon: "🍂", title: "Thu gom lá rụng", description: "Ủ lá rụng thành phân hữu cơ thay vì đốt" },
+      { icon: "🧥", title: "Quyên góp quần áo", description: "Dọn tủ quần áo, quyên góp cho người cần thay vì vứt bỏ" },
+      { icon: "🌾", title: "Mua thực phẩm địa phương", description: "Hỗ trợ nông dân địa phương, giảm khí thải vận chuyển" },
+      { icon: "🏠", title: "Chuẩn bị cho mùa đông", description: "Kiểm tra cách nhiệt nhà cửa, tiết kiệm năng lượng sưởi ấm" },
+    ],
+    Đông: [
+      { icon: "🔥", title: "Tiết kiệm năng lượng", description: "Mặc ấm hơn, giảm nhiệt độ sưởi, tắt đèn không cần thiết" },
+      { icon: "🧣", title: "Tái sử dụng đồ cũ", description: "Sửa chữa, tái chế đồ dùng thay vì mua mới" },
+      { icon: "🍲", title: "Nấu ăn tại nhà", description: "Nấu ăn tại nhà, giảm đóng gói và vận chuyển từ nhà hàng" },
+      { icon: "🎁", title: "Quà tặng bền vững", description: "Chọn quà tặng thân thiện môi trường, tránh đóng gói quá mức" },
+    ],
+  };
+  
+  let actions = allActions[season] || [];
+  
+  // Thêm hành động đặc biệt theo sự kiện
+  if (events.length > 0) {
+    const eventActions = {
+      "Ngày Trái Đất": [
+        { icon: "🌍", title: "Tham gia dọn rác cộng đồng", description: "Tham gia hoạt động dọn dẹp môi trường tại địa phương" },
+        { icon: "♻️", title: "Cam kết giảm rác thải", description: "Đặt mục tiêu giảm rác thải nhựa trong tháng này" },
+      ],
+      "Ngày Môi trường Thế giới": [
+        { icon: "🌱", title: "Trồng một cây xanh", description: "Trồng cây để góp phần làm sạch không khí" },
+        { icon: "🚲", title: "Đi xe đạp thay vì xe máy", description: "Giảm khí thải bằng cách đi xe đạp trong ngày" },
+      ],
+      "Ngày Nước Thế giới": [
+        { icon: "💧", title: "Kiểm tra rò rỉ nước", description: "Sửa chữa vòi nước bị rò rỉ để tiết kiệm nước" },
+        { icon: "🚿", title: "Rút ngắn thời gian tắm", description: "Giảm thời gian tắm để tiết kiệm nước" },
+      ],
+    };
+    
+    events.forEach(event => {
+      if (eventActions[event.name]) {
+        actions = [...eventActions[event.name], ...actions];
+      }
+    });
+  }
+  
+  return actions.slice(0, 4); // Chỉ hiển thị 4 hành động
+};
 
 const ChatBot = () => {
   const router = useRouter();
@@ -222,6 +334,61 @@ const ChatBot = () => {
     </View>
   );
 
+  // Component hiển thị gợi ý hành động theo mùa/sự kiện
+  const SeasonalActionsFooter = () => {
+    const { season, events, month } = getCurrentSeasonAndEvents();
+    const actions = getSeasonalActions(season, month, events);
+    
+    return (
+      <View style={styles.seasonalContainer}>
+        <View style={styles.seasonalHeader}>
+          <MaterialCommunityIcons name="lightbulb-on" size={24} color="#FF9800" />
+          <View style={styles.seasonalHeaderText}>
+            <Text style={styles.seasonalTitle}>Gợi ý hành động {season}</Text>
+            {events.length > 0 && (
+              <Text style={styles.seasonalSubtitle}>
+                {events.map(e => e.icon + " " + e.name).join(" • ")}
+              </Text>
+            )}
+          </View>
+        </View>
+        
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.actionsScroll}
+        >
+          {actions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.actionCard}
+              activeOpacity={0.7}
+              onPress={() => {
+                // Khi nhấn vào hành động, tạo chat mới với chủ đề này
+                createNewChat({
+                  id: `action-${index}`,
+                  title: action.title,
+                  icon: action.icon,
+                  description: action.description
+                });
+              }}
+            >
+              <View style={styles.actionIconContainer}>
+                <Text style={styles.actionIcon}>{action.icon}</Text>
+              </View>
+              <Text style={styles.actionTitle} numberOfLines={1}>
+                {action.title}
+              </Text>
+              <Text style={styles.actionDescription} numberOfLines={2}>
+                {action.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
@@ -267,6 +434,7 @@ const ChatBot = () => {
             filteredSessions.length === 0 && styles.emptyList,
           ]}
           ListEmptyComponent={EmptyState}
+          ListFooterComponent={SeasonalActionsFooter}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4CAF50"/>
@@ -580,6 +748,76 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: "#666",
     fontSize: 12,
+  },
+
+  // Seasonal Actions Styles
+  seasonalContainer: {
+    marginTop: 24,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+  },
+  seasonalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  seasonalHeaderText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  seasonalTitle: {
+    ...typography.h3,
+    fontWeight: "700",
+    color: "#0A0A0A",
+    fontSize: 18,
+  },
+  seasonalSubtitle: {
+    ...typography.body,
+    color: "#666",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  actionsScroll: {
+    paddingRight: 16,
+  },
+  actionCard: {
+    width: 160,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  actionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFF3E0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  actionIcon: {
+    fontSize: 24,
+  },
+  actionTitle: {
+    ...typography.h3,
+    fontWeight: "600",
+    color: "#0A0A0A",
+    fontSize: 15,
+    marginBottom: 6,
+  },
+  actionDescription: {
+    ...typography.body,
+    color: "#666",
+    fontSize: 12,
+    lineHeight: 16,
   },
 });
 

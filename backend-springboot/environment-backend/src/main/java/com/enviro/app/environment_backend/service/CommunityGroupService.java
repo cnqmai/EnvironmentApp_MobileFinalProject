@@ -8,6 +8,8 @@ import com.enviro.app.environment_backend.model.User;
 import com.enviro.app.environment_backend.repository.CommunityGroupRepository;
 import com.enviro.app.environment_backend.repository.GroupMemberRepository;
 import com.enviro.app.environment_backend.repository.UserRepository; // Import mới
+import com.enviro.app.environment_backend.repository.ReportRepository;
+import com.enviro.app.environment_backend.repository.PostRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,16 +27,22 @@ public class CommunityGroupService {
     private final GroupMemberRepository memberRepository;
     private final UserRepository userRepository; // Inject User Repo
     private final BadgeService badgeService;     // Inject Badge Service
+    private final ReportRepository reportRepository; // Inject Report Repository
+    private final PostRepository postRepository;     // Inject Post Repository
 
-    // Cập nhật Constructor để inject thêm UserRepository và BadgeService
+    // Cập nhật Constructor để inject thêm UserRepository, BadgeService, ReportRepository và PostRepository
     public CommunityGroupService(CommunityGroupRepository groupRepository,
                                 GroupMemberRepository memberRepository,
                                 UserRepository userRepository,
-                                BadgeService badgeService) {
+                                BadgeService badgeService,
+                                ReportRepository reportRepository,
+                                PostRepository postRepository) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.badgeService = badgeService;
+        this.reportRepository = reportRepository;
+        this.postRepository = postRepository;
     }
 
     public List<CommunityGroupResponse> getAllGroups(User currentUser) {
@@ -131,9 +139,21 @@ public class CommunityGroupService {
             role = member.map(GroupMember::getRole).orElse(null);
         }
         
-        // --- LOGIC MOCK/TÍNH TOÁN CHO DASHBOARD (FR-12.1.2) ---
-        Integer mockTotalReports = group.getMemberCount() * 3;
-        Double mockRecycledWaste = group.getMemberCount() * 50.5;
+        // --- TÍNH TOÁN THỰC TẾ CHO DASHBOARD (FR-12.1.2) ---
+        // Lấy tất cả thành viên trong nhóm
+        List<GroupMember> groupMembers = memberRepository.findByGroupOrderByJoinedAtDesc(group);
+        
+        // Tính tổng số báo cáo vi phạm của tất cả thành viên trong nhóm
+        Integer totalReports = groupMembers.stream()
+                .mapToInt(member -> (int) reportRepository.countByUser(member.getUser()))
+                .sum();
+        
+        // Tính tổng số posts của các thành viên trong nhóm
+        // Lượng rác tái chế = số lượng bài viết * 10 (kg)
+        long totalPosts = groupMembers.stream()
+                .mapToLong(member -> postRepository.findByUserIdOrderByCreatedAtDesc(member.getUser().getId()).size())
+                .sum();
+        Double recycledWasteKg = (double) (totalPosts * 10);
         // --------------------------------------------------------
 
         return CommunityGroupResponse.builder()
@@ -149,9 +169,9 @@ public class CommunityGroupService {
                 .isMember(isMember)
                 .role(role)
                 .createdAt(group.getCreatedAt())
-                // Ánh xạ dữ liệu Dashboard
-                .totalReports(mockTotalReports)
-                .recycledWasteKg(mockRecycledWaste)
+                // Ánh xạ dữ liệu Dashboard thực tế
+                .totalReports(totalReports)
+                .recycledWasteKg(recycledWasteKg)
                 .imageUrl(group.getImageUrl()) // [CẬP NHẬT] Ánh xạ imageUrl
                 .build();
     }
