@@ -3,8 +3,12 @@ package com.enviro.app.environment_backend.service;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.Arrays;
 import java.nio.file.Files; 
 import java.nio.file.Path; 
 import java.nio.file.Paths; 
@@ -64,6 +68,7 @@ public class UserService {
     private final UserRewardRepository userRewardRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final Set<String> adminEmails;
 
     // Đường dẫn upload (được inject từ application.properties)
     @Value("${app.upload.dir:uploads}")
@@ -84,7 +89,8 @@ public class UserService {
                   NotificationRepository notificationRepository,
                   UserRewardRepository userRewardRepository,
                   PasswordEncoder passwordEncoder,
-                  NotificationService notificationService) { 
+                  NotificationService notificationService,
+                  @Value("${app.security.admin-emails:}") String adminEmailsConfig) { 
     this.userRepository = userRepository;
     this.reportRepository = reportRepository;
     this.savedLocationRepository = savedLocationRepository;
@@ -100,6 +106,12 @@ public class UserService {
     this.userRewardRepository = userRewardRepository;
     this.passwordEncoder = passwordEncoder;
     this.notificationService = notificationService;
+    String adminEmailsRaw = adminEmailsConfig == null ? "" : adminEmailsConfig;
+    this.adminEmails = Arrays.stream(adminEmailsRaw.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .map(s -> s.toLowerCase(Locale.ROOT))
+            .collect(Collectors.toSet());
 }
 
     public Optional<User> findById(UUID id) {
@@ -412,6 +424,13 @@ public class UserService {
         }
         
         return user;
+    }
+
+    public boolean isAdmin(User user) {
+        if (user == null || user.getEmail() == null) {
+            return false;
+        }
+        return adminEmails.contains(user.getEmail().toLowerCase(Locale.ROOT));
     }
     
     /**

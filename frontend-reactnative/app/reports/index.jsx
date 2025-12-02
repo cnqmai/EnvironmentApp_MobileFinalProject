@@ -28,19 +28,42 @@ const ReportList = () => {
     }
   };
 
+  const normalizeStatus = (status) => {
+    if (!status) return null;
+    const statusStr = String(status).toUpperCase();
+    switch (statusStr) {
+      case 'RECEIVED':
+        return 'RECEIVED';
+      case 'IN_PROGRESS':
+      case 'PROCESSING':
+        return 'IN_PROGRESS';
+      case 'RESOLVED':
+      case 'COMPLETED':
+        return 'RESOLVED';
+      case 'REJECTED':
+        return 'REJECTED';
+      default:
+        return statusStr;
+    }
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'COMPLETED': return '#4CAF50'; 
-      case 'PROCESSING': return '#2196F3'; 
-      default: return '#757575'; 
+    switch (normalizeStatus(status)) {
+      case 'RECEIVED': return '#757575';
+      case 'IN_PROGRESS': return '#2196F3';
+      case 'RESOLVED': return '#4CAF50';
+      case 'REJECTED': return '#F44336';
+      default: return '#757575';
     }
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case 'COMPLETED': return 'Hoàn thành';
-      case 'PROCESSING': return 'Đang xử lý';
-      default: return 'Đang xử lý'; 
+    switch (normalizeStatus(status)) {
+      case 'RECEIVED': return 'Đã gửi';
+      case 'IN_PROGRESS': return 'Đang xử lý';
+      case 'RESOLVED': return 'Hoàn thành';
+      case 'REJECTED': return 'Đã từ chối';
+      default: return 'Không xác định';
     }
   };
 

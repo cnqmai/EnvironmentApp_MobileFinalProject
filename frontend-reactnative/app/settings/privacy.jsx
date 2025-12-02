@@ -115,7 +115,7 @@ const PrivacySettingScreen = () => {
 
         <View style={styles.settingsSection}>
           <View style={styles.settingItem}>
-            <Text style={styles.settingTitle}>Mã hóa dữ liệu (FR-7.1)</Text>
+            <Text style={styles.settingTitle}>Mã hóa dữ liệu</Text>
             <Text style={styles.settingDescription}>
               Tất cả dữ liệu của nhân của bạn được mã hóa để đảm bảo an toàn.
             </Text>

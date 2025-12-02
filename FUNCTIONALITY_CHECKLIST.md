@@ -73,11 +73,15 @@
 
 ## ⚠️ CẦN BỔ SUNG (Tùy chọn)
 
-1. **UI Admin để thay đổi trạng thái báo cáo** (FR-4.2.2)
+1. ✅ **UI Admin để thay đổi trạng thái báo cáo** (FR-4.2.2) - **ĐÃ HOÀN THÀNH**
    - Backend đã có API: `PATCH /api/reports/{id}/status`
-   - Có thể thêm UI trong trang chi tiết báo cáo nếu user có quyền admin
-   - **File cần sửa**: `frontend-reactnative/app/reports/[id].jsx`
-   - **Service đã có**: `updateReportStatus` trong `reportService.js`
+   - ✅ Đã thêm UI trong trang chi tiết báo cáo với modal chọn trạng thái
+   - ✅ **File đã sửa**: `frontend-reactnative/app/reports/[id].jsx`
+   - ✅ **Service đã có**: `updateReportStatus` trong `reportService.js`
+   - ✅ Hiển thị section "Quản trị viên" với nút "Thay đổi trạng thái"
+   - ✅ Modal cho phép chọn trạng thái mới: Đã gửi, Đang xử lý, Hoàn thành, Từ chối
+   - ✅ Xử lý loading và error states
+   - ✅ Cập nhật UI sau khi thay đổi thành công
 
 ---
 

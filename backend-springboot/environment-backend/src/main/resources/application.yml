@@ -94,6 +94,7 @@ app:
       
       # [MỚI] Link Ngrok của bạn (Phải khớp 100% với code frontend và Google Console)
       redirect-uri: "https://eructative-prodeportation-nikola.ngrok-free.dev/api/auth/callback/google"
+    admin-emails: "cnqmai@gmail.com"
 
 
 # Cấu hình Reset Password

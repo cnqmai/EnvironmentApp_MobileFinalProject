@@ -60,6 +60,11 @@ public class ReportController {
     public ResponseEntity<Report> updateReportStatus(
             @PathVariable Long id,
             @Valid @RequestBody ReportStatusUpdateRequest request) {
+        User currentUser = getCurrentUser();
+        if (!userService.isAdmin(currentUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền cập nhật trạng thái báo cáo.");
+        }
+
         Report updatedReport = reportService.updateReportStatus(id, request.getNewStatus());
         return ResponseEntity.ok(updatedReport);
     }
